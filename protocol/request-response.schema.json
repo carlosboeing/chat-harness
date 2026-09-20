@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/carlosboeing/chatgpt-github-capability-bridge/protocol/request-response.schema.json",
+  "title": "ChatGPT GitHub Capability Bridge Protocol",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["version", "capability", "input"],
+      "properties": {
+        "version": { "const": 1 },
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "capability": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "input": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "required": ["version", "capability", "ok", "state", "result"],
+      "properties": {
+        "version": { "const": 1 },
+        "request_id": { "type": ["string", "null"] },
+        "capability": { "type": "string" },
+        "ok": { "type": "boolean" },
+        "state": { "type": "string" },
+        "result": {},
+        "error": {
+          "type": ["object", "null"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          },
+          "required": ["code", "message"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
