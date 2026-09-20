@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "capabilities": {
+    "linkedin.job.lookup": {
+      "description": "Resolve one public LinkedIn job by numeric job ID using LinkedIn's unauthenticated guest job endpoint.",
+      "handler": "capabilities/linkedin-job/handler.mjs",
+      "side_effects": "read-only",
+      "timeout_seconds": 15,
+      "max_output_chars": 30000,
+      "network_policy": {
+        "scheme": "https",
+        "hosts": ["www.linkedin.com", "linkedin.com", "*.linkedin.com"],
+        "request_template": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
+      },
+      "input": {
+        "type": "object",
+        "required": ["job_id"],
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "pattern": "^[0-9]{6,20}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
