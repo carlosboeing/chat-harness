@@ -41,9 +41,9 @@ function escapeRegex(value) {
 function extractByClass(html, className) {
   const escaped = escapeRegex(className);
   const pattern = new RegExp(
-    "<([a-zA-Z0-9]+)\\\\b[^>]*class=[\\\"'][^\\\"']*" +
+    "<([a-zA-Z0-9]+)\\b[^>]*class=[\"'][^\"']*" +
       escaped +
-      "[^\\\"']*[\\\"'][^>]*>([\\\\s\\\\S]*?)<\\\\/\\\\1>",
+      "[^\"']*[\"'][^>]*>([\\s\\S]*?)<\\/\\1>",
     "i",
   );
   const match = html.match(pattern);
