@@ -16,11 +16,23 @@ jobs:
   dispatch:
     if: github.event.issue.author_association == 'OWNER' && startsWith(github.event.issue.title, '[capability] ')
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 5
 
     steps:
       - name: Checkout bridge
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve capability runtime
+        id: runtime
+        env:
+          CAPABILITY_REQUEST: ${{ github.event.issue.body }}
+        run: node src/resolve-runtime.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Install browser runtime
+        if: steps.runtime.outputs.runtime == 'browser'
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts playwright@1.55.0
+          npx playwright install --with-deps chromium
 
       - name: Run capability
         env:
