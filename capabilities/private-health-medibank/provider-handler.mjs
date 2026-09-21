@@ -49,6 +49,24 @@ async function collectPageDiagnostics(page) {
     frames.push({
       url: frame.url(),
       name: frame.name(),
+      links: await frame
+        .locator("a[href]")
+        .evaluateAll((nodes) =>
+          nodes
+            .map((node) => ({
+              text: (node.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 180),
+              href: node.href,
+              aria_label: node.getAttribute("aria-label"),
+            }))
+            .filter(
+              (x) =>
+                /provider|dentist|hospital|member/i.test(x.text) ||
+                /provider|dentist|hospital|member/i.test(x.href) ||
+                /provider|dentist|hospital|member/i.test(x.aria_label ?? ""),
+            )
+            .slice(0, 80),
+        )
+        .catch(() => []),
       controls: await frame
         .locator("input, button, select")
         .evaluateAll((nodes) =>
