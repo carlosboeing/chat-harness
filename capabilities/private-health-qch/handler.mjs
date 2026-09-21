@@ -149,6 +149,10 @@ async function clickVisibleText(page, text, timeout = 10_000) {
   throw new Error("Visible control not found for text: " + text);
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^\${}()|[\]\\]/g, "\\$&");
+}
+
 function extractEvidence(bodyText, hospitalProduct, extrasProduct) {
   const normalized = bodyText.replace(/\s+/g, " ").trim();
   const lower = normalized.toLowerCase();
@@ -166,24 +170,10 @@ function extractEvidence(bodyText, hospitalProduct, extrasProduct) {
 
   const prices = [...snippet.matchAll(/\$\s?\d+(?:\.\d{2})?/g)].map((m) => m[0]);
 
-  const escapedHospital = hospitalProduct.replace(/[.*+?^$()|[\]\\]/g, "\\  return {
-    hospital_product_found: hospitalIndex >= 0,
-    extras_product_found: extrasIndex >= 0,
-    prices: [...new Set(prices)].slice(0, 10),
-    evidence_snippet: snippet.slice(0, 2_500),
-  };
-}");
-  const escapedExtras = extrasProduct.replace(/[.*+?^$()|[\]\\]/g, "\\  return {
-    hospital_product_found: hospitalIndex >= 0,
-    extras_product_found: extrasIndex >= 0,
-    prices: [...new Set(prices)].slice(0, 10),
-    evidence_snippet: snippet.slice(0, 2_500),
-  };
-}");
   const summaryPattern = new RegExp(
-    escapedHospital +
+    escapeRegex(hospitalProduct) +
       "\\s*\\$\\s*(\\d+(?:\\.\\d{2})?)\\s*" +
-      escapedExtras +
+      escapeRegex(extrasProduct) +
       "\\s*\\$\\s*(\\d+(?:\\.\\d{2})?)\\s*" +
       "(\\d+(?:\\.\\d{2})?)\\s*Payment frequency",
     "i",
