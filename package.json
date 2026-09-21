@@ -7,7 +7,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test"
+    "validate": "node scripts/validate-registry.mjs",
+    "test": "node --test",
+    "smoke:browser": "node scripts/smoke-browser-runtime.mjs"
   },
   "dependencies": {
     "playwright": "1.63.0"
