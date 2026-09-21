@@ -22,6 +22,7 @@ The GitHub transport is replaceable. Capability names and request/result contrac
 - `linkedin.job.lookup` — read-only lookup of one public LinkedIn job by numeric job ID through LinkedIn's unauthenticated guest job endpoint.
 - `private-health.quote.qch` — experimental read-only browser-backed smoke test of Queensland Country Health Fund's quote flow using a fixed synthetic household profile. It does not submit contact details or join/purchase.
 - `private-health.hospital.qch` — experimental read-only browser-backed lookup of allowlisted hospitals in Queensland Country Health Fund's public hospital network search.
+- `private-health.provider.medibank` — experimental read-only browser-backed lookup of the allowlisted Budi Dental entry in Medibank's public Members' Choice provider finder.
 
 ## Request protocol
 
