@@ -3,6 +3,13 @@ const ALLOWED_TOP_LEVEL_HOSTS = new Set([
   "www.queenslandcountry.health",
   "queenslandcountry.health",
 ]);
+const SUPPORTED_HOSPITAL_PRODUCTS = new Map([
+  ["Signature Hospital (Silver+)", "Choose Signature Hospital"],
+]);
+const SUPPORTED_EXTRAS_PRODUCTS = new Map([
+  ["Select Extras", "Choose Select Extras"],
+]);
+
 const SYNTHETIC_PROFILE = Object.freeze({
   profile_ref: "synthetic-family-qld-v1",
   cover_type: "Family",
@@ -45,6 +52,13 @@ function assertInput(input) {
     ) {
       throw new Error(key + " must be a non-empty string up to 120 characters.");
     }
+  }
+
+  if (!SUPPORTED_HOSPITAL_PRODUCTS.has(input.hospital_product)) {
+    throw new Error("Unsupported hospital product for this experiment.");
+  }
+  if (!SUPPORTED_EXTRAS_PRODUCTS.has(input.extras_product)) {
+    throw new Error("Unsupported extras product for this experiment.");
   }
 }
 
@@ -226,7 +240,35 @@ export async function run(input, context = {}) {
         timeout: 10_000,
       });
       await page.waitForLoadState("domcontentloaded", { timeout: 20_000 }).catch(() => {});
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(1_000);
+
+      const hospitalButtonName = SUPPORTED_HOSPITAL_PRODUCTS.get(input.hospital_product);
+      const hospitalButton = page.getByRole("button", {
+        name: hospitalButtonName,
+        exact: true,
+      });
+      await hospitalButton.waitFor({ state: "visible", timeout: 10_000 });
+      await hospitalButton.click();
+      await page.waitForTimeout(800);
+
+      let currentText = await page.locator("body").innerText();
+      if (!currentText.includes(input.extras_product)) {
+        const extrasTab = page.getByRole("button", { name: /choose extras/i }).first();
+        if ((await extrasTab.count()) > 0) {
+          await extrasTab.click();
+          await page.waitForTimeout(800);
+        }
+      }
+
+      const extrasButtonName = SUPPORTED_EXTRAS_PRODUCTS.get(input.extras_product);
+      const extrasButton = page.getByRole("button", {
+        name: extrasButtonName,
+        exact: true,
+      });
+      if ((await extrasButton.count()) > 0) {
+        await extrasButton.click();
+        await page.waitForTimeout(1_000);
+      }
 
       const bodyText = await page.locator("body").innerText();
       const evidence = extractEvidence(
