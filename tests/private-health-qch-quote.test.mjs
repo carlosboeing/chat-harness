@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  extractQuoteFromText,
+  parseReviewEvidence,
   validateInput,
 } from "../capabilities/private-health-qch-quote/handler.mjs";
 
@@ -11,6 +11,7 @@ const validInput = {
   hospital_product: "Signature Hospital (Silver+)",
   extras_product: "Select Extras",
   excess: 750,
+  payment_frequency: "monthly",
 };
 
 test("accepts only the approved synthetic QCH quote contract", () => {
@@ -33,40 +34,70 @@ test("rejects arbitrary input fields", () => {
   assert.equal(invalid.error.code, "UNEXPECTED_INPUT");
 });
 
-test("extracts a matching quote evidence line", () => {
-  const text = [
-    "Signature Hospital (Silver+)",
-    "$750 excess",
-    "Select Extras",
-    "Your quote $412.34 per month",
-  ].join("\n");
+test("rejects unregistered payment frequencies", () => {
+  const invalid = validateInput({
+    ...validInput,
+    payment_frequency: "weekly",
+  });
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.error.code, "UNSUPPORTED_PAYMENT_FREQUENCY");
+});
 
-  assert.deepEqual(
-    extractQuoteFromText(
-      text,
-      validInput.hospital_product,
-      validInput.extras_product,
-      validInput.excess,
-    ),
-    {
-      product_match: true,
-      excess_match: true,
-      premium_amount: 412.34,
-      frequency: "month",
-      evidence_line: "Your quote $412.34 per month",
-    },
+test("parses internally consistent exact review evidence", () => {
+  const result = parseReviewEvidence({
+    bodyText: [
+      "Signature Hospital (Silver+) $269.00",
+      "Select Extras $76.00",
+      "Prices quoted reflect Government Rebate of 24.118%",
+      "Age based discount of 0%",
+      "Lifetime Health Cover loading of 0%",
+    ].join("\n"),
+    summaryText: "Family in QLD $345.00 Monthly with $750 hospital excess",
+    selectedFrequency: "monthly",
+    selectedExcess: true,
+    combinedProductId: "FSG750LQ",
+  });
+
+  assert.deepEqual(result, {
+    product_match: true,
+    excess_match: true,
+    payment_frequency_match: true,
+    combined_product_id: "FSG750LQ",
+    premium_amount: 345,
+    frequency: "monthly",
+    hospital_component: 269,
+    extras_component: 76,
+    government_rebate_percent: 24.118,
+    age_based_discount_percent: 0,
+    lifetime_health_cover_loading_percent: 0,
+    evidence_summary: "Family in QLD $345.00 Monthly with $750 hospital excess",
+  });
+});
+
+test("rejects inconsistent combined premium", () => {
+  assert.equal(
+    parseReviewEvidence({
+      bodyText:
+        "Signature Hospital (Silver+) $269.00\nSelect Extras $76.00",
+      summaryText: "Family in QLD $999.00 Monthly with $750 hospital excess",
+      selectedFrequency: "monthly",
+      selectedExcess: true,
+      combinedProductId: "FSG750LQ",
+    }),
+    null,
   );
 });
 
-test("does not accept a premium without exact product evidence", () => {
-  const text = "Different Hospital\nSelect Extras\n$300 per month";
+test("rejects evidence when the requested excess is not selected", () => {
   assert.equal(
-    extractQuoteFromText(
-      text,
-      validInput.hospital_product,
-      validInput.extras_product,
-      validInput.excess,
-    ),
+    parseReviewEvidence({
+      bodyText:
+        "Signature Hospital (Silver+) $269.00\nSelect Extras $76.00",
+      summaryText: "Family in QLD $345.00 Monthly with $750 hospital excess",
+      selectedFrequency: "monthly",
+      selectedExcess: false,
+      combinedProductId: "FSG750LQ",
+    }),
     null,
   );
 });
