@@ -70,14 +70,19 @@ async function collectVisibleControls(page) {
 
 async function checkByLabel(page, label, exact = true) {
   const locator = page.getByLabel(label, { exact }).first();
-  await locator.waitFor({ state: "visible", timeout: 8_000 });
-  await locator.check({ timeout: 8_000 });
+  await locator.waitFor({ state: "attached", timeout: 8_000 });
+  await locator.check({ force: true, timeout: 8_000 });
 }
 
-async function fillByLabel(page, pattern, value) {
-  const locator = page.getByLabel(pattern).first();
-  await locator.waitFor({ state: "visible", timeout: 8_000 });
-  await locator.fill(value, { timeout: 8_000 });
+async function fillField(page, selectors, value) {
+  for (const selector of selectors) {
+    const locator = page.locator(selector).first();
+    if ((await locator.count()) === 0) continue;
+    await locator.waitFor({ state: "attached", timeout: 8_000 });
+    await locator.fill(value, { timeout: 8_000 });
+    return;
+  }
+  throw new Error("Expected quote field was not found: " + selectors.join(", "));
 }
 
 async function selectFirstMeaningfulOption(page) {
@@ -197,9 +202,9 @@ export async function run(input, context = {}) {
     }
 
     try {
-      await checkByLabel(page, SYNTHETIC_PROFILE.cover_type);
-      await checkByLabel(page, SYNTHETIC_PROFILE.state);
-      await fillByLabel(page, /What is your age/i, SYNTHETIC_PROFILE.primary_age);
+      await page.locator("#CoverType_family").check({ force: true });
+      await page.locator("#state_QLD").check({ force: true });
+      await fillField(page, ["#Member_Age", 'input[name="Member_Age"]'], SYNTHETIC_PROFILE.primary_age);
 
       const yesRadios = page.getByLabel("Yes", { exact: true });
       const noRadios = page.getByLabel("No", { exact: true });
@@ -208,10 +213,14 @@ export async function run(input, context = {}) {
         throw new Error("Expected quote eligibility radio groups were not found.");
       }
 
-      await yesRadios.nth(0).check();
-      await fillByLabel(page, /partner's age/i, SYNTHETIC_PROFILE.partner_age);
-      await yesRadios.nth(1).check();
-      await noRadios.nth(2).check();
+      await yesRadios.nth(0).check({ force: true });
+      await fillField(
+        page,
+        ["#Partner_Age", 'input[name="Partner_Age"]', 'input[name*="Partner"][type="number"]'],
+        SYNTHETIC_PROFILE.partner_age,
+      );
+      await yesRadios.nth(1).check({ force: true });
+      await noRadios.nth(2).check({ force: true });
 
       const selectedIncomeOptions = await selectFirstMeaningfulOption(page);
 
