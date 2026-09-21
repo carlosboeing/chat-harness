@@ -10,12 +10,18 @@
       "max_output_chars": 30000,
       "network_policy": {
         "scheme": "https",
-        "hosts": ["www.linkedin.com", "linkedin.com", "*.linkedin.com"],
+        "hosts": [
+          "www.linkedin.com",
+          "linkedin.com",
+          "*.linkedin.com"
+        ],
         "request_template": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
       },
       "input": {
         "type": "object",
-        "required": ["job_id"],
+        "required": [
+          "job_id"
+        ],
         "properties": {
           "job_id": {
             "type": "string",
@@ -34,16 +40,27 @@
       "max_output_chars": 20000,
       "network_policy": {
         "scheme": "https",
-        "top_level_hosts": ["www.queenslandcountry.health", "queenslandcountry.health"],
+        "top_level_hosts": [
+          "www.queenslandcountry.health",
+          "queenslandcountry.health"
+        ],
         "start_url": "https://www.queenslandcountry.health/cover-selector-new/"
       },
       "input": {
         "type": "object",
-        "required": ["profile_ref", "hospital_product", "extras_product", "excess", "payment_frequency"],
+        "required": [
+          "profile_ref",
+          "hospital_product",
+          "extras_product",
+          "excess",
+          "payment_frequency"
+        ],
         "properties": {
           "profile_ref": {
             "type": "string",
-            "enum": ["synthetic-family-qld-v1"]
+            "enum": [
+              "synthetic-family-qld-v1"
+            ]
           },
           "hospital_product": {
             "type": "string",
@@ -57,11 +74,47 @@
           },
           "excess": {
             "type": "integer",
-            "enum": [750]
+            "enum": [
+              750
+            ]
           },
           "payment_frequency": {
             "type": "string",
-            "enum": ["weekly"]
+            "enum": [
+              "weekly"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "private-health.hospital.qch": {
+      "description": "Read-only lookup of an allowlisted hospital in Queensland Country Health Fund's public hospital search.",
+      "handler": "capabilities/private-health-qch/hospital-handler.mjs",
+      "runtime": "browser",
+      "side_effects": "read-only",
+      "timeout_seconds": 60,
+      "max_output_chars": 16000,
+      "network_policy": {
+        "scheme": "https",
+        "top_level_hosts": [
+          "www.queenslandcountry.health",
+          "queenslandcountry.health"
+        ],
+        "start_url": "https://www.queenslandcountry.health/provider-search/hospital-search-page/"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "hospital_name"
+        ],
+        "properties": {
+          "hospital_name": {
+            "type": "string",
+            "enum": [
+              "Buderim Private Hospital",
+              "Sunshine Coast University Private Hospital"
+            ]
           }
         },
         "additionalProperties": false
