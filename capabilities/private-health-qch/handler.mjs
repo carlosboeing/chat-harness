@@ -68,10 +68,14 @@ async function collectVisibleControls(page) {
   );
 }
 
-async function checkByLabel(page, label, exact = true) {
-  const locator = page.getByLabel(label, { exact }).first();
+async function setRadioById(page, id) {
+  const locator = page.locator("#" + id);
   await locator.waitFor({ state: "attached", timeout: 8_000 });
-  await locator.check({ force: true, timeout: 8_000 });
+  await locator.evaluate((element) => {
+    element.checked = true;
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 }
 
 async function fillField(page, selectors, value) {
@@ -86,10 +90,11 @@ async function fillField(page, selectors, value) {
 }
 
 async function selectFirstMeaningfulOption(page) {
-  const selects = page.locator("select:visible");
+  const preferred = page.locator("#AssessableIncome_Couple");
+  const selects = (await preferred.count()) > 0 ? preferred : page.locator("select:visible");
   const count = await selects.count();
   if (count === 0) {
-    throw new Error("No visible income selector was found.");
+    throw new Error("No income selector was found.");
   }
 
   const selected = [];
@@ -206,21 +211,14 @@ export async function run(input, context = {}) {
       await page.locator("#state_QLD").check({ force: true });
       await fillField(page, ["#Member_Age", 'input[name="Member_Age"]'], SYNTHETIC_PROFILE.primary_age);
 
-      const yesRadios = page.getByLabel("Yes", { exact: true });
-      const noRadios = page.getByLabel("No", { exact: true });
-
-      if ((await yesRadios.count()) < 2 || (await noRadios.count()) < 3) {
-        throw new Error("Expected quote eligibility radio groups were not found.");
-      }
-
-      await yesRadios.nth(0).check({ force: true });
+      await setRadioById(page, "Member_ContinuousCover_Yes");
       await fillField(
         page,
         ["#Partner_Age", 'input[name="Partner_Age"]', 'input[name*="Partner"][type="number"]'],
         SYNTHETIC_PROFILE.partner_age,
       );
-      await yesRadios.nth(1).check({ force: true });
-      await noRadios.nth(2).check({ force: true });
+      await setRadioById(page, "Partner_ContinuousCover_Yes");
+      await setRadioById(page, "Dependants_YoungAdult_No");
 
       const selectedIncomeOptions = await selectFirstMeaningfulOption(page);
 
