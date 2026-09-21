@@ -1,29 +1,35 @@
 # ChatGPT GitHub Capability Bridge
 
-A small, auditable execution bridge that lets **ordinary ChatGPT Project chats** invoke vetted capabilities through the GitHub plugin and GitHub Actions.
+A small, auditable execution bridge that lets **ordinary ChatGPT Project chats** invoke vetted external capabilities through the GitHub plugin and GitHub Actions.
 
 ## Architecture
 
 ```text
 ChatGPT Project
-  -> GitHub issue request
-  -> capability-dispatch workflow
-  -> vetted capability handler
-  -> structured issue comment result
-  -> ChatGPT GitHub plugin
+  -> typed capability request
+  -> private GitHub Issue
+  -> generic registry / dispatcher
+  -> selected runtime
+     -> node / direct HTTP
+     -> browser / Playwright
+     -> future runtime
+  -> bounded durable capability adapter
+  -> structured result
+  -> ChatGPT continues workflow
 ```
 
-The dispatcher is generic; capabilities are explicit and typed. This repository intentionally does **not** expose arbitrary shell/Python/JavaScript execution, arbitrary URL fetching, user-controlled headers/cookies, or unrestricted network access.
+The bridge infrastructure is use-case agnostic. Capability adapters are specific and **disposable by default**; only adapters that satisfy the durable-promotion rules belong in the active registry on `main`.
 
-The GitHub transport is replaceable. Capability names and request/result contracts should remain stable if the runtime later moves to MCP, serverless infrastructure, or another execution backend.
+See:
 
-See [`docs/design.md`](docs/design.md) for the implementation architecture, runtime boundaries, safety model, and spike/rollout interpretation.
+- [`docs/design.md`](docs/design.md) — implementation architecture and runtime boundaries.
+- [`docs/capability-lifecycle.md`](docs/capability-lifecycle.md) — deterministic spike vs durable adapter lifecycle.
 
-## Capabilities
+## Active durable capabilities
 
-- `linkedin.job.lookup` — read-only lookup of one public LinkedIn job by numeric job ID through LinkedIn's unauthenticated guest job endpoint.
-- `private-health.quote.qch` — experimental read-only browser-backed smoke test of Queensland Country Health Fund's quote flow using a fixed synthetic household profile. It does not submit contact details or join/purchase.
-- `private-health.hospital.qch` — read-only direct-HTTP lookup of allowlisted hospitals in Queensland Country Health Fund's public hospital network search.
+- `linkedin.job.lookup` — read-only lookup of one public LinkedIn job by numeric job ID through LinkedIn's unauthenticated guest endpoint.
+
+The browser runtime is available on `main`, but there is currently **no durable browser-backed adapter registered**. It was proven with a disposable private-health spike and is now tested with a domain-agnostic local browser smoke test.
 
 ## Request protocol
 
@@ -45,22 +51,20 @@ with a raw JSON body:
 }
 ```
 
-An optional `request_id` may be supplied by the caller.
+An optional `request_id` may be supplied.
 
 ## Response protocol
 
 The workflow posts one issue comment beginning with `CAPABILITY_RESULT`, followed by structured JSON, then closes the issue.
 
-The response contains explicit identity/provenance fields so a caller can distinguish exact-resource verification from partial, blocked, expired, mismatched, or unresolved results.
-
 ## Runtime classes
 
 Capabilities declare a runtime in `registry.json`:
 
-- `node` — normal dependency-free Node execution.
-- `browser` — installs a pinned Playwright runtime and Chromium for that capability invocation only.
+- `node` — deterministic computation, parsing, direct HTTP/API calls.
+- `browser` — pinned Playwright/Chromium for bounded interactive workflows.
 
-The GitHub Actions job has a coarse outer timeout. Each registered capability also has a tighter `timeout_seconds` and `max_output_chars` budget enforced by the dispatcher.
+A runtime can remain durable even when the spike adapter that proved it is removed.
 
 ## Safety properties
 
@@ -69,48 +73,92 @@ The GitHub Actions job has a coarse outer timeout. Each registered capability al
 - allowlisted named capabilities;
 - strict capability-specific input validation;
 - handler-owned network destinations;
+- no arbitrary shell/script execution;
 - no arbitrary URL/host/header/cookie inputs;
-- browser capabilities restrict top-level navigation and do not bypass CAPTCHA/bot protection;
-- bounded request, response, timeout, and output sizes;
+- browser top-level navigation is HTTPS + allowlist constrained;
+- bounded request, response, action, navigation and runtime budgets;
 - least-privilege GitHub workflow permissions;
-- no persistent browser profiles, caches, or credentials;
-- synthetic profile only for the first browser-backed quote experiment.
+- no persistent browser profiles, caches or credentials;
+- CAPTCHA/bot/auth boundaries are failures, not bypass targets.
+
+## Capability lifecycle
+
+New task-specific adapters start as **spikes**.
+
+A spike:
+
+- stays on a branch;
+- may temporarily use the branch registry for end-to-end testing;
+- must be removed before merge unless explicitly promoted;
+- must not leave orphan handler/test code on `main`.
+
+A durable adapter must satisfy one of:
+
+1. **Recurring use** — at least two independent real tasks/sessions needed the same bounded capability contract.
+2. **Recurring workflow** — a durable Project/workflow explicitly depends on it as an expected recurring operation and it has been proven end-to-end.
+
+The active registry on `main` accepts only `lifecycle: durable` entries with promotion evidence.
+
+`scripts/validate-registry.mjs` enforces this in CI.
 
 ## Repository layout
 
 ```text
-.github/workflows/capability-dispatch.yml
+.github/workflows/
+  capability-dispatch.yml
+  ci.yml
+
 capabilities/
   linkedin-job/
     handler.mjs
-  private-health-qch/
-    handler.mjs
+
+docs/
+  design.md
+  capability-lifecycle.md
+
 protocol/
   request-response.schema.json
+
+scripts/
+  validate-registry.mjs
+  smoke-browser-runtime.mjs
+
 src/
   browser-runtime.mjs
   dispatch.mjs
   resolve-runtime.mjs
+
 tests/
+  browser-runtime.test.mjs
   linkedin-job.test.mjs
-  private-health-qch.test.mjs
+
 registry.json
 package.json
 package-lock.json
 ```
 
-## Adding capabilities
+## Adding a capability
 
-Add capabilities only for a concrete ChatGPT Project execution gap.
+Do not add an adapter merely because one task was awkward.
 
-Every capability should have:
+Follow the lifecycle decision:
 
-- a stable name;
-- a typed and validated input contract;
-- deterministic destination/permission policy;
-- bounded runtime/output;
-- a structured result contract;
+```text
+material native gap?
+  -> existing durable capability fits? reuse
+  -> otherwise one-off/unproven? spike branch
+  -> recurring need proven? durable promotion candidate
+```
+
+For a durable promotion, require:
+
+- stable typed contract;
+- explicit side-effect class;
+- bounded timeout/output;
+- destination/network policy;
+- structured result/failure states;
 - tests;
-- an explicit side-effect classification.
+- successful real transport execution;
+- promotion evidence in the registry.
 
 Do **not** add a generic `run_script`, shell execution tool, unrestricted `fetch_url`, or unrestricted browser capability.
