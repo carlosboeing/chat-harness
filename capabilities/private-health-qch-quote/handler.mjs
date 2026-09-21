@@ -5,6 +5,8 @@ import {
 
 const QUOTE_URL =
   "https://www.queenslandcountry.health/cover-selector-new/";
+const REVIEW_PATH =
+  "/cover-selector-new/cover-selector---review/";
 const ALLOWED_HOSTS = [
   "queenslandcountry.health",
   "www.queenslandcountry.health",
@@ -14,19 +16,21 @@ const SYNTHETIC_PROFILES = {
   "synthetic-family-qld-v1": {
     coverType: "Family",
     state: "QLD",
-    age: 40,
+    memberAge: 40,
     partnerAge: 40,
-    continuousHospitalCover: true,
+    memberContinuousCover: true,
+    partnerContinuousCover: true,
     adultDependents: false,
-    incomeOptionValue: "0",
+    incomeTier: "0",
   },
 };
 
-const ALLOWED_HOSPITAL_PRODUCTS = new Set([
-  "Signature Hospital (Silver+)",
-]);
-const ALLOWED_EXTRAS_PRODUCTS = new Set(["Select Extras"]);
-const ALLOWED_EXCESSES = new Set([750]);
+const SUPPORTED_REQUEST = {
+  hospitalProduct: "Signature Hospital (Silver+)",
+  extrasProduct: "Select Extras",
+  excess: 750,
+  paymentFrequency: "monthly",
+};
 
 function invalid(code, message) {
   return {
@@ -46,6 +50,7 @@ export function validateInput(input) {
     "hospital_product",
     "extras_product",
     "excess",
+    "payment_frequency",
   ]);
   const unexpected = Object.keys(input).filter((key) => !allowed.has(key));
   if (unexpected.length > 0) {
@@ -55,183 +60,138 @@ export function validateInput(input) {
     );
   }
 
-  if (!SYNTHETIC_PROFILES[input.profile_ref]) {
+  const profile = SYNTHETIC_PROFILES[input.profile_ref];
+  if (!profile) {
     return invalid(
       "UNKNOWN_PROFILE",
       "Only the approved synthetic profile is supported in this experiment.",
     );
   }
 
-  if (!ALLOWED_HOSPITAL_PRODUCTS.has(input.hospital_product)) {
+  if (input.hospital_product !== SUPPORTED_REQUEST.hospitalProduct) {
     return invalid(
       "UNSUPPORTED_HOSPITAL_PRODUCT",
       "Unsupported hospital product.",
     );
   }
 
-  if (!ALLOWED_EXTRAS_PRODUCTS.has(input.extras_product)) {
+  if (input.extras_product !== SUPPORTED_REQUEST.extrasProduct) {
     return invalid(
       "UNSUPPORTED_EXTRAS_PRODUCT",
       "Unsupported extras product.",
     );
   }
 
-  if (!ALLOWED_EXCESSES.has(input.excess)) {
+  if (input.excess !== SUPPORTED_REQUEST.excess) {
     return invalid("UNSUPPORTED_EXCESS", "Unsupported hospital excess.");
   }
 
-  return {
-    ok: true,
-    profile: SYNTHETIC_PROFILES[input.profile_ref],
-  };
+  if (input.payment_frequency !== SUPPORTED_REQUEST.paymentFrequency) {
+    return invalid(
+      "UNSUPPORTED_PAYMENT_FREQUENCY",
+      "Only monthly payment frequency is supported in this experiment.",
+    );
+  }
+
+  return { ok: true, profile };
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+function numberFromMatch(match) {
+  if (!match?.[1]) return null;
+  const value = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(value) ? value : null;
 }
 
-async function checkNamedRadio(page, label, occurrence = 0) {
-  const locator = page.getByRole("radio", {
-    name: new RegExp("^" + escapeRegex(label) + "$", "i"),
-  });
-  const count = await locator.count();
-  if (count <= occurrence) return false;
-  await locator.nth(occurrence).check({ force: true });
-  return true;
-}
-
-async function fillAge(page, labelPattern, value, fallbackIndex) {
-  const byLabel = page.getByLabel(labelPattern);
-  if ((await byLabel.count()) > 0) {
-    await byLabel.first().fill(String(value));
-    await byLabel.first().blur();
-    return true;
+export function parseReviewEvidence({
+  bodyText,
+  summaryText,
+  selectedFrequency,
+  selectedExcess,
+  combinedProductId,
+}) {
+  if (typeof bodyText !== "string" || typeof summaryText !== "string") {
+    return null;
   }
 
-  const numbers = page.locator('input[type="number"]:visible');
-  if ((await numbers.count()) > fallbackIndex) {
-    await numbers.nth(fallbackIndex).fill(String(value));
-    await numbers.nth(fallbackIndex).blur();
-    return true;
-  }
+  const normalizedBody = bodyText.replace(/\r/g, "");
+  const normalizedSummary = summaryText.replace(/\s+/g, " ").trim();
 
-  const textInputs = page.locator('input[type="text"]:visible');
-  if ((await textInputs.count()) > fallbackIndex) {
-    await textInputs.nth(fallbackIndex).fill(String(value));
-    await textInputs.nth(fallbackIndex).blur();
-    return true;
-  }
-
-  return false;
-}
-
-async function chooseTextOption(page, value) {
-  const pattern = new RegExp(escapeRegex(value), "i");
-
-  for (const role of ["radio", "checkbox"]) {
-    const control = page.getByRole(role, { name: pattern });
-    if ((await control.count()) > 0) {
-      await control.first().check({ force: true });
-      return true;
-    }
-  }
-
-  const label = page.getByLabel(pattern);
-  if ((await label.count()) > 0) {
-    const first = label.first();
-    const type = await first.getAttribute("type");
-    if (type === "radio" || type === "checkbox") {
-      await first.check({ force: true });
-    } else {
-      await first.click();
-    }
-    return true;
-  }
-
-  const text = page.getByText(pattern);
-  if ((await text.count()) > 0) {
-    await text.first().click();
-    return true;
-  }
-
-  return false;
-}
-
-async function clickFirst(page, names) {
-  for (const name of names) {
-    const pattern = new RegExp("^" + escapeRegex(name) + "$", "i");
-
-    for (const role of ["button", "link"]) {
-      const locator = page.getByRole(role, { name: pattern });
-      if ((await locator.count()) > 0) {
-        await locator.first().click();
-        return name;
-      }
-    }
-  }
-
-  return null;
-}
-
-export function extractQuoteFromText(
-  text,
-  hospitalProduct,
-  extrasProduct,
-  excess,
-) {
-  const normalized = text.replace(/\r/g, "");
-  const productMatch =
-    normalized.toLowerCase().includes(hospitalProduct.toLowerCase()) &&
-    normalized.toLowerCase().includes(extrasProduct.toLowerCase());
-  const excessMatch = new RegExp(
-    "\\$?\\s*" + String(excess) + "\\s*(?:excess)?",
-    "i",
-  ).test(normalized);
-
-  const lines = normalized
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
-
-  const priced = lines.find(
-    (line) =>
-      /\$\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?/.test(line) &&
-      /(week|fortnight|month|year|premium|quote)/i.test(line),
+  const hospitalMatch = normalizedBody.match(
+    /Signature Hospital \(Silver\+\)\s*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i,
+  );
+  const extrasMatch = normalizedBody.match(
+    /Select Extras\s*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i,
+  );
+  const totalMatch = normalizedSummary.match(
+    /\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+Monthly\s+with\s+\$750\s+hospital excess/i,
+  );
+  const rebateMatch = normalizedBody.match(
+    /Government Rebate of\s*([0-9]+(?:\.[0-9]+)?)%/i,
+  );
+  const ageDiscountMatch = normalizedBody.match(
+    /Age based discount of\s*([0-9]+(?:\.[0-9]+)?)%/i,
+  );
+  const lhcMatch = normalizedBody.match(
+    /Lifetime Health Cover loading of\s*([0-9]+(?:\.[0-9]+)?)%/i,
   );
 
-  if (!productMatch || !priced) return null;
+  if (
+    !hospitalMatch ||
+    !extrasMatch ||
+    !totalMatch ||
+    selectedFrequency !== "monthly" ||
+    selectedExcess !== true
+  ) {
+    return null;
+  }
 
-  const amount = priced.match(/\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/);
-  const frequency = priced.match(/(?:per|\/)\s*(week|fortnight|month|year)/i);
+  const hospitalAmount = numberFromMatch(hospitalMatch);
+  const extrasAmount = numberFromMatch(extrasMatch);
+  const premiumAmount = numberFromMatch(totalMatch);
+
+  if (
+    hospitalAmount === null ||
+    extrasAmount === null ||
+    premiumAmount === null ||
+    Math.abs(hospitalAmount + extrasAmount - premiumAmount) > 0.02
+  ) {
+    return null;
+  }
 
   return {
     product_match: true,
-    excess_match: excessMatch,
-    premium_amount: amount
-      ? Number(amount[1].replace(/,/g, ""))
-      : null,
-    frequency: frequency?.[1]?.toLowerCase() ?? null,
-    evidence_line: priced.slice(0, 300),
+    excess_match: true,
+    payment_frequency_match: true,
+    combined_product_id:
+      typeof combinedProductId === "string" && combinedProductId
+        ? combinedProductId
+        : null,
+    premium_amount: premiumAmount,
+    frequency: "monthly",
+    hospital_component: hospitalAmount,
+    extras_component: extrasAmount,
+    government_rebate_percent: numberFromMatch(rebateMatch),
+    age_based_discount_percent: numberFromMatch(ageDiscountMatch),
+    lifetime_health_cover_loading_percent: numberFromMatch(lhcMatch),
+    evidence_summary: normalizedSummary.slice(0, 300),
   };
 }
 
-async function fillInitialQuestions(page, profile, step) {
+async function fillInitialQuestionnaire(page, profile, step) {
   await step("select-family", () =>
     page.locator("#CoverType_family").check({ force: true }),
   );
-
   await step("select-state", () =>
     page.locator("#state_QLD").check({ force: true }),
   );
 
-  await step("fill-primary-age", async () => {
+  await step("fill-member-age", async () => {
     const age = page.locator("#Member_Age");
-    await age.fill(String(profile.age));
+    await age.fill(String(profile.memberAge));
     await age.blur();
     await page.waitForTimeout(150);
   });
-
-  await step("primary-continuous-cover", () =>
+  await step("member-continuous-cover", () =>
     page.locator("#Member_ContinuousCover_Yes").check({ force: true }),
   );
 
@@ -241,7 +201,6 @@ async function fillInitialQuestions(page, profile, step) {
     await age.blur();
     await page.waitForTimeout(150);
   });
-
   await step("partner-continuous-cover", () =>
     page.locator("#Partner_ContinuousCover_Yes").check({ force: true }),
   );
@@ -249,79 +208,161 @@ async function fillInitialQuestions(page, profile, step) {
   await step("adult-dependents", () =>
     page.locator("#Dependants_YoungAdult_No").check({ force: true }),
   );
-
   await step("income-tier", () =>
-    page
-      .locator("#AssessableIncome_Couple")
-      .selectOption(String(profile.incomeOptionValue)),
+    page.locator("#AssessableIncome_Couple").selectOption(profile.incomeTier),
   );
 
-  await step("choose-cover", async () => {
-    const submit = page.locator('button[type="submit"]').filter({
-      hasText: /Choose cover/i,
-    });
-    if ((await submit.count()) === 0) {
+  await step("submit-questionnaire", async () => {
+    const submit = page
+      .locator('button[type="submit"]')
+      .filter({ hasText: /Choose cover/i });
+
+    if ((await submit.count()) !== 1) {
       throw new BrowserPolicyError(
         "UI_CHANGED",
-        "Could not locate the Choose cover action.",
+        "Expected one Choose cover action.",
       );
     }
-    await submit.first().click({ force: true });
+
+    await submit.click({ force: true });
   });
 }
 
-async function attemptProductSelection(page, input, step) {
+async function chooseHospital(page, step) {
   await page.waitForLoadState("domcontentloaded").catch(() => {});
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
 
-  await step("select-hospital-product", async () => {
-    await chooseTextOption(page, input.hospital_product);
+  await step("verify-hospital-page", async () => {
+    if (!page.url().includes("/cover-selector-new/choose-cover/")) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected hospital-selection page was not reached.",
+      );
+    }
   });
 
-  await step("select-excess", async () => {
-    await chooseTextOption(page, "$" + input.excess);
-  });
-
-  await step("select-extras-product", async () => {
-    await chooseTextOption(page, input.extras_product);
-  });
-
-  const safeProgressActions = [
-    "Continue",
-    "Next",
-    "Customise your quote",
-    "Review cover",
-    "Review quote",
-    "View quote",
-    "Get a quote",
-  ];
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const text = await page.locator("body").innerText();
-    const quote = extractQuoteFromText(
-      text,
-      input.hospital_product,
-      input.extras_product,
-      input.excess,
-    );
-    if (quote) return quote;
-
-    const clicked = await step("progress-quote-" + attempt, () =>
-      clickFirst(page, safeProgressActions),
-    );
-    if (!clicked) break;
-
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await page.waitForTimeout(400);
-  }
-
-  const finalText = await page.locator("body").innerText();
-  return extractQuoteFromText(
-    finalText,
-    input.hospital_product,
-    input.extras_product,
-    input.excess,
+  await step("select-signature-excess", () =>
+    page.locator("#SG750").check({ force: true }),
   );
+  await step("select-signature-hospital", () =>
+    page.locator("#choose_61951").check({ force: true }),
+  );
+
+  await step("submit-hospital", async () => {
+    const submit = page
+      .locator('button[type="submit"]')
+      .filter({ hasText: /Choose extras/i });
+
+    if ((await submit.count()) !== 1) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected one Choose extras action.",
+      );
+    }
+
+    await submit.click({ force: true });
+  });
+}
+
+async function chooseExtras(page, step) {
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  await page.waitForTimeout(300);
+
+  await step("verify-extras-page", async () => {
+    if (!page.url().includes("/cover-selector-new/choose-extras/")) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected extras-selection page was not reached.",
+      );
+    }
+  });
+
+  await step("select-extras", () =>
+    page.locator("#choose_2457").check({ force: true }),
+  );
+
+  await step("submit-extras", async () => {
+    const submit = page
+      .locator('button[type="submit"]')
+      .filter({ hasText: /Review cover/i });
+
+    if ((await submit.count()) !== 1) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected one Review cover action.",
+      );
+    }
+
+    await submit.click({ force: true });
+  });
+}
+
+async function extractReview(page, step) {
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  await page.waitForTimeout(300);
+
+  await step("verify-review-page", async () => {
+    const url = new URL(page.url());
+    if (url.pathname !== REVIEW_PATH) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected quote review page was not reached.",
+      );
+    }
+  });
+
+  await step("set-monthly-frequency", async () => {
+    const frequency = page.locator("select#frequency");
+    if ((await frequency.count()) !== 1) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected payment-frequency selector was not found.",
+      );
+    }
+    await frequency.selectOption("monthly");
+    await page.waitForTimeout(500);
+  });
+
+  return await step("extract-verified-quote", async () => {
+    const bodyText = await page.locator("body").innerText();
+    const summaryButton = page
+      .getByRole("button", { name: /Toggle product details/i })
+      .first();
+
+    if ((await summaryButton.count()) !== 1) {
+      throw new BrowserPolicyError(
+        "UI_CHANGED",
+        "Expected quote summary was not found.",
+      );
+    }
+
+    const summaryText = await summaryButton.evaluate(
+      (el) => el.parentElement?.innerText ?? "",
+    );
+    const selectedFrequency = await page.locator("select#frequency").inputValue();
+    const selectedExcess = await page.locator("#SG750").isChecked();
+    const combinedProductId =
+      (await page.locator("#pid").count()) === 1
+        ? await page.locator("#pid").inputValue()
+        : null;
+
+    const quote = parseReviewEvidence({
+      bodyText,
+      summaryText,
+      selectedFrequency,
+      selectedExcess,
+      combinedProductId,
+    });
+
+    if (!quote) {
+      throw new BrowserPolicyError(
+        "PARTIAL_EVIDENCE",
+        "Review page did not contain internally consistent exact quote evidence.",
+      );
+    }
+
+    return quote;
+  });
 }
 
 function mapBrowserFailure(error) {
@@ -331,6 +372,14 @@ function mapBrowserFailure(error) {
         ok: false,
         state: "TIMEOUT",
         error: { code: "TIMEOUT", message: "Browser execution timed out." },
+      };
+    }
+
+    if (error.code === "PARTIAL_EVIDENCE") {
+      return {
+        ok: false,
+        state: "PARTIAL_EVIDENCE",
+        error: { code: error.code, message: error.message },
       };
     }
 
@@ -372,12 +421,12 @@ export async function run(input, context = {}) {
         allowedHosts: ALLOWED_HOSTS,
         locale: "en-AU",
         timezoneId: "Australia/Brisbane",
-        maxActions: 40,
+        maxActions: 30,
       },
       async ({ page, step, safeGoto }) => {
         await safeGoto(QUOTE_URL);
 
-        await step("verify-quote-page", async () => {
+        await step("verify-questionnaire", async () => {
           const body = await page.locator("body").innerText();
           if (!/to quote, we need the following details/i.test(body)) {
             throw new BrowserPolicyError(
@@ -387,34 +436,12 @@ export async function run(input, context = {}) {
           }
         });
 
-        await fillInitialQuestions(page, validation.profile, step);
-        return await attemptProductSelection(page, input, step);
+        await fillInitialQuestionnaire(page, validation.profile, step);
+        await chooseHospital(page, step);
+        await chooseExtras(page, step);
+        return await extractReview(page, step);
       },
     );
-
-    if (!execution.result) {
-      return {
-        ok: false,
-        state: "PARTIAL_EVIDENCE",
-        quote: null,
-        requested: {
-          profile_ref: input.profile_ref,
-          hospital_product: input.hospital_product,
-          extras_product: input.extras_product,
-          excess: input.excess,
-        },
-        provenance: {
-          retrieved_at: retrievedAt,
-          source: QUOTE_URL,
-        },
-        diagnostics: execution.diagnostics,
-        error: {
-          code: "QUOTE_NOT_EXTRACTED",
-          message:
-            "Browser reached the quote workflow but did not extract a verified matching premium.",
-        },
-      };
-    }
 
     return {
       ok: true,
@@ -424,11 +451,13 @@ export async function run(input, context = {}) {
         hospital_product: input.hospital_product,
         extras_product: input.extras_product,
         excess: input.excess,
+        payment_frequency: input.payment_frequency,
       },
       quote: execution.result,
       provenance: {
         retrieved_at: retrievedAt,
         source: QUOTE_URL,
+        final_path: REVIEW_PATH,
       },
       diagnostics: execution.diagnostics,
     };
@@ -440,6 +469,7 @@ export async function run(input, context = {}) {
         hospital_product: input.hospital_product,
         extras_product: input.extras_product,
         excess: input.excess,
+        payment_frequency: input.payment_frequency,
       },
       provenance: {
         retrieved_at: retrievedAt,
