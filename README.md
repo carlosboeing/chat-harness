@@ -88,12 +88,15 @@ capabilities/
 protocol/
   request-response.schema.json
 src/
+  browser-runtime.mjs
   dispatch.mjs
   resolve-runtime.mjs
 tests/
   linkedin-job.test.mjs
   private-health-qch.test.mjs
 registry.json
+package.json
+package-lock.json
 ```
 
 ## Adding capabilities
