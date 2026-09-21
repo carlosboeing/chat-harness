@@ -119,6 +119,51 @@
         },
         "additionalProperties": false
       }
+    },
+    "private-health.provider.medibank": {
+      "description": "Read-only browser lookup of allowlisted dental providers in Medibank's public Members' Choice provider finder.",
+      "handler": "capabilities/private-health-medibank/provider-handler.mjs",
+      "runtime": "browser",
+      "side_effects": "read-only",
+      "timeout_seconds": 75,
+      "max_output_chars": 18000,
+      "network_policy": {
+        "scheme": "https",
+        "top_level_hosts": [
+          "www.medibank.com.au",
+          "medibank.com.au"
+        ],
+        "start_url": "https://www.medibank.com.au/health-insurance/find-provider/"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "provider_name",
+          "postcode",
+          "provider_type"
+        ],
+        "properties": {
+          "provider_name": {
+            "type": "string",
+            "enum": [
+              "Budi Dental"
+            ]
+          },
+          "postcode": {
+            "type": "string",
+            "enum": [
+              "4556"
+            ]
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": [
+              "Dentist"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
     }
   }
 }
