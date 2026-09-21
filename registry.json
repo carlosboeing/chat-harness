@@ -39,7 +39,7 @@
       },
       "input": {
         "type": "object",
-        "required": ["profile_ref", "hospital_product", "extras_product"],
+        "required": ["profile_ref", "hospital_product", "extras_product", "excess", "payment_frequency"],
         "properties": {
           "profile_ref": {
             "type": "string",
@@ -54,6 +54,14 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
+          },
+          "excess": {
+            "type": "integer",
+            "enum": [750]
+          },
+          "payment_frequency": {
+            "type": "string",
+            "enum": ["weekly"]
           }
         },
         "additionalProperties": false
