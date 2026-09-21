@@ -7,7 +7,7 @@ const SUPPORTED_HOSPITAL_PRODUCTS = new Map([
   ["Signature Hospital (Silver+)", "Choose Signature Hospital"],
 ]);
 const SUPPORTED_EXTRAS_PRODUCTS = new Map([
-  ["Select Extras", "Choose Select Extras"],
+  ["Select Extras", "Add Select Extras"],
 ]);
 
 const SYNTHETIC_PROFILE = Object.freeze({
@@ -276,6 +276,13 @@ export async function run(input, context = {}) {
       const extrasMatches = page.getByText(extrasButtonName, { exact: true });
       if ((await extrasMatches.count()) > 0) {
         await clickVisibleText(page, extrasButtonName);
+        await page.waitForTimeout(800);
+      }
+
+      const reviewMatches = page.getByText("Review cover", { exact: true });
+      if ((await reviewMatches.count()) > 0) {
+        await clickVisibleText(page, "Review cover");
+        await page.waitForLoadState("domcontentloaded", { timeout: 20_000 }).catch(() => {});
         await page.waitForTimeout(1_000);
       }
 
@@ -286,7 +293,10 @@ export async function run(input, context = {}) {
         input.extras_product,
       );
 
+      const reviewReached =
+        page.url().includes("/review-cover") || /Step 4\s+current/i.test(bodyText);
       const exact =
+        reviewReached &&
         evidence.hospital_product_found &&
         evidence.extras_product_found &&
         evidence.prices.length > 0;
@@ -303,7 +313,10 @@ export async function run(input, context = {}) {
           hospital_product: input.hospital_product,
           extras_product: input.extras_product,
         },
-        evidence,
+        evidence: {
+          ...evidence,
+          review_reached: reviewReached,
+        },
         provenance: {
           retrieved_at: new Date().toISOString(),
           start_url: START_URL,
