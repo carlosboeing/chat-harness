@@ -1,37 +1,43 @@
 # ChatGPT GitHub Capability Bridge
 
-A small, auditable execution bridge that lets **ordinary ChatGPT Project chats** invoke vetted external capabilities through the GitHub plugin and GitHub Actions.
+A small, auditable bridge that lets ordinary ChatGPT Project chats invoke **vetted external capabilities** without exposing generic remote execution.
 
-## Architecture
+The bridge is use-case agnostic. Domain adapters are specific and disposable by default; only adapters that satisfy the durable-promotion rules belong in the active registry on `main`.
 
-```text
-ChatGPT Project
-  -> typed capability request
-  -> private GitHub Issue
-  -> generic registry / dispatcher
-  -> selected runtime
-     -> node / direct HTTP
-     -> browser / Playwright
-     -> future runtime
-  -> bounded durable capability adapter
-  -> structured result
-  -> ChatGPT continues workflow
+## At a glance
+
+```mermaid
+flowchart LR
+    P["ChatGPT Project"] --> T["Private GitHub Issue<br/>typed request"]
+    T --> B["Capability bridge<br/>registry + dispatcher"]
+    B --> R{"Runtime"}
+    R --> N["Node / HTTP"]
+    R --> W["Playwright browser"]
+    R --> F["Future runtime"]
+    N --> A["Bounded capability adapter"]
+    W --> A
+    F --> A
+    A --> O["Structured result<br/>state + evidence + provenance"]
+    O --> P
 ```
 
-The bridge infrastructure is use-case agnostic. Capability adapters are specific and **disposable by default**; only adapters that satisfy the durable-promotion rules belong in the active registry on `main`.
+The stable abstraction is:
 
-See:
+```text
+invoke(capability_name, typed_input) -> structured result
+```
 
-- [`docs/design.md`](docs/design.md) — implementation architecture and runtime boundaries.
-- [`docs/capability-lifecycle.md`](docs/capability-lifecycle.md) — deterministic spike vs durable adapter lifecycle.
+GitHub Issues, Actions, Node and Playwright are implementation choices behind that contract.
 
 ## Active durable capabilities
 
-- `linkedin.job.lookup` — read-only lookup of one public LinkedIn job by numeric job ID through LinkedIn's unauthenticated guest endpoint.
+| Capability | Runtime | Side effects | Purpose |
+|---|---|---|---|
+| `linkedin.job.lookup` | Node / HTTP | Read-only | Resolve one public LinkedIn job by exact numeric job ID. |
 
-The browser runtime is available on `main`, but there is currently **no durable browser-backed adapter registered**. It was proven with a disposable private-health spike and is now tested with a domain-agnostic local browser smoke test.
+The browser runtime is available on `main`, but there is currently **no durable browser-backed adapter registered**. It was proven with a disposable private-health spike and is now regression-tested with a domain-agnostic local browser smoke test.
 
-## Request protocol
+## Request and response
 
 Create an owner-authored issue titled:
 
@@ -53,18 +59,16 @@ with a raw JSON body:
 
 An optional `request_id` may be supplied.
 
-## Response protocol
-
 The workflow posts one issue comment beginning with `CAPABILITY_RESULT`, followed by structured JSON, then closes the issue.
 
-## Runtime classes
+## Design principles
 
-Capabilities declare a runtime in `registry.json`:
-
-- `node` — deterministic computation, parsing, direct HTTP/API calls.
-- `browser` — pinned Playwright/Chromium for bounded interactive workflows.
-
-A runtime can remain durable even when the spike adapter that proved it is removed.
+- **Typed and bounded, not generic.** No arbitrary shell, scripts, unrestricted HTTP, or unrestricted browser control.
+- **Use the simplest reliable execution path.** Prefer native/public API or direct HTTP before browser automation.
+- **Read-only by default.** Consequential actions require a stronger capability-specific approval and security design.
+- **Adapters are disposable by default.** A spike does not become permanent merely because it worked once.
+- **Runtime and transport are replaceable.** Domain Projects should depend on capability contracts, not GitHub Actions or Playwright.
+- **Structured failures matter.** Callers must be able to distinguish not-found, auth boundaries, bot blocks, timeouts, partial evidence and policy failures.
 
 ## Safety properties
 
@@ -73,33 +77,32 @@ A runtime can remain durable even when the spike adapter that proved it is remov
 - allowlisted named capabilities;
 - strict capability-specific input validation;
 - handler-owned network destinations;
-- no arbitrary shell/script execution;
-- no arbitrary URL/host/header/cookie inputs;
-- browser top-level navigation is HTTPS + allowlist constrained;
+- no caller-controlled hosts, headers, cookies or credentials;
+- HTTPS + allowlisted top-level navigation for browser capabilities;
 - bounded request, response, action, navigation and runtime budgets;
 - least-privilege GitHub workflow permissions;
 - no persistent browser profiles, caches or credentials;
-- CAPTCHA/bot/auth boundaries are failures, not bypass targets.
+- CAPTCHA, bot and authentication boundaries are failures, not bypass targets.
 
 ## Capability lifecycle
 
-New task-specific adapters start as **spikes**.
+```mermaid
+flowchart LR
+    G["Material gap"] --> E{"Existing durable capability?"}
+    E -->|Yes| U["Reuse"]
+    E -->|No| S["Spike on branch"]
+    S --> V["Prove on real workflow"]
+    V --> P{"Promotion criteria met?"}
+    P -->|Yes| D["Durable registry entry"]
+    P -->|No| X["Delete adapter before merge"]
+    V --> I{"Reusable infrastructure?"}
+    I -->|Yes| K["Keep/refactor generic runtime pieces"]
+    I -->|No| X
+```
 
-A spike:
+A durable adapter must qualify through either recurring use or a documented recurring workflow requirement. CI enforces the production-registry rules.
 
-- stays on a branch;
-- may temporarily use the branch registry for end-to-end testing;
-- must be removed before merge unless explicitly promoted;
-- must not leave orphan handler/test code on `main`.
-
-A durable adapter must satisfy one of:
-
-1. **Recurring use** — at least two independent real tasks/sessions needed the same bounded capability contract.
-2. **Recurring workflow** — a durable Project/workflow explicitly depends on it as an expected recurring operation and it has been proven end-to-end.
-
-The active registry on `main` accepts only `lifecycle: durable` entries with promotion evidence.
-
-`scripts/validate-registry.mjs` enforces this in CI.
+See [`docs/capability-lifecycle.md`](docs/capability-lifecycle.md).
 
 ## Repository layout
 
@@ -137,28 +140,30 @@ package.json
 package-lock.json
 ```
 
+Directory trees stay as text; architecture, workflows, sequence and lifecycle visuals use Mermaid.
+
+## Documentation
+
+- [`docs/design.md`](docs/design.md) — current implementation architecture, contracts, runtime model, safety and operability.
+- [`docs/capability-lifecycle.md`](docs/capability-lifecycle.md) — deterministic spike-to-durable lifecycle and CI enforcement.
+
+Cross-project policy for when ordinary ChatGPT Projects should create or invoke external capabilities remains canonical in:
+
+`Tech & AI/20 - Knowledge/Guides/chatgpt-capability-extension.md`
+
 ## Adding a capability
 
 Do not add an adapter merely because one task was awkward.
 
-Follow the lifecycle decision:
+Before implementation:
 
-```text
-material native gap?
-  -> existing durable capability fits? reuse
-  -> otherwise one-off/unproven? spike branch
-  -> recurring need proven? durable promotion candidate
-```
+1. prove the gap is material and native/fallback options are insufficient;
+2. check whether an existing durable capability fits;
+3. define the smallest useful typed operation;
+4. classify side effects and network boundaries;
+5. choose the simplest runtime;
+6. define verification and failure states.
 
-For a durable promotion, require:
+Unless recurrence is already proven, implement the adapter as a **branch-only spike**. After the real workflow is tested, either promote it deliberately or delete it before merge.
 
-- stable typed contract;
-- explicit side-effect class;
-- bounded timeout/output;
-- destination/network policy;
-- structured result/failure states;
-- tests;
-- successful real transport execution;
-- promotion evidence in the registry.
-
-Do **not** add a generic `run_script`, shell execution tool, unrestricted `fetch_url`, or unrestricted browser capability.
+Do not add generic `run_script`, shell execution, unrestricted `fetch_url`, or unrestricted browser capabilities.
