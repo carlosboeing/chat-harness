@@ -1,471 +1,320 @@
 # Capability Bridge Design
 
-## Purpose
+## Summary
 
-This repository implements a **use-case-agnostic external capability layer for ordinary ChatGPT Project chats**.
+The capability bridge gives ordinary ChatGPT Project chats a **small, typed external execution plane** for operations that native ChatGPT tools cannot perform reliably.
 
-The bridge exists so a ChatGPT Project can invoke narrowly bounded operations that are unavailable or unreliable through native ChatGPT tools, while keeping ChatGPT itself as the orchestrator.
+ChatGPT remains the orchestrator. The bridge validates a named capability, selects a bounded runtime, executes one narrow adapter, and returns a structured result with explicit state and provenance.
 
-Domain workloads such as LinkedIn job lookup or private-health-insurance verification are **proving cases and adapters**, not the architecture.
+The central design constraint is:
 
-Cross-project policy for when capabilities should exist is canonical in:
+> **Generic infrastructure, specific capabilities.**
+
+The bridge should survive the deletion of any one domain adapter.
+
+Cross-project policy for **when** a capability should exist is canonical in:
 
 `Tech & AI/20 - Knowledge/Guides/chatgpt-capability-extension.md`
 
-This document owns the **repository implementation design**.
+This document owns the repository implementation design.
 
-## Design goals
+## Goals and non-goals
+
+### Goals
 
 The bridge should:
 
-- extend ordinary ChatGPT Project chats without turning them into a generic remote shell;
-- expose stable, typed capability contracts;
-- keep domain Projects unaware of transport/runtime plumbing;
-- prefer the smallest reliable execution primitive;
-- make side effects, permissions, timeouts, output limits and network destinations explicit;
-- return structured evidence and failure states that ChatGPT can reason over;
-- keep execution backends replaceable;
-- be cheap and understandable enough for a small codebase to own.
+- expose stable typed capability contracts;
+- keep domain Projects independent of transport/runtime plumbing;
+- enforce side-effect, network, runtime and output boundaries;
+- prefer the simplest reliable execution primitive;
+- return evidence and explicit failure states that ChatGPT can reason over;
+- keep runtimes and transport replaceable;
+- remain small enough for one engineer to understand and operate.
 
-## Non-goals
+### Non-goals
 
-The bridge is intentionally **not**:
+The bridge is not:
 
 - a generic browser agent;
 - arbitrary remote code execution;
-- arbitrary HTTP fetching;
+- unrestricted HTTP;
 - a workflow engine for whole research processes;
 - a replacement for native ChatGPT search/plugins;
-- a place to persist sensitive user data;
-- a mechanism for bypassing authentication, CAPTCHA or anti-bot controls;
-- a platform that requires every capability to share the same execution runtime.
+- a store for credentials or sensitive user data;
+- a CAPTCHA/authentication bypass mechanism;
+- a platform that forces every capability through the same runtime.
 
-## Architecture
+## System architecture
 
-```text
-ChatGPT Project
-     |
-     | typed capability request
-     v
-Transport
-(currently private GitHub Issue)
-     |
-     v
-Capability Bridge
-+-----------------------------+
-| registry                    |
-| dispatcher                  |
-| runtime resolver            |
-| request/result envelope     |
-| timeout/output enforcement  |
-+-----------------------------+
-     |
-     | selects registered handler/runtime
-     v
-Execution runtime
-+-----------------------------+
-| node / direct HTTP          |
-| browser / Playwright        |
-| future serverless/MCP/etc.  |
-+-----------------------------+
-     |
-     v
-Bounded durable adapter
-+-----------------------------+
-| linkedin.job.lookup         |
-| future promoted adapters    |
-+-----------------------------+
-     |
-     v
-Structured result + provenance
-     |
-     v
-ChatGPT continues workflow
+```mermaid
+flowchart TB
+    subgraph Control["ChatGPT control plane"]
+        P["ChatGPT Project<br/>decides what is needed"]
+    end
+
+    subgraph Transport["Current transport"]
+        I["Private GitHub Issue<br/>typed request"]
+        C["Structured issue comment<br/>result"]
+    end
+
+    subgraph Bridge["Capability bridge"]
+        REG["registry.json<br/>allowlist + metadata"]
+        DISP["dispatcher<br/>validation + budgets"]
+        RES["runtime resolver"]
+    end
+
+    subgraph Runtime["Execution runtimes"]
+        NODE["Node<br/>HTTP / parsing / compute"]
+        BROWSER["Playwright<br/>bounded browser task"]
+        FUTURE["Future provider<br/>serverless / MCP / worker"]
+    end
+
+    subgraph Adapter["Bounded adapter"]
+        H["Capability handler<br/>domain-specific logic"]
+    end
+
+    EXT["External source"]
+
+    P --> I --> DISP
+    REG --> DISP
+    DISP --> RES
+    RES --> NODE
+    RES --> BROWSER
+    RES -.-> FUTURE
+    NODE --> H
+    BROWSER --> H
+    FUTURE -.-> H
+    H --> EXT
+    EXT --> H
+    H --> DISP
+    DISP --> C --> P
 ```
 
-The important boundary is:
+The bridge is generic. The handler owns domain-specific input validation, destination details, extraction and verification.
 
-> **The bridge is generic; capability adapters are specific.**
-
-A new domain should normally add a registered capability adapter, not a new transport or orchestration layer.
-
-## Stable vs replaceable components
+## Stable contract vs replaceable plumbing
 
 ### Stable contract
 
-The architectural asset is the capability contract:
+The architectural asset is:
 
 ```text
-invoke(capability_name, typed_input)
-    -> structured result
+invoke(capability_name, typed_input) -> structured result
 ```
 
-A capability should have:
+A durable capability defines:
 
 - stable name;
-- typed/validated input;
-- explicit side-effect class;
-- bounded timeout/output;
-- destination/network policy;
+- typed input;
+- side-effect class;
+- network/permission policy;
+- timeout and output budgets;
 - structured result and failure states;
 - provenance/identity evidence;
-- tests.
-
-Domain Projects should depend on this contract, not on GitHub Actions, Playwright, or any other backend.
+- tests;
+- lifecycle/promotion metadata.
 
 ### Replaceable plumbing
 
-The following are implementation choices and may change without changing Project workflows:
+The following may change without changing the Project-side contract:
 
 - GitHub Issue transport;
 - GitHub Actions execution;
 - Node runtime;
 - Playwright;
+- serverless/container execution;
+- managed browser providers;
 - future MCP endpoint;
-- serverless/container runtime;
-- managed browser;
-- another model or semantic worker.
+- semantic or model-backed workers.
 
-If latency, geography, IP reputation, cost, concurrency or statefulness becomes material, move the runtime while preserving capability names/contracts.
+If latency, geography, statefulness, IP reputation, concurrency or cost becomes material, change the execution provider while preserving the capability contract where practical.
 
-## Control-plane ownership
+## Request execution
 
-ChatGPT remains the control plane.
+```mermaid
+sequenceDiagram
+    participant P as ChatGPT Project
+    participant G as GitHub transport
+    participant D as Dispatcher
+    participant R as Runtime
+    participant H as Capability handler
+    participant S as External source
 
-It decides:
+    P->>G: typed capability request
+    G->>D: issue body
+    D->>D: validate envelope + registry
+    D->>D: enforce timeout/output budgets
+    D->>R: select runtime
+    R->>H: run(input, bounded context)
+    H->>S: bounded HTTP/browser interaction
+    S-->>H: source evidence
+    H-->>D: structured capability result
+    D-->>G: v1 result envelope
+    G-->>P: CAPABILITY_RESULT
+```
 
-- what fact/action is needed;
-- whether the gap is material;
-- which registered capability fits;
-- how returned evidence affects the larger workflow;
-- whether additional verification is required;
-- when an approval boundary has been reached.
-
-The bridge should not become an autonomous planner for the user's whole task.
+The dispatcher contains no domain logic.
 
 ## Execution selection
 
-Use the least complex reliable path:
+Use the least complex reliable path.
 
-```text
-native ChatGPT capability
-    -> equivalent authoritative source
-    -> direct API / HTTP
-    -> deterministic browser
-    -> semantic browser assistance
-    -> managed/stateful browser
-    -> authenticated or side-effecting flow
+```mermaid
+flowchart LR
+    A["Native ChatGPT / authoritative source"] --> B{"Sufficient?"}
+    B -->|Yes| DONE["Stop"]
+    B -->|No| C["Direct API / reproducible HTTP"]
+    C --> D{"Sufficient?"}
+    D -->|Yes| DONE
+    D -->|No| E["Deterministic browser"]
+    E --> F{"Reliable?"}
+    F -->|Yes| DONE
+    F -->|No, semantic ambiguity| G["Semantic browser assistance"]
+    G --> H{"Still blocked by runtime/provider?"}
+    H -->|No| DONE
+    H -->|Yes| I["Managed/stateful browser"]
+    I --> J{"Auth or side effects required?"}
+    J -->|No| DONE
+    J -->|Yes| K["Separate approval/security design"]
 ```
 
-This is an architectural rule, not just an optimization.
+A browser-discovered workflow should be reduced to direct HTTP/API if a stable bounded request exists.
 
-A capability that was initially discovered through browser inspection should be simplified to direct HTTP/API if a stable bounded request exists.
+## Components
 
-### Evidence from the first browser spike
+| Component | Responsibility | Must not own |
+|---|---|---|
+| `registry.json` | Capability allowlist, runtime, budgets, network/input metadata, lifecycle | Domain workflow execution |
+| `src/dispatch.mjs` | Envelope validation, registry lookup, budget enforcement, handler invocation, result normalization | Domain-specific parsing/selectors |
+| `src/resolve-runtime.mjs` | Tell CI/Actions which runtime dependencies are required | Capability policy decisions |
+| `src/browser-runtime.mjs` | Shared Playwright launch/cleanup, allowlisting, budgets, aborts, sanitized diagnostics | Website-specific navigation |
+| Capability handler | Domain validation, request/browser steps, extraction, verification, domain states | Generic orchestration |
+| GitHub workflow | Transport/execution wiring and least-privilege permissions | Business logic |
 
-The Shopping/private-health benchmark produced three useful cases:
+## Runtime model
 
-1. **QCH personalised quote**
-   - multi-step interaction was genuinely required;
-   - deterministic Playwright completed it;
-   - this justified the `browser` runtime class.
+### Node
 
-2. **QCH hospital lookup**
-   - looked interactive;
-   - browser inspection exposed a stable GET contract;
-   - steady-state implementation was reduced to direct HTTP.
+Use for:
 
-3. **Medibank provider finder**
-   - Chromium loaded the public page;
-   - no actionable public provider-search UI was exposed;
-   - this was classified as a public-data/auth/source boundary rather than solved by adding a smarter browser.
+- direct HTTP/API access;
+- parsing;
+- deterministic computation;
+- short-lived probes.
 
-These results reinforce that **browser is one execution primitive, not the default fallback for every blocked page**.
+Current durable example: `linkedin.job.lookup`.
 
-## Current transport
+### Browser
 
-The current transport is:
+Use only when rendered or interactive state is genuinely required.
 
-```text
-owner-authored private GitHub Issue
-    -> capability-dispatch workflow
-    -> structured CAPABILITY_RESULT comment
-    -> issue closed
-    -> ChatGPT reads result through GitHub integration
-```
+The shared runtime provides:
 
-This transport is pragmatic because ordinary ChatGPT Projects can access the connected GitHub repository.
-
-It is not part of the permanent capability contract.
-
-## Registry
-
-`registry.json` is the allowlist and execution metadata source.
-
-Each entry defines, as applicable:
-
-- capability description;
-- handler path;
-- runtime class;
-- side-effect classification;
-- timeout;
-- maximum output;
-- network policy;
-- typed input schema.
-
-The registry must never become an escape hatch for caller-controlled scripts, hosts, headers, cookies or credentials.
-
-## Dispatcher
-
-`src/dispatch.mjs` is deliberately generic.
-
-Its responsibilities are:
-
-1. validate the outer request envelope;
-2. resolve the capability from the registry;
-3. enforce registered execution budgets;
-4. load the registered handler;
-5. pass bounded execution context;
-6. normalize the result into the v1 response envelope;
-7. reject oversized results.
-
-It should not contain domain logic.
-
-## Runtime classes
-
-### `node`
-
-Use for deterministic computation, parsing, direct HTTP/API calls and other short-lived operations that do not need browser state.
-
-Current durable example:
-
-- `linkedin.job.lookup`.
-
-The QCH hospital spike demonstrated that an apparently interactive workflow could be simplified to direct HTTP, but the spike adapter itself is no longer registered.
-
-### `browser`
-
-Use only when interaction/rendered application state is actually required.
-
-The runtime was first proven by the disposable `private-health.quote.qch` spike. That adapter has been removed from the active registry; the reusable browser runtime remains and is regression-tested with a domain-agnostic local fixture.
-
-Any future browser-backed capability must still be a **bounded durable operation** after promotion. ChatGPT does not receive a generic `browser.run(url, prompt)`.
-
-Potential future runtime classes should be added only after a real workload justifies them.
-
-## Browser runtime principles
-
-A shared browser runtime may provide common mechanics such as:
-
-- launch/cleanup;
-- locale/timezone;
-- timeout/action budgets;
-- HTTPS top-level navigation allowlists;
+- headless Chromium lifecycle;
+- locale/timezone configuration;
+- default action/navigation timeouts;
+- bounded action count;
+- HTTPS top-level host allowlisting;
 - abort handling;
-- sanitized diagnostics;
-- optional tracing/screenshots under an explicit policy.
+- service-worker blocking;
+- sanitized diagnostics.
 
-It should not absorb domain navigation logic prematurely.
+Domain selectors and workflow logic stay in the adapter.
 
-Adapters own the concrete workflow and verification rules.
-
-Do not introduce semantic browser control such as Jev until deterministic Playwright demonstrates real selector/recovery maintenance problems.
-
-## Capability adapter responsibilities
-
-A capability adapter owns:
-
-- domain-specific input validation;
-- exact destinations/endpoints;
-- selectors/request construction;
-- result extraction;
-- identity verification;
-- domain-specific failure states;
-- stopping before prohibited side effects.
-
-Adapters should be easy to delete or replace.
-
-The shared bridge should remain useful even when a particular adapter becomes obsolete.
-
-## Safety model
-
-### Read-only by default
-
-Most automatically invoked capabilities should be read-only.
-
-Examples:
-
-- public resource lookup;
-- quote calculation that stops before contact submission;
-- provider/network verification;
-- deterministic analysis.
-
-### Consequential actions
-
-Purchases, messages, applications, account mutations, bookings, cancellations and destructive actions require a stronger capability-specific design and explicit approval semantics.
-
-They should not be smuggled into an otherwise read-only adapter.
-
-### Sensitive data
-
-The GitHub Issue transport persists request bodies and comments.
-
-Do not put:
-
-- credentials;
-- auth cookies/tokens;
-- payment data;
-- sensitive health data;
-- private identifiers;
-- unnecessary PII
-
-into capability requests/results.
-
-Where private state is eventually required, prefer a stable opaque reference to preconfigured secure state rather than embedding the data in the request.
-
-## Failure model
-
-Failures are part of the contract and should be explicit rather than hidden behind generic exceptions.
-
-Useful classes include:
-
-- `INVALID_INPUT`;
-- `UNKNOWN_CAPABILITY`;
-- `TIMEOUT`;
-- `OUTPUT_TOO_LARGE`;
-- `NOT_FOUND`;
-- `PARTIAL_EVIDENCE`;
-- `UI_CHANGED`;
-- `BOT_BLOCKED`;
-- `AUTH_REQUIRED`;
-- `FETCH_FAILED`;
-- domain-specific unavailable/mismatch states.
-
-ChatGPT must be able to distinguish:
-
-- retryable execution failure;
-- permanent source limitation;
-- missing public information;
-- authentication boundary;
-- successful but partial evidence.
-
-## Observability
-
-Every non-trivial capability should return enough sanitized metadata to diagnose reliability:
-
-- retrieved timestamp;
-- execution mode;
-- final/source URL where safe;
-- duration;
-- meaningful step count where applicable;
-- explicit result state.
-
-Do not return entire page dumps or sensitive browser artifacts by default.
+The browser runtime is durable infrastructure even though the private-health adapter that first proved it was removed.
 
 ## Capability lifecycle
 
-Adapters are disposable by default. The production registry on `main` contains only durable capabilities.
+Adapters are **disposable by default**.
 
-See [`docs/capability-lifecycle.md`](capability-lifecycle.md) for the enforceable lifecycle and promotion rules.
+The production registry on `main` contains only durable capabilities that have explicit promotion evidence. A one-off adapter can exist on a branch for end-to-end proof but must be deleted before merge unless it qualifies for durable promotion.
 
-In short:
+See [`capability-lifecycle.md`](capability-lifecycle.md) for the state model and CI enforcement.
 
-- first observed one-off need -> spike branch;
-- repeated need across at least two independent real tasks -> eligible for durable promotion;
-- explicitly recurring Project/workflow need + successful end-to-end proof -> eligible for durable promotion;
-- otherwise remove the adapter before merge and keep only genuinely reusable infrastructure.
+## Safety and privacy
 
-CI validates that every handler on `main` is registered, every registry entry is durable with promotion evidence, and no `spikes/` or `experiments/` tree is present.
+### Default posture
 
-## Adding a capability
+- read-only capabilities are the normal case;
+- consequential writes require a capability-specific approval design;
+- caller-controlled arbitrary hosts, headers, cookies, credentials and scripts are forbidden;
+- capability destinations are handler-owned;
+- browser top-level navigation is HTTPS + allowlist constrained.
 
-Before implementation:
+### Sensitive data
 
-1. prove native tools/plugins do not already solve the material gap;
-2. check the registry for an existing overlapping capability;
-3. define the smallest useful operation;
-4. classify side effects;
-5. define typed inputs and destination policy;
-6. choose the simplest runtime;
-7. define verification and failure states.
+The current GitHub Issue transport persists request bodies and comments.
 
-Then:
+Do not put credentials, auth cookies/tokens, payment data, sensitive health data, private identifiers or unnecessary PII into requests/results.
 
-1. create a spike adapter on a branch unless recurrence is already proven;
-2. test through the real transport;
-3. measure latency/reliability/maintenance;
-4. extract only genuinely reusable infrastructure;
-5. promote the adapter only if it meets the durable lifecycle rule;
-6. otherwise delete the adapter and domain-specific tests before merge;
-7. keep domain methodology in the domain Project.
+If private state is eventually required, use a dedicated secret/private-state boundary rather than embedding it in the Issue payload.
 
-## Domain independence
+## Failure model
 
-The bridge has already been exercised from two domains:
+Failures are part of the public contract.
 
-### Work & Career
+Representative states include:
 
-`linkedin.job.lookup` proved:
+| Class | Examples | Meaning |
+|---|---|---|
+| Request | `INVALID_INPUT`, `UNKNOWN_CAPABILITY` | Caller or routing problem |
+| Execution | `TIMEOUT`, `FETCH_FAILED`, `OUTPUT_TOO_LARGE` | Runtime/source execution problem |
+| Source | `NOT_FOUND`, `PARTIAL_EVIDENCE` | Source did not yield complete evidence |
+| Browser | `UI_CHANGED`, `BOT_BLOCKED` | Interactive workflow no longer matches assumptions |
+| Boundary | `AUTH_REQUIRED` | Public/read-only capability has reached a security boundary |
 
-- ordinary ChatGPT -> external typed capability;
-- exact-resource verification;
-- direct HTTP handler;
-- structured evidence returned to the same workflow.
+Do not collapse these into generic exceptions; ChatGPT needs to know whether to retry, use another source, stop, or request approved/manual action.
 
-### Shopping
+## Observability and operability
 
-Private health insurance proved:
+Every non-trivial capability should return enough **sanitized** metadata to diagnose reliability without dumping source pages:
 
-- the same transport/registry/dispatcher can support another domain;
-- some operations require a different runtime class;
-- browser-backed execution can be added without changing the Project-side architectural model;
-- apparent browser gaps may reduce to HTTP or turn out to be source/auth boundaries.
+- retrieval timestamp;
+- execution mode;
+- source/final URL where safe;
+- duration;
+- meaningful browser step count where applicable;
+- explicit result state.
 
-Future domains should reuse the same bridge rather than fork domain-specific execution infrastructure.
+Operational signals that justify changing runtime/provider include recurring:
 
-## PR/spike interpretation
+- timeouts;
+- 403/429 or IP reputation failures;
+- geography mismatch;
+- browser startup cost;
+- selector maintenance;
+- concurrency pressure;
+- state/auth requirements.
 
-The health-insurance work is a **spike used to validate the generic execution architecture**.
+Do not pre-build around hypothetical scale.
 
-The QCH adapters were intentionally narrow and have now been removed from the active registry after serving their spike purpose.
+## Validation evidence
 
-What should survive the spike is:
+The initial browser spike used private-health research because it exercised several failure shapes.
 
-- typed capability registry;
-- generic dispatch;
-- enforceable execution budgets;
-- runtime selection;
-- safe browser execution pattern;
-- structured provenance/failure states;
-- progressive escalation discipline.
+| Experiment | Observation | Durable architectural lesson |
+|---|---|---|
+| QCH personalised quote | Multi-step interaction genuinely required Playwright | Browser runtime class is useful |
+| QCH hospital lookup | Browser inspection exposed a stable GET contract | Downgrade to HTTP when possible |
+| Medibank provider finder | Public page exposed no actionable provider-search UI | Some gaps are source/auth boundaries, not browser problems |
 
-## Initial browser-runtime rollout
+The domain adapters were removed after the spike. The reusable runtime, budgets, failure handling and lifecycle rules remain.
 
-The first browser-runtime implementation was developed through two divergent spike branches:
+The first browser-runtime rollout also reconciled two divergent implementation spikes: stronger reusable runtime/packaging pieces were consolidated into the empirically tested path before merge. That history belongs here only as rationale; PRs remain the detailed implementation record.
 
-- PR #13 explored stronger reusable runtime/packaging structure;
-- PR #14 accumulated the live QCH experiments and empirical findings.
+## Current state
 
-They were alternatives, not cumulative dependencies. The useful reusable pieces from #13 — pinned package/lockfile, shared browser runtime, action/navigation budgets, sanitized diagnostics and separate CI — were deliberately consolidated into PR #14 rather than merging both branches.
-
-PR #14 was the canonical initial browser-runtime change. PR #13 was superseded by that consolidation.
-
-After the runtime was proven, the private-health adapters were removed from `main` because recurrence was not established. The browser runtime, safety controls, dispatcher changes and generic regression coverage remain.
-
-The durable lesson is broader than those PRs: future capability spikes may use disposable domain adapters, but reusable execution infrastructure should be reconciled into one implementation path before promotion to `main`, and adapters themselves must separately earn durable status.
+- `main` exposes the durable `linkedin.job.lookup` capability.
+- Node and browser runtime classes are supported.
+- No durable browser-backed adapter is currently registered.
+- Browser infrastructure is tested through a domain-agnostic local fixture.
+- CI validates that only durable promoted adapters can remain in the production registry.
 
 ## Future evolution
 
-Possible future extensions include:
+Possible future execution providers include serverless functions, persistent workers, managed browsers, MCP endpoints, external LLM workers and bounded semantic-decision models such as Jev.
 
-- serverless execution;
-- MCP transport;
-- managed browsers;
-- semantic decision workers such as Jev;
-- external LLM review workers;
-- deterministic data/optimization jobs;
-- authenticated capabilities with a dedicated secret/private-state boundary.
+They should preserve the same principles:
 
-They should all preserve the same principle:
-
-> **ChatGPT orchestrates; the capability layer exposes bounded typed operations; execution providers remain replaceable.**
+> **ChatGPT orchestrates. Capabilities are typed and bounded. Runtimes are replaceable. Adapters earn permanence.**
