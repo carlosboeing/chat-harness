@@ -166,10 +166,47 @@ function extractEvidence(bodyText, hospitalProduct, extrasProduct) {
 
   const prices = [...snippet.matchAll(/\$\s?\d+(?:\.\d{2})?/g)].map((m) => m[0]);
 
+  const escapedHospital = hospitalProduct.replace(/[.*+?^$()|[\]\\]/g, "\\  return {
+    hospital_product_found: hospitalIndex >= 0,
+    extras_product_found: extrasIndex >= 0,
+    prices: [...new Set(prices)].slice(0, 10),
+    evidence_snippet: snippet.slice(0, 2_500),
+  };
+}");
+  const escapedExtras = extrasProduct.replace(/[.*+?^$()|[\]\\]/g, "\\  return {
+    hospital_product_found: hospitalIndex >= 0,
+    extras_product_found: extrasIndex >= 0,
+    prices: [...new Set(prices)].slice(0, 10),
+    evidence_snippet: snippet.slice(0, 2_500),
+  };
+}");
+  const summaryPattern = new RegExp(
+    escapedHospital +
+      "\\s*\\$\\s*(\\d+(?:\\.\\d{2})?)\\s*" +
+      escapedExtras +
+      "\\s*\\$\\s*(\\d+(?:\\.\\d{2})?)\\s*" +
+      "(\\d+(?:\\.\\d{2})?)\\s*Payment frequency",
+    "i",
+  );
+  const summaryMatch = normalized.match(summaryPattern);
+
   return {
     hospital_product_found: hospitalIndex >= 0,
     extras_product_found: extrasIndex >= 0,
     prices: [...new Set(prices)].slice(0, 10),
+    quote_summary: summaryMatch
+      ? {
+          hospital_price: Number(summaryMatch[1]),
+          extras_price: Number(summaryMatch[2]),
+          combined_price: Number(summaryMatch[3]),
+        }
+      : null,
+    rebate_percent:
+      Number(normalized.match(/Government Rebate of\s+(\d+(?:\.\d+)?)%/i)?.[1]) || null,
+    age_based_discount_percent:
+      Number(normalized.match(/Age based discount of\s+(\d+(?:\.\d+)?)%/i)?.[1]) || 0,
+    lhc_loading_percent:
+      Number(normalized.match(/Lifetime Health Cover loading of\s+(\d+(?:\.\d+)?)%/i)?.[1]) || 0,
     evidence_snippet: snippet.slice(0, 2_500),
   };
 }
@@ -294,7 +331,9 @@ export async function run(input, context = {}) {
       );
 
       const reviewReached =
-        page.url().includes("/review-cover") || /Step 4\s+current/i.test(bodyText);
+        /review/i.test(new URL(page.url()).pathname) ||
+        /Cover Selector\s*-\s*Review/i.test(bodyText) ||
+        /Step 4\s+current/i.test(bodyText);
       const exact =
         reviewReached &&
         evidence.hospital_product_found &&
@@ -316,6 +355,29 @@ export async function run(input, context = {}) {
         evidence: {
           ...evidence,
           review_reached: reviewReached,
+        },
+        quote: {
+          premium: evidence.quote_summary?.combined_price ?? null,
+          payment_frequency:
+            (await page
+              .locator('select[name="PaymentFrequency"]:visible')
+              .first()
+              .locator("option:checked")
+              .textContent()
+              .catch(() => null))?.trim() ?? null,
+          excess:
+            (await page
+              .locator('input[type="radio"]:checked')
+              .evaluateAll((nodes) =>
+                nodes
+                  .map((node) => Array.from(node.labels ?? []).map((x) => x.textContent?.trim()).filter(Boolean))
+                  .flat()
+                  .find((label) => /\\$\\d+ excess/i.test(label ?? "")) ?? null,
+              )
+              .catch(() => null)),
+          rebate_percent: evidence.rebate_percent,
+          age_based_discount_percent: evidence.age_based_discount_percent,
+          lhc_loading_percent: evidence.lhc_loading_percent,
         },
         provenance: {
           retrieved_at: new Date().toISOString(),
