@@ -64,6 +64,14 @@ for (const [name, entry] of entries) {
       )
     ) {
       fail(name + " must have non-empty promotion.evidence.");
+    } else if (
+      entry.promotion.basis === "recurring-use" &&
+      entry.promotion.evidence.length < 2
+    ) {
+      fail(
+        name +
+          " promoted by recurring-use must cite at least two independent real-use references.",
+      );
     }
 
     if (
