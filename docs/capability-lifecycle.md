@@ -1,101 +1,119 @@
 # Capability Adapter Lifecycle
 
-## Purpose
+## Summary
 
-Keep the capability bridge small and use-case agnostic while still allowing fast one-off experiments.
+Capability adapters are **disposable by default**.
 
-The repository distinguishes **reusable infrastructure** from **capability adapters**:
+A task-specific adapter may be created on a branch to complete or prove a real workflow. It reaches `main` only if it satisfies explicit durable-promotion criteria. Otherwise the adapter and its domain-specific tests are deleted before merge; reusable runtime/infrastructure improvements may still be retained.
 
-- infrastructure may be durable even when the workload that proved it was temporary;
-- adapters are disposable by default and must earn promotion to the active registry.
+The active registry on `main` is therefore a **production allowlist**, not a history of experiments.
 
-The active registry on `main` is a production allowlist, not a history of experiments.
+## State model
 
-## States
+```mermaid
+stateDiagram-v2
+    [*] --> Gap: material external gap observed
+    Gap --> Reuse: durable capability already fits
+    Gap --> Spike: new adapter justified
+    Gap --> Stop: no adapter justified
+
+    Spike --> Proven: real workflow succeeds
+    Spike --> Abandoned: experiment fails / not worth maintaining
+
+    Proven --> Durable: promotion criteria met
+    Proven --> Removed: promotion criteria not met
+
+    Durable --> Deprecated: recurring need disappears / source changes
+    Deprecated --> Removed
+
+    Reuse --> [*]
+    Stop --> [*]
+    Abandoned --> [*]
+    Removed --> [*]
+    Durable --> [*]
+```
+
+`Spike` is a branch state, not a valid production-registry lifecycle value.
+
+## Decision procedure
+
+```mermaid
+flowchart TD
+    A["Material gap remains after native/fallback paths"] --> B{"Existing durable capability fits?"}
+    B -->|Yes| R["Reuse it"]
+    B -->|No| C{"Adapter needed to complete/prove the task?"}
+    C -->|No| S["Use another source, manual/approved input, or leave unresolved"]
+    C -->|Yes| D{"Recurrence already proven?"}
+    D -->|No| E["Create branch-only spike"]
+    D -->|Yes| F["Durable-promotion candidate"]
+
+    E --> G["Test through real transport"]
+    G --> H{"Reusable infrastructure discovered?"}
+    H -->|Yes| I["Extract/refactor generic infrastructure"]
+    H -->|No| J{"Promotion criteria met?"}
+    I --> J
+    J -->|Yes| F
+    J -->|No| K["Delete adapter + domain tests before merge"]
+
+    F --> L["Add lifecycle/promotion metadata"]
+    L --> M["CI validation"]
+    M --> N["Merge to main"]
+```
+
+## Lifecycle states
 
 ### Spike
 
-Default state for a new task-specific adapter.
-
-Use when:
+Use `Spike` when:
 
 - the need has been observed once;
-- the adapter exists mainly to complete or test one task;
+- the adapter mainly completes or tests one task;
 - reuse is plausible but unproven;
-- the adapter is helping validate generic infrastructure.
+- the adapter is validating generic infrastructure.
 
 Rules:
 
 - branch-only;
 - may temporarily modify the branch registry for end-to-end testing;
-- should normally live in its natural capability path while the branch is active;
+- may live under the normal capability path while the branch exists;
 - must not remain in the active registry on `main`;
-- must be deleted before merge unless it is explicitly promoted to durable;
-- domain-specific smoke tests must also be removed or replaced by generic infrastructure tests before merge.
+- must be deleted before merge unless explicitly promoted;
+- domain-specific smoke tests must be removed or replaced by generic infrastructure tests before merge.
 
-A spike PR may intentionally fail the lifecycle validator until cleanup/promotion is complete.
+A spike PR may intentionally fail the lifecycle validator until promotion or cleanup is complete.
 
 ### Durable
 
-A registered capability intended to remain callable from future ChatGPT sessions/projects.
+A durable adapter is expected to remain callable from future ChatGPT sessions/projects.
 
-Promotion is allowed only through one of these two bases:
+Promotion is allowed through one of two bases.
 
-#### 1. Recurring use
+| Promotion basis | Minimum evidence |
+|---|---|
+| **Recurring use** | At least two independent real tasks/sessions needed the same bounded capability contract. |
+| **Recurring workflow** | A durable Project/workflow explicitly expects the operation repeatedly, and the capability has succeeded end-to-end at least once. |
 
-At least **two independent real tasks/sessions** successfully needed the same bounded capability contract.
-
-The registry promotion metadata must cite at least two evidence references.
-
-#### 2. Recurring workflow
-
-A durable Project/workflow explicitly depends on the capability as an expected recurring operation, and the capability has been proven end-to-end at least once.
-
-The registry promotion metadata must cite the workflow requirement.
-
-Either route still requires:
+Either route also requires:
 
 - stable typed contract;
-- clear side-effect classification;
+- explicit side-effect class;
 - bounded destination/network policy;
 - tests;
 - successful real transport execution;
-- acceptable maintenance/operational cost;
+- acceptable maintenance and operational cost;
 - no simpler native/API/HTTP alternative that makes the adapter unnecessary.
 
-## Decision procedure
+### Deprecated / removed
 
-For every observed external-capability gap:
+A durable capability should be deprecated or removed when:
 
-```text
-material gap after native/fallback?
-  no  -> do not build
-  yes
-   |
-existing durable capability fits?
-  yes -> reuse it
-  no
-   |
-need adapter to complete/prove this task?
-  no  -> leave unresolved / use another source
-  yes
-   |
-recurrence already proven?
-  no  -> SPIKE (branch-only)
-  yes -> candidate for DURABLE promotion
-```
+- the recurring workflow disappears;
+- the source/API no longer exists;
+- native ChatGPT capability replaces it reliably;
+- maintenance cost exceeds workflow value;
+- security/privacy constraints no longer fit the transport.
 
-After a spike succeeds:
-
-```text
-did it expose reusable infrastructure?
-  yes -> extract/refactor infrastructure for main
-  no  -> no infra change
-
-does adapter meet durable promotion rule?
-  yes -> add promotion metadata + keep handler
-  no  -> delete adapter + domain tests before merge
-```
+The registry should represent current callable capability, not historical nostalgia.
 
 ## Registry contract
 
@@ -112,69 +130,75 @@ Every capability in `registry.json` on `main` must declare:
 }
 ```
 
-There is intentionally no valid `spike` lifecycle value for the production registry.
+There is intentionally no valid `spike` value for the production registry.
 
-## Repository hygiene rules
+## Repository hygiene invariants
 
 On `main`:
 
-- every `capabilities/**/handler.mjs` must be referenced by the registry;
-- every registry entry must point to an existing handler;
-- every registry entry must be `lifecycle: durable`;
-- `spikes/` and `experiments/` directories are forbidden;
-- disposable domain-specific smoke tests are forbidden once their adapter is removed.
+- every `capabilities/**/handler.mjs` is referenced by the registry;
+- every registry entry points to an existing handler;
+- every registry entry is `lifecycle: durable`;
+- `spikes/` and `experiments/` trees are forbidden;
+- removed spike adapters do not leave domain-specific smoke tests behind.
 
 Historical spike evidence belongs in:
 
-- Git history / closed PRs;
-- concise design rationale in `docs/design.md`;
-- external durable research/workbench state when relevant.
+- Git history and closed PRs;
+- concise architectural rationale in `docs/design.md`;
+- external Workbench/Research state when it matters outside the repo.
 
 Do not keep dead adapter code merely as an example.
 
 ## Generic runtime testing
 
-Reusable runtimes should have **domain-agnostic** tests.
+Reusable runtimes should be tested without keeping the domain adapter that originally proved them.
 
-For the browser runtime, CI launches Chromium and exercises `src/browser-runtime.mjs` against an in-memory local HTML fixture. This proves:
+For the browser runtime, CI launches Chromium against an in-memory local HTML fixture.
 
-- Playwright dependency/install;
-- Chromium launch;
-- bounded step execution;
-- DOM interaction/extraction;
-- diagnostics;
+```mermaid
+flowchart LR
+    CI["CI"] --> PW["Playwright / Chromium"]
+    PW --> FIX["Local in-memory HTML fixture"]
+    FIX --> ACT["Bounded DOM actions"]
+    ACT --> ASSERT["Assertions + sanitized diagnostics"]
+```
 
-without preserving a health-insurance, retailer, job-site, or other domain adapter.
+This verifies Playwright installation, Chromium launch, bounded step execution, DOM interaction/extraction and diagnostics without retaining insurer-, retailer- or job-site-specific code.
 
 ## CI enforcement
 
 `scripts/validate-registry.mjs` fails when:
 
 - a registry entry is not durable;
-- promotion metadata is missing/invalid;
+- promotion metadata is missing or invalid;
 - recurring-use promotion has fewer than two evidence references;
 - a registered handler is missing;
 - an orphan handler exists under `capabilities/`;
 - `spikes/` or `experiments/` exists on the branch.
 
-This makes cleanup a merge prerequisite rather than a convention.
+This turns cleanup into a merge prerequisite rather than a convention.
 
-For strongest enforcement, configure the repository so the CI `test` check is required on `main`. The codebase can validate lifecycle deterministically, but GitHub branch protection/rulesets are what prevent an administrator from merging despite a failed check.
+For strongest enforcement, configure GitHub branch protection/rulesets so the CI `test` check is required on `main`. The repository can validate lifecycle deterministically, but repository administration controls whether a privileged user can merge despite a failed check.
 
 ## Examples
 
-### LinkedIn exact job lookup
+### Durable: LinkedIn exact job lookup
 
 `linkedin.job.lookup` is durable because exact LinkedIn job retrieval is part of a recurring Work & Career workflow and has been proven end-to-end.
 
-### QCH health-insurance adapters
+### Removed spike: QCH private-health adapters
 
-The QCH quote and hospital adapters were spikes used to prove:
+The QCH quote and hospital adapters were created to prove:
 
 - browser-backed capability execution;
 - progressive fallback from browser to direct HTTP;
-- structured evidence through the real Issue -> Actions -> ChatGPT path.
+- structured evidence through the real Issue → Actions → ChatGPT path.
 
-They did not establish a recurring capability need, so the adapters themselves are removed from `main`.
+They did not establish recurring capability demand, so the adapters were removed from `main`.
 
 The reusable browser runtime, dispatcher/runtime changes, tests and design lessons remain.
+
+## Operating rule
+
+> **First occurrence creates a spike, not a product feature. Repetition or an explicit recurring workflow earns permanence.**
