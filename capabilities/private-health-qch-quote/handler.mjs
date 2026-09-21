@@ -257,13 +257,16 @@ async function fillInitialQuestions(page, profile, step) {
   );
 
   await step("choose-cover", async () => {
-    const clicked = await clickFirst(page, ["Choose cover"]);
-    if (!clicked) {
+    const submit = page.locator('button[type="submit"]').filter({
+      hasText: /Choose cover/i,
+    });
+    if ((await submit.count()) === 0) {
       throw new BrowserPolicyError(
         "UI_CHANGED",
         "Could not locate the Choose cover action.",
       );
     }
+    await submit.first().click({ force: true });
   });
 }
 
