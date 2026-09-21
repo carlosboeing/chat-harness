@@ -16,23 +16,24 @@ try {
 
   await page.locator("#CoverType_family").check({ force: true });
   await page.locator("#state_QLD").check({ force: true });
-
   await page.locator("#Member_Age").fill("40");
   await page.locator("#Member_Age").blur();
   await page.waitForTimeout(150);
   await page.locator("#Member_ContinuousCover_Yes").check({ force: true });
-
   await page.locator("#Partner_Age").fill("40");
   await page.locator("#Partner_Age").blur();
   await page.waitForTimeout(150);
   await page.locator("#Partner_ContinuousCover_Yes").check({ force: true });
-
   await page.locator("#Dependants_YoungAdult_No").check({ force: true });
   await page.locator("#AssessableIncome_Couple").selectOption("0");
+  await page.locator('button[type="submit"]').filter({ hasText: /Choose cover/i }).click({ force: true });
 
-  await page.locator('button[type="submit"]').filter({
-    hasText: /Choose cover/i,
-  }).click({ force: true });
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  await page.waitForTimeout(500);
+
+  await page.locator("#SG750").check({ force: true });
+  await page.locator("#choose_61951").check({ force: true });
+  await page.locator('button[type="submit"]').filter({ hasText: /Choose extras/i }).click({ force: true });
 
   await page.waitForLoadState("domcontentloaded").catch(() => {});
   await page.waitForTimeout(800);
@@ -47,7 +48,7 @@ try {
             ? document.querySelector('label[for="' + CSS.escape(id) + '"]')?.innerText?.trim() ?? null
             : null;
           const parentText =
-            el.parentElement?.innerText?.replace(/\s+/g, " ").trim().slice(0, 500) ?? null;
+            el.parentElement?.innerText?.replace(/\s+/g, " ").trim().slice(0, 600) ?? null;
 
           return {
             tag: el.tagName.toLowerCase(),
@@ -76,7 +77,7 @@ try {
         .filter((x) =>
           x.id ||
           x.name ||
-          /signature|select extras|750|continue|next|quote|custom|review|hospital|extras/i.test(
+          /select extras|extras|continue|next|quote|custom|review|starter|premium|essential/i.test(
             [x.text, x.label, x.parent_text].filter(Boolean).join(" "),
           )
         ),
@@ -85,19 +86,10 @@ try {
   const body = (await page.locator("body").innerText())
     .replace(/\r/g, "")
     .replace(/\n{3,}/g, "\n\n")
-    .slice(0, 24000);
+    .slice(0, 26000);
 
   process.stdout.write(
-    JSON.stringify(
-      {
-        url: page.url(),
-        title: await page.title(),
-        controls,
-        body,
-      },
-      null,
-      2,
-    ) + "\n",
+    JSON.stringify({ url: page.url(), title: await page.title(), controls, body }, null, 2) + "\n",
   );
 } finally {
   await context.close();
