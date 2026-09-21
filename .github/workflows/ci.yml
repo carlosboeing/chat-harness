@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout bridge
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run unit tests
+        run: npm test
+
+  browser-smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout bridge
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps --only-shell chromium
+
+      - name: Run synthetic QCH quote smoke test
+        env:
+          CAPABILITY_REQUEST: '{"version":1,"capability":"private-health.quote.qch","input":{"profile_ref":"synthetic-family-qld-v1","hospital_product":"Signature Hospital (Silver+)","extras_product":"Select Extras","excess":750,"payment_frequency":"weekly"}}'
+        run: |
+          node src/dispatch.mjs > browser-smoke-result.json
+          cat browser-smoke-result.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("browser-smoke-result.json","utf8")); if (x.state !== "EXACT_QUOTE_VERIFIED") process.exit(1)'
+
+      - name: Run QCH hospital network HTTP smoke tests
+        run: |
+          for HOSPITAL in "Buderim Private Hospital" "Sunshine Coast University Private Hospital"; do
+            export CAPABILITY_REQUEST="$(node -e 'process.stdout.write(JSON.stringify({version:1,capability:"private-health.hospital.qch",input:{hospital_name:process.argv[1]}}))' "$HOSPITAL")"
+            node src/dispatch.mjs > hospital-smoke-result.json
+            cat hospital-smoke-result.json
+            node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("hospital-smoke-result.json","utf8")); if (x.state !== "HOSPITAL_NETWORK_LISTED") process.exit(1)'
+          done

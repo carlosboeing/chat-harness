@@ -17,9 +17,13 @@ The dispatcher is generic; capabilities are explicit and typed. This repository 
 
 The GitHub transport is replaceable. Capability names and request/result contracts should remain stable if the runtime later moves to MCP, serverless infrastructure, or another execution backend.
 
-## Initial capability
+See [`docs/design.md`](docs/design.md) for the implementation architecture, runtime boundaries, safety model, and spike/rollout interpretation.
+
+## Capabilities
 
 - `linkedin.job.lookup` — read-only lookup of one public LinkedIn job by numeric job ID through LinkedIn's unauthenticated guest job endpoint.
+- `private-health.quote.qch` — experimental read-only browser-backed smoke test of Queensland Country Health Fund's quote flow using a fixed synthetic household profile. It does not submit contact details or join/purchase.
+- `private-health.hospital.qch` — read-only direct-HTTP lookup of allowlisted hospitals in Queensland Country Health Fund's public hospital network search.
 
 ## Request protocol
 
@@ -49,6 +53,15 @@ The workflow posts one issue comment beginning with `CAPABILITY_RESULT`, followe
 
 The response contains explicit identity/provenance fields so a caller can distinguish exact-resource verification from partial, blocked, expired, mismatched, or unresolved results.
 
+## Runtime classes
+
+Capabilities declare a runtime in `registry.json`:
+
+- `node` — normal dependency-free Node execution.
+- `browser` — installs a pinned Playwright runtime and Chromium for that capability invocation only.
+
+The GitHub Actions job has a coarse outer timeout. Each registered capability also has a tighter `timeout_seconds` and `max_output_chars` budget enforced by the dispatcher.
+
 ## Safety properties
 
 - private repository;
@@ -57,12 +70,11 @@ The response contains explicit identity/provenance fields so a caller can distin
 - strict capability-specific input validation;
 - handler-owned network destinations;
 - no arbitrary URL/host/header/cookie inputs;
-- HTTPS-only redirects restricted by each handler;
+- browser capabilities restrict top-level navigation and do not bypass CAPTCHA/bot protection;
 - bounded request, response, timeout, and output sizes;
 - least-privilege GitHub workflow permissions;
-- one-minute workflow timeout;
-- no artifacts or caches;
-- no LinkedIn credentials or authenticated session.
+- no persistent browser profiles, caches, or credentials;
+- synthetic profile only for the first browser-backed quote experiment.
 
 ## Repository layout
 
@@ -71,13 +83,20 @@ The response contains explicit identity/provenance fields so a caller can distin
 capabilities/
   linkedin-job/
     handler.mjs
+  private-health-qch/
+    handler.mjs
 protocol/
   request-response.schema.json
 src/
+  browser-runtime.mjs
   dispatch.mjs
+  resolve-runtime.mjs
 tests/
   linkedin-job.test.mjs
+  private-health-qch.test.mjs
 registry.json
+package.json
+package-lock.json
 ```
 
 ## Adding capabilities
@@ -94,11 +113,4 @@ Every capability should have:
 - tests;
 - an explicit side-effect classification.
 
-Examples that may be useful later:
-
-- Work & Career: job/company source resolvers;
-- Shopping: selected retailer/API lookups and deal verification helpers;
-- Tech & AI: API/benchmark probes;
-- life admin: narrow public-data/API lookups.
-
-Do **not** add a generic `run_script`, shell execution tool, or unrestricted `fetch_url` capability.
+Do **not** add a generic `run_script`, shell execution tool, unrestricted `fetch_url`, or unrestricted browser capability.
