@@ -1,11 +1,6 @@
 const START_URL =
   "https://www.queenslandcountry.health/provider-search/hospital-search-page/";
 
-const ALLOWED_TOP_LEVEL_HOSTS = new Set([
-  "www.queenslandcountry.health",
-  "queenslandcountry.health",
-]);
-
 const ALLOWED_HOSPITALS = new Set([
   "Buderim Private Hospital",
   "Sunshine Coast University Private Hospital",
@@ -36,59 +31,34 @@ function assertInput(input) {
   }
 }
 
-function isAllowedTopLevelUrl(value) {
-  const url = new URL(value);
-  return url.protocol === "https:" && ALLOWED_TOP_LEVEL_HOSTS.has(url.hostname);
+function buildLookupUrl(hospitalName) {
+  const url = new URL(START_URL);
+  url.searchParams.set("lat", "undefined");
+  url.searchParams.set("lng", "undefined");
+  url.searchParams.set("gps", "0");
+  url.searchParams.set("location", "");
+  url.searchParams.set("name", hospitalName);
+  return url;
 }
 
-async function collectControls(page) {
-  return page
-    .locator("input, button, select")
-    .evaluateAll((nodes) =>
-      nodes.slice(0, 60).map((node) => ({
-        tag: node.tagName.toLowerCase(),
-        type: node.getAttribute("type"),
-        name: node.getAttribute("name"),
-        id: node.id || null,
-        placeholder: node.getAttribute("placeholder"),
-        aria_label: node.getAttribute("aria-label"),
-        labels: node.labels
-          ? Array.from(node.labels)
-              .map((label) => label.innerText.trim())
-              .filter(Boolean)
-          : [],
-        text:
-          node.tagName === "BUTTON"
-            ? node.innerText.trim().slice(0, 120)
-            : null,
-      })),
-    );
+function htmlToText(html) {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-async function fillHospitalName(page, value) {
-  const candidates = [
-    page.getByLabel("Provider Name", { exact: true }),
-    page.locator('input[name*="Provider" i]'),
-    page.locator('input[id*="Provider" i]'),
-  ];
-
-  for (const candidate of candidates) {
-    if ((await candidate.count()) === 0) continue;
-    const input = candidate.first();
-    await input.waitFor({ state: "attached", timeout: 8_000 });
-    await input.fill(value);
-    return;
-  }
-
-  throw new Error("Provider Name input was not found.");
-}
-
-function extractSnippet(bodyText, hospitalName) {
-  const normalized = bodyText.replace(/\s+/g, " ").trim();
-  const lower = normalized.toLowerCase();
+function extractSnippet(text, hospitalName) {
+  const lower = text.toLowerCase();
   const index = lower.indexOf(hospitalName.toLowerCase());
-  if (index < 0) return normalized.slice(0, 2500);
-  return normalized.slice(Math.max(0, index - 500), index + 2500);
+  if (index < 0) return text.slice(0, 2500);
+  return text.slice(Math.max(0, index - 500), index + 2500);
 }
 
 export async function run(input, context = {}) {
@@ -102,57 +72,40 @@ export async function run(input, context = {}) {
   }
 
   const started = Date.now();
-  let browser;
+  const url = buildLookupUrl(input.hospital_name);
 
   try {
-    const { chromium } = await import("playwright");
-    browser = await chromium.launch({ headless: true });
-
-    context.signal?.addEventListener(
-      "abort",
-      () => {
-        void browser?.close().catch(() => {});
+    const response = await fetch(url, {
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "user-agent":
+          "Mozilla/5.0 (compatible; ChatGPTCapabilityBridge/1.0; +https://github.com/)",
       },
-      { once: true },
-    );
-
-    const browserContext = await browser.newContext({
-      locale: "en-AU",
-      timezoneId: "Australia/Brisbane",
-    });
-    const page = await browserContext.newPage();
-
-    await page.route("**/*", async (route) => {
-      const request = route.request();
-      if (
-        request.isNavigationRequest() &&
-        request.frame() === page.mainFrame() &&
-        !isAllowedTopLevelUrl(request.url())
-      ) {
-        await route.abort("blockedbyclient");
-        return;
-      }
-      await route.continue();
+      redirect: "error",
+      signal: context.signal,
     });
 
-    await page.goto(START_URL, {
-      waitUntil: "domcontentloaded",
-      timeout: 30_000,
-    });
-
-    await fillHospitalName(page, input.hospital_name);
-
-    const findButton = page.getByRole("button", { name: /^Find$/i }).first();
-    if ((await findButton.count()) === 0) {
-      throw new Error("Find button was not found.");
+    if (!response.ok) {
+      return failure(
+        "HTTP_ERROR",
+        "Hospital search returned HTTP " + response.status + ".",
+        {
+          provenance: {
+            retrieved_at: new Date().toISOString(),
+            source_url: url.toString(),
+            execution: "http",
+          },
+          diagnostics: {
+            duration_ms: Date.now() - started,
+            http_status: response.status,
+          },
+        },
+      );
     }
 
-    await findButton.click({ timeout: 10_000 });
-    await page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => {});
-    await page.waitForTimeout(1_000);
-
-    const bodyText = await page.locator("body").innerText();
-    const found = bodyText
+    const html = await response.text();
+    const text = htmlToText(html);
+    const found = text
       .toLowerCase()
       .includes(input.hospital_name.toLowerCase());
 
@@ -164,36 +117,34 @@ export async function run(input, context = {}) {
       },
       evidence: {
         hospital_found: found,
-        evidence_snippet: extractSnippet(bodyText, input.hospital_name),
+        evidence_snippet: extractSnippet(text, input.hospital_name),
       },
       provenance: {
         retrieved_at: new Date().toISOString(),
-        start_url: START_URL,
-        final_url: page.url(),
-        execution: "playwright",
+        source_url: url.toString(),
+        execution: "http",
       },
       diagnostics: {
         duration_ms: Date.now() - started,
+        http_status: response.status,
       },
     };
   } catch (error) {
     return failure(
-      context.signal?.aborted ? "TIMEOUT" : "UI_CHANGED",
+      context.signal?.aborted ? "TIMEOUT" : "FETCH_FAILED",
       error instanceof Error ? error.message : "Hospital lookup failed.",
       {
         provenance: {
           retrieved_at: new Date().toISOString(),
-          start_url: START_URL,
-          execution: "playwright",
+          source_url: url.toString(),
+          execution: "http",
         },
         diagnostics: {
           duration_ms: Date.now() - started,
         },
       },
     );
-  } finally {
-    await browser?.close().catch(() => {});
   }
 }
 
-export { extractSnippet, isAllowedTopLevelUrl };
+export { buildLookupUrl, extractSnippet, htmlToText };
