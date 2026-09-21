@@ -29,11 +29,15 @@ try {
   await page.locator('button[type="submit"]').filter({ hasText: /Choose cover/i }).click({ force: true });
 
   await page.waitForLoadState("domcontentloaded").catch(() => {});
-  await page.waitForTimeout(500);
-
+  await page.waitForTimeout(400);
   await page.locator("#SG750").check({ force: true });
   await page.locator("#choose_61951").check({ force: true });
   await page.locator('button[type="submit"]').filter({ hasText: /Choose extras/i }).click({ force: true });
+
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  await page.waitForTimeout(400);
+  await page.locator("#choose_2457").check({ force: true });
+  await page.locator('button[type="submit"]').filter({ hasText: /Review cover/i }).click({ force: true });
 
   await page.waitForLoadState("domcontentloaded").catch(() => {});
   await page.waitForTimeout(800);
@@ -42,43 +46,25 @@ try {
     .locator("input, select, button, a")
     .evaluateAll((els) =>
       els
-        .map((el) => {
-          const id = el.id || null;
-          const label = id
-            ? document.querySelector('label[for="' + CSS.escape(id) + '"]')?.innerText?.trim() ?? null
-            : null;
-          const parentText =
-            el.parentElement?.innerText?.replace(/\s+/g, " ").trim().slice(0, 600) ?? null;
-
-          return {
-            tag: el.tagName.toLowerCase(),
-            type: el.getAttribute("type"),
-            id,
-            name: el.getAttribute("name"),
-            value: el.getAttribute("value"),
-            checked: "checked" in el ? el.checked : null,
-            label,
-            text:
-              el.tagName === "BUTTON" || el.tagName === "A"
-                ? el.innerText.trim()
-                : null,
-            href: el.tagName === "A" ? el.getAttribute("href") : null,
-            parent_text: parentText,
-            options:
-              el.tagName === "SELECT"
-                ? [...el.options].map((o) => ({
-                    value: o.value,
-                    text: o.text.trim(),
-                    selected: o.selected,
-                  }))
-                : null,
-          };
-        })
+        .map((el) => ({
+          tag: el.tagName.toLowerCase(),
+          type: el.getAttribute("type"),
+          id: el.id || null,
+          name: el.getAttribute("name"),
+          value: el.getAttribute("value"),
+          text:
+            el.tagName === "BUTTON" || el.tagName === "A"
+              ? el.innerText.trim()
+              : null,
+          href: el.tagName === "A" ? el.getAttribute("href") : null,
+          parent_text:
+            el.parentElement?.innerText?.replace(/\s+/g, " ").trim().slice(0, 700) ?? null,
+        }))
         .filter((x) =>
           x.id ||
           x.name ||
-          /select extras|extras|continue|next|quote|custom|review|starter|premium|essential/i.test(
-            [x.text, x.label, x.parent_text].filter(Boolean).join(" "),
+          /quote|join|continue|premium|weekly|monthly|signature|select extras|review/i.test(
+            [x.text, x.parent_text].filter(Boolean).join(" "),
           )
         ),
     );
@@ -86,7 +72,7 @@ try {
   const body = (await page.locator("body").innerText())
     .replace(/\r/g, "")
     .replace(/\n{3,}/g, "\n\n")
-    .slice(0, 26000);
+    .slice(0, 30000);
 
   process.stdout.write(
     JSON.stringify({ url: page.url(), title: await page.title(), controls, body }, null, 2) + "\n",
