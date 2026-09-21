@@ -87,13 +87,11 @@ export async function withBrowserTask(
 
       if (
         request.isNavigationRequest() &&
-        request.frame() === request.frame().page()?.mainFrame?.()
+        request.frame().parentFrame() === null &&
+        !isAllowedTopLevelUrl(request.url(), allowedHosts)
       ) {
-        const target = request.url();
-        if (!isAllowedTopLevelUrl(target, allowedHosts)) {
-          await route.abort("blockedbyclient");
-          return;
-        }
+        await route.abort("blockedbyclient");
+        return;
       }
 
       await route.continue();
