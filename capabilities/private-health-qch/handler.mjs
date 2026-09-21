@@ -136,6 +136,19 @@ async function selectFirstMeaningfulOption(page) {
   return selected;
 }
 
+async function clickVisibleText(page, text, timeout = 10_000) {
+  const matches = page.getByText(text, { exact: true });
+  const count = await matches.count();
+  for (let i = 0; i < count; i += 1) {
+    const candidate = matches.nth(i);
+    if (await candidate.isVisible().catch(() => false)) {
+      await candidate.click({ timeout });
+      return;
+    }
+  }
+  throw new Error("Visible control not found for text: " + text);
+}
+
 function extractEvidence(bodyText, hospitalProduct, extrasProduct) {
   const normalized = bodyText.replace(/\s+/g, " ").trim();
   const lower = normalized.toLowerCase();
@@ -243,30 +256,26 @@ export async function run(input, context = {}) {
       await page.waitForTimeout(1_000);
 
       const hospitalButtonName = SUPPORTED_HOSPITAL_PRODUCTS.get(input.hospital_product);
-      const hospitalButton = page.getByRole("button", {
-        name: hospitalButtonName,
-        exact: true,
-      });
-      await hospitalButton.waitFor({ state: "visible", timeout: 10_000 });
-      await hospitalButton.click();
+      await clickVisibleText(page, hospitalButtonName);
       await page.waitForTimeout(800);
 
       let currentText = await page.locator("body").innerText();
       if (!currentText.includes(input.extras_product)) {
-        const extrasTab = page.getByRole("button", { name: /choose extras/i }).first();
-        if ((await extrasTab.count()) > 0) {
-          await extrasTab.click();
-          await page.waitForTimeout(800);
+        const chooseExtras = page.getByText("Choose extras", { exact: true });
+        const count = await chooseExtras.count();
+        for (let i = 0; i < count; i += 1) {
+          if (await chooseExtras.nth(i).isVisible().catch(() => false)) {
+            await chooseExtras.nth(i).click();
+            await page.waitForTimeout(800);
+            break;
+          }
         }
       }
 
       const extrasButtonName = SUPPORTED_EXTRAS_PRODUCTS.get(input.extras_product);
-      const extrasButton = page.getByRole("button", {
-        name: extrasButtonName,
-        exact: true,
-      });
-      if ((await extrasButton.count()) > 0) {
-        await extrasButton.click();
+      const extrasMatches = page.getByText(extrasButtonName, { exact: true });
+      if ((await extrasMatches.count()) > 0) {
+        await clickVisibleText(page, extrasButtonName);
         await page.waitForTimeout(1_000);
       }
 
