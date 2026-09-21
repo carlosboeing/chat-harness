@@ -96,7 +96,7 @@ async function checkNamedRadio(page, label, occurrence = 0) {
   });
   const count = await locator.count();
   if (count <= occurrence) return false;
-  await locator.nth(occurrence).check();
+  await locator.nth(occurrence).check({ force: true });
   return true;
 }
 
@@ -128,7 +128,7 @@ async function chooseTextOption(page, value) {
   for (const role of ["radio", "checkbox"]) {
     const control = page.getByRole(role, { name: pattern });
     if ((await control.count()) > 0) {
-      await control.first().check();
+      await control.first().check({ force: true });
       return true;
     }
   }
@@ -138,7 +138,7 @@ async function chooseTextOption(page, value) {
     const first = label.first();
     const type = await first.getAttribute("type");
     if (type === "radio" || type === "checkbox") {
-      await first.check();
+      await first.check({ force: true });
     } else {
       await first.click();
     }
