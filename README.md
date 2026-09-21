@@ -17,6 +17,8 @@ The dispatcher is generic; capabilities are explicit and typed. This repository 
 
 The GitHub transport is replaceable. Capability names and request/result contracts should remain stable if the runtime later moves to MCP, serverless infrastructure, or another execution backend.
 
+See [`docs/design.md`](docs/design.md) for the implementation architecture, runtime boundaries, safety model, and spike/rollout interpretation.
+
 ## Capabilities
 
 - `linkedin.job.lookup` — read-only lookup of one public LinkedIn job by numeric job ID through LinkedIn's unauthenticated guest job endpoint.
