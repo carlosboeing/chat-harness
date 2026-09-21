@@ -10,12 +10,18 @@
       "max_output_chars": 30000,
       "network_policy": {
         "scheme": "https",
-        "hosts": ["www.linkedin.com", "linkedin.com", "*.linkedin.com"],
+        "hosts": [
+          "www.linkedin.com",
+          "linkedin.com",
+          "*.linkedin.com"
+        ],
         "request_template": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
       },
       "input": {
         "type": "object",
-        "required": ["job_id"],
+        "required": [
+          "job_id"
+        ],
         "properties": {
           "job_id": {
             "type": "string",
@@ -46,28 +52,43 @@
           "profile_ref",
           "hospital_product",
           "extras_product",
-          "excess"
+          "excess",
+          "payment_frequency"
         ],
         "properties": {
           "profile_ref": {
             "type": "string",
-            "enum": ["synthetic-family-qld-v1"]
+            "enum": [
+              "synthetic-family-qld-v1"
+            ]
           },
           "hospital_product": {
             "type": "string",
-            "enum": ["Signature Hospital (Silver+)"]
+            "enum": [
+              "Signature Hospital (Silver+)"
+            ]
           },
           "extras_product": {
             "type": "string",
-            "enum": ["Select Extras"]
+            "enum": [
+              "Select Extras"
+            ]
           },
           "excess": {
             "type": "integer",
-            "enum": [750]
+            "enum": [
+              750
+            ]
+          },
+          "payment_frequency": {
+            "type": "string",
+            "enum": [
+              "monthly"
+            ]
           }
         },
         "additionalProperties": false
       }
     }
   }
-}
+}\n
