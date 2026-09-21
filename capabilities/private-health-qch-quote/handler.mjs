@@ -18,7 +18,7 @@ const SYNTHETIC_PROFILES = {
     partnerAge: 40,
     continuousHospitalCover: true,
     adultDependents: false,
-    incomeOptionIndex: 1,
+    incomeOptionValue: "0",
   },
 };
 
@@ -104,18 +104,21 @@ async function fillAge(page, labelPattern, value, fallbackIndex) {
   const byLabel = page.getByLabel(labelPattern);
   if ((await byLabel.count()) > 0) {
     await byLabel.first().fill(String(value));
+    await byLabel.first().blur();
     return true;
   }
 
   const numbers = page.locator('input[type="number"]:visible');
   if ((await numbers.count()) > fallbackIndex) {
     await numbers.nth(fallbackIndex).fill(String(value));
+    await numbers.nth(fallbackIndex).blur();
     return true;
   }
 
   const textInputs = page.locator('input[type="text"]:visible');
   if ((await textInputs.count()) > fallbackIndex) {
     await textInputs.nth(fallbackIndex).fill(String(value));
+    await textInputs.nth(fallbackIndex).blur();
     return true;
   }
 
@@ -213,86 +216,45 @@ export function extractQuoteFromText(
 }
 
 async function fillInitialQuestions(page, profile, step) {
-  await step("select-family", async () => {
-    if (!(await checkNamedRadio(page, profile.coverType))) {
-      throw new BrowserPolicyError(
-        "UI_CHANGED",
-        "Could not locate the Family cover control.",
-      );
-    }
-  });
+  await step("select-family", () =>
+    page.locator("#CoverType_family").check({ force: true }),
+  );
 
-  await step("select-state", async () => {
-    if (!(await checkNamedRadio(page, profile.state))) {
-      throw new BrowserPolicyError(
-        "UI_CHANGED",
-        "Could not locate the QLD state control.",
-      );
-    }
-  });
+  await step("select-state", () =>
+    page.locator("#state_QLD").check({ force: true }),
+  );
 
   await step("fill-primary-age", async () => {
-    if (!(await fillAge(page, /what is your age/i, profile.age, 0))) {
-      throw new BrowserPolicyError(
-        "UI_CHANGED",
-        "Could not locate the primary age field.",
-      );
-    }
+    const age = page.locator("#Member_Age");
+    await age.fill(String(profile.age));
+    await age.blur();
+    await page.waitForTimeout(150);
   });
 
-  await step("primary-continuous-cover", async () => {
-    if (!(await checkNamedRadio(page, "Yes", 0))) {
-      throw new BrowserPolicyError(
-        "UI_CHANGED",
-        "Could not answer primary continuous-cover question.",
-      );
-    }
-  });
+  await step("primary-continuous-cover", () =>
+    page.locator("#Member_ContinuousCover_Yes").check({ force: true }),
+  );
 
   await step("fill-partner-age", async () => {
-    if (
-      !(await fillAge(
-        page,
-        /partner(?:'s|s) age/i,
-        profile.partnerAge,
-        1,
-      ))
-    ) {
-      throw new BrowserPolicyError(
-        "UI_CHANGED",
-        "Could not locate the partner age field.",
-      );
-    }
+    const age = page.locator("#Partner_Age");
+    await age.fill(String(profile.partnerAge));
+    await age.blur();
+    await page.waitForTimeout(150);
   });
 
-  await step("partner-continuous-cover", async () => {
-    if (!(await checkNamedRadio(page, "Yes", 1))) {
-      throw new BrowserPolicyError(
-        "UI_CHANGED",
-        "Could not answer partner continuous-cover question.",
-      );
-    }
-  });
+  await step("partner-continuous-cover", () =>
+    page.locator("#Partner_ContinuousCover_Yes").check({ force: true }),
+  );
 
-  await step("adult-dependents", async () => {
-    const noRadios = page.getByRole("radio", { name: /^No$/i });
-    const count = await noRadios.count();
-    if (count > 0) {
-      await noRadios.last().check();
-    }
-  });
+  await step("adult-dependents", () =>
+    page.locator("#Dependants_YoungAdult_No").check({ force: true }),
+  );
 
-  await step("income-tier", async () => {
-    const selects = page.locator("select:visible");
-    const count = await selects.count();
-    if (count > 0) {
-      const select = selects.last();
-      const options = await select.locator("option").count();
-      if (options > profile.incomeOptionIndex) {
-        await select.selectOption({ index: profile.incomeOptionIndex });
-      }
-    }
-  });
+  await step("income-tier", () =>
+    page
+      .locator("#AssessableIncome_Couple")
+      .selectOption(String(profile.incomeOptionValue)),
+  );
 
   await step("choose-cover", async () => {
     const clicked = await clickFirst(page, ["Choose cover"]);
