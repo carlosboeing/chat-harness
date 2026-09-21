@@ -41,7 +41,7 @@ jobs:
 
       - name: Run synthetic QCH quote smoke test
         env:
-          CAPABILITY_REQUEST: '{"version":1,"capability":"private-health.quote.qch","input":{"profile_ref":"synthetic-family-qld-v1","hospital_product":"Signature Hospital (Silver+)","extras_product":"Select Extras"}}'
+          CAPABILITY_REQUEST: '{"version":1,"capability":"private-health.quote.qch","input":{"profile_ref":"synthetic-family-qld-v1","hospital_product":"Signature Hospital (Silver+)","extras_product":"Select Extras","excess":750,"payment_frequency":"weekly"}}'
         run: |
           node src/dispatch.mjs > browser-smoke-result.json
           cat browser-smoke-result.json
