@@ -34,7 +34,13 @@ function failure(state, error, extra = {}) {
 }
 
 function assertInput(input) {
-  const allowed = new Set(["profile_ref", "hospital_product", "extras_product"]);
+  const allowed = new Set([
+    "profile_ref",
+    "hospital_product",
+    "extras_product",
+    "excess",
+    "payment_frequency",
+  ]);
   const unexpected = Object.keys(input ?? {}).filter((key) => !allowed.has(key));
   if (unexpected.length > 0) {
     throw new Error("Unexpected input fields: " + unexpected.join(", "));
@@ -59,6 +65,12 @@ function assertInput(input) {
   }
   if (!SUPPORTED_EXTRAS_PRODUCTS.has(input.extras_product)) {
     throw new Error("Unsupported extras product for this experiment.");
+  }
+  if (input.excess !== 750) {
+    throw new Error("Only the $750 excess is allowed in this experiment.");
+  }
+  if (input.payment_frequency !== "weekly") {
+    throw new Error("Only weekly payment frequency is allowed in this experiment.");
   }
 }
 
@@ -281,6 +293,18 @@ export async function run(input, context = {}) {
       });
       await page.waitForLoadState("domcontentloaded", { timeout: 20_000 }).catch(() => {});
       await page.waitForTimeout(1_000);
+
+      await setRadioById(page, "SG750");
+      const signatureExcess = page.locator("#SG750");
+      const signatureCard = signatureExcess.locator(
+        "xpath=ancestor::*[.//select[@name='PaymentFrequency']][1]",
+      );
+      const signatureFrequency = signatureCard.locator(
+        'select[name="PaymentFrequency"]',
+      ).first();
+      if ((await signatureFrequency.count()) > 0) {
+        await signatureFrequency.selectOption({ label: "Weekly" });
+      }
 
       const hospitalButtonName = SUPPORTED_HOSPITAL_PRODUCTS.get(input.hospital_product);
       await clickVisibleText(page, hospitalButtonName);
