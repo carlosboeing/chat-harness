@@ -70,12 +70,10 @@ Execution runtime
 +-----------------------------+
      |
      v
-Bounded capability adapter
+Bounded durable adapter
 +-----------------------------+
 | linkedin.job.lookup         |
-| private-health.quote.qch    |
-| private-health.hospital.qch |
-| future domain adapters      |
+| future promoted adapters    |
 +-----------------------------+
      |
      v
@@ -239,20 +237,19 @@ It should not contain domain logic.
 
 Use for deterministic computation, parsing, direct HTTP/API calls and other short-lived operations that do not need browser state.
 
-Examples:
+Current durable example:
 
-- `linkedin.job.lookup`;
-- `private-health.hospital.qch`.
+- `linkedin.job.lookup`.
+
+The QCH hospital spike demonstrated that an apparently interactive workflow could be simplified to direct HTTP, but the spike adapter itself is no longer registered.
 
 ### `browser`
 
 Use only when interaction/rendered application state is actually required.
 
-The first proven workload is:
+The runtime was first proven by the disposable `private-health.quote.qch` spike. That adapter has been removed from the active registry; the reusable browser runtime remains and is regression-tested with a domain-agnostic local fixture.
 
-- `private-health.quote.qch`.
-
-Browser-backed capabilities must still be **bounded domain operations**. ChatGPT does not receive a generic `browser.run(url, prompt)`.
+Any future browser-backed capability must still be a **bounded durable operation** after promotion. ChatGPT does not receive a generic `browser.run(url, prompt)`.
 
 Potential future runtime classes should be added only after a real workload justifies them.
 
@@ -365,6 +362,21 @@ Every non-trivial capability should return enough sanitized metadata to diagnose
 
 Do not return entire page dumps or sensitive browser artifacts by default.
 
+## Capability lifecycle
+
+Adapters are disposable by default. The production registry on `main` contains only durable capabilities.
+
+See [`docs/capability-lifecycle.md`](capability-lifecycle.md) for the enforceable lifecycle and promotion rules.
+
+In short:
+
+- first observed one-off need -> spike branch;
+- repeated need across at least two independent real tasks -> eligible for durable promotion;
+- explicitly recurring Project/workflow need + successful end-to-end proof -> eligible for durable promotion;
+- otherwise remove the adapter before merge and keep only genuinely reusable infrastructure.
+
+CI validates that every handler on `main` is registered, every registry entry is durable with promotion evidence, and no `spikes/` or `experiments/` tree is present.
+
 ## Adding a capability
 
 Before implementation:
@@ -379,12 +391,13 @@ Before implementation:
 
 Then:
 
-1. add handler + tests;
-2. register it;
-3. test through the real transport;
-4. measure latency/reliability/maintenance;
-5. keep only reusable infrastructure in the bridge;
-6. keep domain methodology in the domain Project.
+1. create a spike adapter on a branch unless recurrence is already proven;
+2. test through the real transport;
+3. measure latency/reliability/maintenance;
+4. extract only genuinely reusable infrastructure;
+5. promote the adapter only if it meets the durable lifecycle rule;
+6. otherwise delete the adapter and domain-specific tests before merge;
+7. keep domain methodology in the domain Project.
 
 ## Domain independence
 
@@ -414,7 +427,7 @@ Future domains should reuse the same bridge rather than fork domain-specific exe
 
 The health-insurance work is a **spike used to validate the generic execution architecture**.
 
-The QCH adapters are intentionally narrow and may later be removed, generalized, or replaced.
+The QCH adapters were intentionally narrow and have now been removed from the active registry after serving their spike purpose.
 
 What should survive the spike is:
 
@@ -435,9 +448,11 @@ The first browser-runtime implementation was developed through two divergent spi
 
 They were alternatives, not cumulative dependencies. The useful reusable pieces from #13 — pinned package/lockfile, shared browser runtime, action/navigation budgets, sanitized diagnostics and separate CI — were deliberately consolidated into PR #14 rather than merging both branches.
 
-PR #14 is therefore the canonical initial browser-runtime change. PR #13 is superseded by that consolidation.
+PR #14 was the canonical initial browser-runtime change. PR #13 was superseded by that consolidation.
 
-The durable lesson is broader than those PRs: future capability spikes may use disposable domain adapters, but reusable execution infrastructure should be reconciled into one implementation path before promotion to `main`.
+After the runtime was proven, the private-health adapters were removed from `main` because recurrence was not established. The browser runtime, safety controls, dispatcher changes and generic regression coverage remain.
+
+The durable lesson is broader than those PRs: future capability spikes may use disposable domain adapters, but reusable execution infrastructure should be reconciled into one implementation path before promotion to `main`, and adapters themselves must separately earn durable status.
 
 ## Future evolution
 
