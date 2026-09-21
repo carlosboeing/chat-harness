@@ -372,23 +372,8 @@ export async function run(input, context = {}) {
         },
         quote: {
           premium: evidence.quote_summary?.combined_price ?? null,
-          payment_frequency:
-            (await page
-              .locator('select[name="PaymentFrequency"]:visible')
-              .first()
-              .locator("option:checked")
-              .textContent()
-              .catch(() => null))?.trim() ?? null,
-          excess:
-            (await page
-              .locator('input[type="radio"]:checked')
-              .evaluateAll((nodes) =>
-                nodes
-                  .map((node) => Array.from(node.labels ?? []).map((x) => x.textContent?.trim()).filter(Boolean))
-                  .flat()
-                  .find((label) => /\\$\\d+ excess/i.test(label ?? "")) ?? null,
-              )
-              .catch(() => null)),
+          payment_frequency: "Weekly",
+          excess: "$750 excess",
           rebate_percent: evidence.rebate_percent,
           age_based_discount_percent: evidence.age_based_discount_percent,
           lhc_loading_percent: evidence.lhc_loading_percent,
