@@ -3,18 +3,31 @@ name: capability-dispatch
 on:
   issues:
     types: [opened]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
   issues: write
 
 concurrency:
-  group: capability-${{ github.event.issue.number }}
+  group: capability-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout bridge
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run unit tests
+        run: node --test
+
   dispatch:
-    if: github.event.issue.author_association == 'OWNER' && startsWith(github.event.issue.title, '[capability] ')
+    if: github.event_name == 'issues' && github.event.issue.author_association == 'OWNER' && startsWith(github.event.issue.title, '[capability] ')
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
