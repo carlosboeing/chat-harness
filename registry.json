@@ -4,6 +4,7 @@
     "linkedin.job.lookup": {
       "description": "Resolve one public LinkedIn job by numeric job ID using LinkedIn's unauthenticated guest job endpoint.",
       "handler": "capabilities/linkedin-job/handler.mjs",
+      "runtime": "node",
       "side_effects": "read-only",
       "timeout_seconds": 15,
       "max_output_chars": 30000,
@@ -19,6 +20,40 @@
           "job_id": {
             "type": "string",
             "pattern": "^[0-9]{6,20}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "private-health.quote.qch": {
+      "description": "Read-only synthetic-profile smoke test of Queensland Country Health Fund's interactive family quote flow.",
+      "handler": "capabilities/private-health-qch/handler.mjs",
+      "runtime": "browser",
+      "side_effects": "read-only",
+      "timeout_seconds": 90,
+      "max_output_chars": 20000,
+      "network_policy": {
+        "scheme": "https",
+        "top_level_hosts": ["www.queenslandcountry.health", "queenslandcountry.health"],
+        "start_url": "https://www.queenslandcountry.health/cover-selector-new/"
+      },
+      "input": {
+        "type": "object",
+        "required": ["profile_ref", "hospital_product", "extras_product"],
+        "properties": {
+          "profile_ref": {
+            "type": "string",
+            "enum": ["synthetic-family-qld-v1"]
+          },
+          "hospital_product": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "extras_product": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           }
         },
         "additionalProperties": false
