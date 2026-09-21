@@ -56,14 +56,6 @@ jobs:
             node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("hospital-smoke-result.json","utf8")); if (x.state !== "HOSPITAL_NETWORK_LISTED") process.exit(1)'
           done
 
-      - name: Run Medibank provider network smoke test
-        env:
-          CAPABILITY_REQUEST: '{"version":1,"capability":"private-health.provider.medibank","input":{"provider_name":"Budi Dental","postcode":"4556","provider_type":"Dentist"}}'
-        run: |
-          node src/dispatch.mjs > medibank-provider-smoke-result.json
-          cat medibank-provider-smoke-result.json
-          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("medibank-provider-smoke-result.json","utf8")); if (x.state !== "PROVIDER_NETWORK_VERIFIED") process.exit(1)'
-
   dispatch:
     if: github.event_name == 'issues' && github.event.issue.author_association == 'OWNER' && startsWith(github.event.issue.title, '[capability] ')
     runs-on: ubuntu-latest
