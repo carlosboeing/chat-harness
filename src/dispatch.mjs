@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 
 const MAX_REQUEST_CHARS = 16_384;
+const DEFAULT_TIMEOUT_SECONDS = 30;
+const DEFAULT_MAX_OUTPUT_CHARS = 30_000;
 
 function envelope({
   capability = "unknown",
@@ -19,6 +21,10 @@ function envelope({
     result,
     error,
   };
+}
+
+function boundedInteger(value, fallback, min, max) {
+  return Number.isInteger(value) && value >= min && value <= max ? value : fallback;
 }
 
 async function main() {
@@ -106,6 +112,19 @@ async function main() {
     });
   }
 
+  const timeoutSeconds = boundedInteger(
+    entry.timeout_seconds,
+    DEFAULT_TIMEOUT_SECONDS,
+    1,
+    240,
+  );
+  const maxOutputChars = boundedInteger(
+    entry.max_output_chars,
+    DEFAULT_MAX_OUTPUT_CHARS,
+    1_000,
+    100_000,
+  );
+
   const handlerUrl = new URL("../" + entry.handler, import.meta.url);
   const handler = await import(handlerUrl.href);
 
@@ -113,9 +132,42 @@ async function main() {
     throw new Error("Registered capability handler does not export run(input).");
   }
 
-  const result = await handler.run(request.input);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(new Error("Capability execution exceeded its time budget."));
+  }, timeoutSeconds * 1000);
 
-  return envelope({
+  let result;
+  try {
+    result = await Promise.race([
+      handler.run(request.input, {
+        capability,
+        runtime: entry.runtime ?? "node",
+        signal: controller.signal,
+        timeout_seconds: timeoutSeconds,
+        max_output_chars: maxOutputChars,
+      }),
+      new Promise((resolve) => {
+        controller.signal.addEventListener(
+          "abort",
+          () =>
+            resolve({
+              ok: false,
+              state: "TIMEOUT",
+              error: {
+                code: "TIMEOUT",
+                message: "Capability execution exceeded its configured time budget.",
+              },
+            }),
+          { once: true },
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  let output = envelope({
     capability,
     requestId,
     ok: result?.ok === true,
@@ -123,6 +175,21 @@ async function main() {
     result,
     error: result?.error ?? null,
   });
+
+  if (JSON.stringify(output).length > maxOutputChars) {
+    output = envelope({
+      capability,
+      requestId,
+      ok: false,
+      state: "OUTPUT_TOO_LARGE",
+      error: {
+        code: "OUTPUT_TOO_LARGE",
+        message: "Capability result exceeded its configured output budget.",
+      },
+    });
+  }
+
+  return output;
 }
 
 try {
