@@ -426,17 +426,18 @@ What should survive the spike is:
 - structured provenance/failure states;
 - progressive escalation discipline.
 
-## Current rollout state
+## Initial browser-runtime rollout
 
-As of this design document:
+The first browser-runtime implementation was developed through two divergent spike branches:
 
-- `main` contains the original bridge and `linkedin.job.lookup`;
-- browser-backed capability work is still on draft branches/PRs;
-- PR #13 and PR #14 are **alternative/divergent implementations**, not cumulative dependencies;
-- merging both is not required and would create overlapping implementations;
-- one consolidated browser-runtime implementation should be selected, reviewed, and merged before browser capabilities are available from `main`.
+- PR #13 explored stronger reusable runtime/packaging structure;
+- PR #14 accumulated the live QCH experiments and empirical findings.
 
-The current empirical work and live smoke tests are on PR #14. Any stronger reusable runtime/packaging pieces from #13 should be deliberately reconciled into the chosen implementation rather than merging both PRs wholesale.
+They were alternatives, not cumulative dependencies. The useful reusable pieces from #13 — pinned package/lockfile, shared browser runtime, action/navigation budgets, sanitized diagnostics and separate CI — were deliberately consolidated into PR #14 rather than merging both branches.
+
+PR #14 is therefore the canonical initial browser-runtime change. PR #13 is superseded by that consolidation.
+
+The durable lesson is broader than those PRs: future capability spikes may use disposable domain adapters, but reusable execution infrastructure should be reconciled into one implementation path before promotion to `main`.
 
 ## Future evolution
 
