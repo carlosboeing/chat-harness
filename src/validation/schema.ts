@@ -1,4 +1,4 @@
-import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
+import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020";
 
 import lifecycleSchema from "../../schemas/lifecycle/frontmatter.schema.json" with { type: "json" };
 import sourcePolicySchema from "../../schemas/source-policy/v1.schema.json" with { type: "json" };
