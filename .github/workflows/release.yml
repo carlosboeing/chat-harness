@@ -116,10 +116,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Set up Node 20
+      - name: Set up Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Build Node-compatible CLI
         run: bun run build:npm
@@ -133,7 +133,7 @@ jobs:
       - name: Pack npm tarball
         run: npm pack --pack-destination dist/release
 
-      - name: Smoke packed CLI source under Node 20
+      - name: Smoke packed CLI source under Node 22
         run: node dist/npm/chat-harness.js --version
 
       - name: Generate package checksum
