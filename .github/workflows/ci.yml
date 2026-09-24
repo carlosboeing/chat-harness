@@ -32,6 +32,9 @@ jobs:
       - name: Validate durable capability registry
         run: bun run validate
 
+      - name: Validate documentation
+        run: bun run validate:docs
+
       - name: Run unit tests
         run: bun run test
 
