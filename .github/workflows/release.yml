@@ -237,19 +237,14 @@ jobs:
         env:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
-          published=""
           for _ in $(seq 1 30); do
-            if [ "$(npm view "chat-harness@${VERSION}" version 2>/dev/null || true)" = "${VERSION}" ]; then
-              published=1
-              break
+            OUTPUT="$(npx --yes "chat-harness@${VERSION}" --version 2>/dev/null || true)"
+            if [ "${OUTPUT}" = "${VERSION}" ]; then
+              echo "published artifact verified"
+              exit 0
             fi
             sleep 10
           done
 
-          if [ -z "${published}" ]; then
-            echo "::error::chat-harness@${VERSION} did not appear on npm within 5 minutes"
-            exit 1
-          fi
-
-          test "$(npx --yes "chat-harness@${VERSION}" --version)" = "${VERSION}"
-          echo "published artifact verified"
+          echo "::error::chat-harness@${VERSION} was published but its tarball/CLI did not become installable within 5 minutes"
+          exit 1
