@@ -16,7 +16,8 @@ import {
   type CommandName,
   type Finding,
 } from "./result.js";
-import { runSetup } from "../setup/command.js";\nimport { runValidate } from "../validation/command.js";
+import { runSetup } from "../setup/command.js";
+import { runValidate } from "../validation/command.js";
 import {
   resolveWorkspaceRoot,
   WorkspaceResolutionError,
