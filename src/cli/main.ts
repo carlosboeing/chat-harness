@@ -16,7 +16,7 @@ import {
   type CommandName,
   type Finding,
 } from "./result.js";
-import { runSetup } from "../setup/command.js";
+import { runSetup } from "../setup/command.js";\nimport { runValidate } from "../validation/command.js";
 import {
   resolveWorkspaceRoot,
   WorkspaceResolutionError,
@@ -67,6 +67,10 @@ function defaultHandler(
   context: CommandContext,
   runtime: CliRuntime,
 ): Promise<CommandHandlerResult> {
+  if (context.command === "validate") {
+    return runValidate(context.workspace);
+  }
+
   if (context.command === "setup") {
     return runSetup(
       context.workspace,

@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "validate": "node scripts/validate-registry.mjs",
     "test": "bun run test:cli && bun run test:legacy",
-    "test:cli": "bun test tests/cli tests/setup",
+    "test:cli": "bun test tests/cli tests/setup tests/validation tests/source-policy",
     "test:legacy": "node --test tests/*.test.mjs",
     "smoke:browser": "node scripts/smoke-browser-runtime.mjs"
   },

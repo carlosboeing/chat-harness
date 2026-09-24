@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "version",
+    "capabilities"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "description",
+          "handler",
+          "runtime",
+          "side_effects",
+          "timeout_seconds",
+          "max_output_chars",
+          "network_policy",
+          "input",
+          "lifecycle",
+          "promotion"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "handler": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runtime": {
+            "enum": [
+              "node",
+              "browser"
+            ]
+          },
+          "side_effects": {
+            "enum": [
+              "read-only",
+              "write",
+              "consequential"
+            ]
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_output_chars": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "network_policy": {
+            "type": "object"
+          },
+          "input": {
+            "type": "object"
+          },
+          "lifecycle": {
+            "const": "durable"
+          },
+          "promotion": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

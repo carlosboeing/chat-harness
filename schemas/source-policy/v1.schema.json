@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chat-harness.dev/schemas/source-policy/v1.schema.json",
+  "type": "object",
+  "required": [
+    "version"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "defaults": {
+      "type": "object",
+      "required": [
+        "privacy"
+      ],
+      "properties": {
+        "privacy": {
+          "enum": [
+            "public",
+            "personal",
+            "confidential",
+            "restricted"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "match",
+          "privacy"
+        ],
+        "properties": {
+          "match": {
+            "type": "object",
+            "required": [
+              "path"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "privacy": {
+            "enum": [
+              "public",
+              "personal",
+              "confidential",
+              "restricted"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

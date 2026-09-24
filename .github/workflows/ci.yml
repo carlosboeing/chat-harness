@@ -24,13 +24,7 @@ jobs:
           bun-version: 1.4.2
 
       - name: Install dependencies
-        run: bun install --ignore-scripts
-
-      - name: Capture regenerated Bun lock
-        run: |
-          echo "__CHAT_HARNESS_BUN_LOCK_BEGIN__"
-          cat bun.lock
-          echo "__CHAT_HARNESS_BUN_LOCK_END__"
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Type-check TypeScript
         run: bun run typecheck
@@ -56,7 +50,7 @@ jobs:
           bun-version: 1.4.2
 
       - name: Install dependencies
-        run: bun install --ignore-scripts
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Install Chromium
         run: bunx playwright install --with-deps --only-shell chromium
