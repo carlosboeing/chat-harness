@@ -134,10 +134,9 @@ export async function runCli(
       .argument("[path]", "Workspace root; defaults to the current directory")
       .option("--json", "Emit the stable machine-readable JSON envelope")
       .option("--no-color", "Disable ANSI terminal decoration")
-      .action(async (inputPath: string | undefined, command: Command) => {
+      .action(async (inputPath: string | undefined, options: { json?: boolean }) => {
         selectedCommand = name;
         selectedPath = inputPath;
-        const options = command.opts<{ json?: boolean }>();
         const workspace = await resolveWorkspaceRoot(inputPath, runtime.cwd);
         const handler = runtime.handlers[name] ?? defaultHandler;
         const output = await handler({ command: name, workspace });
