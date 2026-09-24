@@ -34,6 +34,32 @@ flowchart LR
 
 A Workspace is an **ownership and durable-state boundary**, not the complete context universe. Relevant context may live in other Workspaces, repositories, connected apps, assistant context systems, or current public sources. Retrieve it when it materially matters; keep canon in its owning source.
 
+## Installation
+
+Release artifacts are self-contained; the primary binary install does not require Bun or Node.
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/carlosboeing/chat-harness/main/install.sh | sh
+```
+
+PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/carlosboeing/chat-harness/main/install.ps1 | iex
+```
+
+Both installers verify the matching SHA-256 sidecar before installing. Set `CHAT_HARNESS_VERSION` to pin a release or `CHAT_HARNESS_INSTALL_DIR` to choose the destination.
+
+The secondary npm channel is:
+
+```bash
+npm install -g chat-harness
+```
+
+Package publication is release-gated; until v0.1.0 is published, build from the repository instead.
+
 ## Quick start
 
 The v0.1 CLI operates on one **local filesystem directory**.
