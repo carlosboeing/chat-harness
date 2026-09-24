@@ -106,7 +106,7 @@ Completed:
 - unscoped npm package `chat-harness` registered and published;
 - GitHub Release `v0.1.0` published from the qualified release-candidate commit with five native binaries, SHA-256 sidecars, and npm tarball;
 - npm trusted publishing/OIDC configured as the durable release path;
-- v0.1.1 release-engineering follow-up prepared on `main`; its corrected tag/release publication is tracked separately from the v0.1 qualification record.
+- GitHub Release and npm package `v0.1.1` / `chat-harness@0.1.1` published successfully; the release workflow's final smoke initially reported a false negative because npm metadata propagated before the tarball CDN, and the retry logic was hardened afterward.
 
 ## Release decision
 
