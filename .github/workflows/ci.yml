@@ -24,19 +24,16 @@ jobs:
           bun-version: 1.4.2
 
       - name: Install dependencies
-        run: bun install --ignore-scripts
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Type-check TypeScript
+        run: bun run typecheck
 
       - name: Validate durable capability registry
         run: bun run validate
 
-      - name: Run legacy capability tests
+      - name: Run unit tests
         run: bun run test
-
-      - name: Capture Bun lockfile for migration
-        run: |
-          echo "__CHAT_HARNESS_BUN_LOCK_BEGIN__"
-          cat bun.lock
-          echo "__CHAT_HARNESS_BUN_LOCK_END__"
 
   browser-smoke:
     if: github.event_name == 'pull_request'
@@ -53,7 +50,7 @@ jobs:
           bun-version: 1.4.2
 
       - name: Install dependencies
-        run: bun install --ignore-scripts
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Install Chromium
         run: bunx playwright install --with-deps --only-shell chromium

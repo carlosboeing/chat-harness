@@ -9,8 +9,12 @@
     "node": ">=20"
   },
   "scripts": {
+    "cli": "bun src/cli/main.ts",
+    "typecheck": "tsc --noEmit",
     "validate": "node scripts/validate-registry.mjs",
-    "test": "node --test",
+    "test": "bun run test:cli && bun run test:legacy",
+    "test:cli": "bun test tests/cli",
+    "test:legacy": "node --test tests/*.test.mjs",
     "smoke:browser": "node scripts/smoke-browser-runtime.mjs"
   },
   "dependencies": {
