@@ -81,7 +81,9 @@ describe("CLI surface", () => {
       const envelope = JSON.parse(io.stdout());
       expect(envelope.command).toBe(command);
       expect(envelope.workspace).toBe(await realpath(nested));
-      expect(envelope.result.state).toBe(\n        command === "setup" ? "changes_applied" : "ready",\n      );
+      expect(envelope.result.state).toBe(
+        command === "setup" ? "changes_applied" : "ready",
+      );
     },
   );
 
