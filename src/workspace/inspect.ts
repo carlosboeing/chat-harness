@@ -45,7 +45,9 @@ async function inspectPath(
     if (
       error instanceof Error &&
       "code" in error &&
-      ["ENOENT", "ENOTDIR"].includes(\n        (error as NodeJS.ErrnoException).code ?? "",\n      )
+      ["ENOENT", "ENOTDIR"].includes(
+        (error as NodeJS.ErrnoException).code ?? "",
+      )
     ) {
       return { path: managedPath, absolutePath, kind: "missing" };
     }
