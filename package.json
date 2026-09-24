@@ -1,8 +1,10 @@
 {
-  "name": "chatgpt-github-capability-bridge",
-  "version": "0.2.0",
+  "name": "chat-harness",
+  "version": "0.1.0",
   "private": true,
+  "description": "Harness engineering for AI assistants.",
   "type": "module",
+  "packageManager": "bun@1.4.2",
   "engines": {
     "node": ">=20"
   },
@@ -12,6 +14,12 @@
     "smoke:browser": "node scripts/smoke-browser-runtime.mjs"
   },
   "dependencies": {
+    "@clack/prompts": "1.8.1",
+    "commander": "15.0.0",
     "playwright": "1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "7.0.2"
   }
 }
