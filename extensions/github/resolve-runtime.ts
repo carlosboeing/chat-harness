@@ -30,7 +30,11 @@ export async function resolveRuntime(
   return registry.capabilities[capability]?.runtime ?? "node";
 }
 
-if (import.meta.main) {
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isEntrypoint) {
   const runtime = await resolveRuntime(process.env.CAPABILITY_REQUEST ?? "");
   process.stdout.write(`runtime=${runtime}\n`);
 }

@@ -340,6 +340,10 @@ export async function main(): Promise<void> {
   }
 }
 
-if (import.meta.main) {
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isEntrypoint) {
   await main();
 }
