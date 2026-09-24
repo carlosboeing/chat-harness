@@ -76,13 +76,17 @@ describe("CLI surface", () => {
       const io = capture(root);
 
       const code = await runCli([command, nested, "--json"], io.runtime);
-      expect(code).toBe(0);
+      expect(code).toBe(command === "validate" ? 1 : 0);
 
       const envelope = JSON.parse(io.stdout());
       expect(envelope.command).toBe(command);
       expect(envelope.workspace).toBe(await realpath(nested));
       expect(envelope.result.state).toBe(
-        command === "setup" ? "changes_applied" : "ready",
+        command === "setup"
+          ? "changes_applied"
+          : command === "validate"
+            ? "failed"
+            : "ready",
       );
     },
   );
@@ -97,7 +101,7 @@ describe("CLI surface", () => {
       const io = capture(child);
 
       const code = await runCli([command, "--json"], io.runtime);
-      expect(code).toBe(0);
+      expect(code).toBe(command === "validate" ? 1 : 0);
 
       const envelope = JSON.parse(io.stdout());
       expect(envelope.workspace).toBe(await realpath(child));
