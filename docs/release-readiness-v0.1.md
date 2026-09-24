@@ -31,7 +31,7 @@ This document is the implementation-side qualification record for Chat Harness v
 | Standalone binary distribution | pass | native five-platform private smoke |
 | Standalone does not require installed Bun/Node | pass | native runner smoke with empty `PATH` |
 | SHA-256 sidecars | pass | five-platform private smoke + checksum unit test |
-| Node/npm compatibility path | pass | Node 20 vs standalone JSON-equivalence smoke |
+| Node/npm compatibility path | pass | Node 22 vs standalone JSON-equivalence smoke |
 | npm package surface excludes examples/evals/extensions/capability runtime/tests | pass | real `npm pack --dry-run` allowlist check |
 | License/contribution/security basics | pass | repository files |
 | Release automation does not publish implicitly | pass | manual build-only release workflow; no tag/release/npm-publish step |
@@ -48,7 +48,7 @@ Private native smoke run `36012528324` succeeded on 2026-09-24 for:
 
 Each job compiled its native Bun standalone executable, ran `--version`, `setup --json`, and `validate --json` with an empty `PATH`, generated a SHA-256 sidecar, and uploaded a private Actions artifact.
 
-The regular CI distribution job independently builds Linux x64 standalone plus the bundled Node-compatible npm CLI, compares their `validate --json` results under Node 20, and validates the actual npm pack surface.
+The regular CI distribution job independently builds Linux x64 standalone plus the bundled Node-compatible npm CLI, compares their `validate --json` results under Node 22, and validates the actual npm pack surface.
 
 ## Public documentation/positioning audit
 
