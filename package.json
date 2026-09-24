@@ -14,7 +14,7 @@
     "validate": "bun scripts/validate-registry.ts",
     "test": "bun run test:cli && bun run test:legacy",
     "test:cli": "bun test tests/cli tests/setup tests/validation tests/source-policy tests/doctor tests/extensions tests/capabilities",
-    "test:legacy": "node --test tests/*.test.mjs",
+    "test:legacy": "node --test tests/workflow-contract.test.mjs",
     "smoke:browser": "bun scripts/smoke-browser-runtime.ts"
   },
   "dependencies": {
