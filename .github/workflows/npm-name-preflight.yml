@@ -1,0 +1,46 @@
+name: npm-name-preflight
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/npm-name-preflight.yml
+
+permissions:
+  contents: read
+
+jobs:
+  registry-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Check exact unscoped package name
+        shell: bash
+        run: |
+          set +e
+          OUTPUT="$(npm view chat-harness version --registry=https://registry.npmjs.org 2>&1)"
+          STATUS=$?
+          set -e
+
+          printf '%s\n' "$OUTPUT"
+
+          if [ "$STATUS" -eq 0 ]; then
+            echo "::error::npm package name chat-harness is already occupied."
+            exit 1
+          fi
+
+          if printf '%s\n' "$OUTPUT" | grep -qE 'E404|404 Not Found'; then
+            echo "npm registry authoritative result: chat-harness is unregistered/available."
+            exit 0
+          fi
+
+          echo "::error::npm registry check failed for an unexpected reason."
+          exit 2
