@@ -21,7 +21,7 @@ This document is the implementation-side qualification record for Chat Harness v
 | Doctor is read-only and reports hosted state unknown | pass | doctor tests |
 | Capability registry identity/schema/authority/security/budgets/lifecycle | pass | registry validation + tests |
 | Strict capability input validation before handler execution | pass | dispatcher integration tests |
-| GitHub persistent transport public/no-credential/read-only security gate | pass | negative tests |
+| GitHub persistent transport public/no-credential/read-only security gate | pass | negative tests + live private-main smoke |
 | TypeScript LinkedIn capability exact/mismatch/partial evidence semantics | pass | fixture tests |
 | Browser helper bounded but not represented as full egress sandbox | pass | browser policy tests + docs |
 | Frozen Phase 0 dispatcher behaviour under TypeScript | pass | dispatcher parity suite |
@@ -86,15 +86,20 @@ Current release-candidate state:
 - examples/evals use synthetic data;
 - observability uses structured findings/results rather than private transcripts or chain-of-thought.
 
+## Live GitHub transport qualification
+
+Private-main smoke issue `#20` exercised the real owner-gated GitHub transport on 2026-09-25 using public LinkedIn job ID `4468897387`. Workflow run `36013831053` completed successfully. The TypeScript dispatcher returned `ok: true`, state `EXACT_VERIFIED`, exact resource identity for the requested job, posted the structured `CAPABILITY_RESULT` comment, and automatically closed the issue as `completed`.
+
+This clears the v0.1 GitHub Issue → Actions → typed capability → structured comment → close integration gate without using private data or credentials.
+
 ## Qualification still pending
 
 These are real evidence/action gates rather than missing architecture:
 
 1. **Real ChatGPT host smoke** — requires a ChatGPT Project configured with the documented Project Instructions binding and a retrievable fixture Workspace. It must demonstrate that `AGENTS.md` is effective, Workspace Map/Workstream retrieval works, a fresh session resumes from `Next action`, cross-context Source Policy/transparency behaviour matches the documentation, and CLOSE persists durable state. Until then ChatGPT remains **documented / end-to-end unverified** in `docs/compatibility.md`.
-2. **Real GitHub transport smoke of the new implementation** — issue-triggered workflows use the default branch. Run after the release-candidate implementation is on private `main`, using only synthetic/public data, then verify structured result comment and automatic issue closure.
-3. **Canonical repository rename** to `carlosboeing/chat-harness` — explicit maintainer approval gate.
-4. **Authoritative npm name check** immediately before publication. A collision requires an explicit naming/scoping decision; do not silently change package identity.
-5. **External publication actions** — private→public, `v0.1.0` tag, GitHub Release, and npm publish each remain explicit maintainer approval gates.
+2. **Canonical repository rename** to `carlosboeing/chat-harness` — explicit maintainer approval gate.
+3. **Authoritative npm name check** immediately before publication. A collision requires an explicit naming/scoping decision; do not silently change package identity.
+4. **External publication actions** — private→public, `v0.1.0` tag, GitHub Release, and npm publish each remain explicit maintainer approval gates.
 
 ## Release decision
 
