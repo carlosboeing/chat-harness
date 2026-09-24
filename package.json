@@ -1,6 +1,6 @@
 {
   "name": "chat-harness",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": false,
   "description": "Harness engineering toolkit for long-running work with ChatGPT, Claude, and other AI assistants.",
   "type": "module",
@@ -18,10 +18,11 @@
     "smoke:browser": "bun scripts/smoke-browser-runtime.ts",
     "validate:docs": "bun scripts/validate-docs.ts",
     "validate:evals": "bun scripts/validate-evals.ts",
-    "build:npm": "bun build src/cli/main.ts --target=node --format=esm --minify --outfile dist/npm/chat-harness.js && bun scripts/prepare-npm.ts",
+    "build:npm": "bun build src/cli/main.ts --target=node --format=esm --packages=bundle --minify --outfile dist/npm/chat-harness.js && bun scripts/prepare-npm.ts",
     "build:binary": "bun scripts/build-binary.ts",
     "checksum": "bun scripts/checksum.ts",
-    "validate:package": "bun scripts/validate-package.ts"
+    "validate:package": "bun scripts/validate-package.ts",
+    "smoke:npm-package": "bun scripts/smoke-npm-package.ts"
   },
   "devDependencies": {
     "@types/node": "20.19.43",

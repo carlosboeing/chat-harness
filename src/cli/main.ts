@@ -2,6 +2,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { Command, CommanderError } from "commander";
 
+import packageMetadata from "../../package.json" with { type: "json" };
+
 import {
   EXIT_INTERNAL,
   EXIT_SUCCESS,
@@ -174,7 +176,7 @@ export async function runCli(
   program
     .name("chat-harness")
     .description("Harness engineering for AI assistants.")
-    .version("0.1.0")
+    .version(packageMetadata.version)
     .exitOverride()
     .configureOutput({
       writeOut: (output) => runtime.stdout(output),

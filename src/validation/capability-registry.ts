@@ -1,6 +1,6 @@
-import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import Ajv2020 from "ajv/dist/2020.js";
 import type { ValidateFunction } from "ajv";
 
 import registrySchema from "../../schemas/capability/registry.schema.json" with { type: "json" };
@@ -40,13 +40,6 @@ export interface CapabilityRegistry {
   capabilities: Record<string, CapabilityEntry>;
 }
 
-interface AjvLike {
-  compile(schema: object): ValidateFunction;
-}
-type AjvConstructor = new (options?: Record<string, unknown>) => AjvLike;
-const require = createRequire(import.meta.url);
-const ajvModule = require("ajv/dist/2020") as { default?: AjvConstructor } & AjvConstructor;
-const Ajv2020: AjvConstructor = ajvModule.default ?? ajvModule;
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 const validateRegistry = ajv.compile(registrySchema);
 

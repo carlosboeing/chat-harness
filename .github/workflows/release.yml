@@ -6,7 +6,7 @@ on:
       version:
         description: Release version to package (without v prefix)
         required: true
-        default: "0.1.1"
+        default: "0.1.2"
   push:
     tags:
       - "v*.*.*"
@@ -157,8 +157,8 @@ jobs:
       - name: Pack npm tarball
         run: npm pack --pack-destination dist/release
 
-      - name: Smoke packed CLI source under Node 24
-        run: node dist/npm/chat-harness.js --version
+      - name: Smoke clean-installed npm package under Node 24
+        run: bun run smoke:npm-package -- "dist/release/chat-harness-${{ needs.verify.outputs.version }}.tgz"
 
       - name: Generate package checksum
         shell: bash
