@@ -35,6 +35,9 @@ jobs:
       - name: Validate documentation
         run: bun run validate:docs
 
+      - name: Validate evaluation fixtures
+        run: bun run validate:evals
+
       - name: Run unit tests
         run: bun run test
 

@@ -13,10 +13,11 @@
     "typecheck": "tsc --noEmit",
     "validate": "bun scripts/validate-registry.ts",
     "test": "bun run test:cli && bun run test:legacy",
-    "test:cli": "bun test tests/cli tests/setup tests/validation tests/source-policy tests/doctor tests/extensions tests/capabilities",
+    "test:cli": "bun test tests/cli tests/setup tests/validation tests/source-policy tests/doctor tests/extensions tests/capabilities tests/evals",
     "test:legacy": "node --test tests/workflow-contract.test.mjs",
     "smoke:browser": "bun scripts/smoke-browser-runtime.ts",
-    "validate:docs": "bun scripts/validate-docs.ts"
+    "validate:docs": "bun scripts/validate-docs.ts",
+    "validate:evals": "bun scripts/validate-evals.ts"
   },
   "dependencies": {
     "@clack/prompts": "1.8.1",
