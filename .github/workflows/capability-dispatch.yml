@@ -19,25 +19,31 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Checkout bridge
+      - name: Checkout Chat Harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Resolve capability runtime
         id: runtime
         env:
           CAPABILITY_REQUEST: ${{ github.event.issue.body }}
-        run: node src/resolve-runtime.mjs >> "$GITHUB_OUTPUT"
+        run: bun extensions/github/resolve-runtime.ts >> "$GITHUB_OUTPUT"
 
       - name: Install browser runtime
         if: steps.runtime.outputs.runtime == 'browser'
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npx playwright install --with-deps --only-shell chromium
+        run: bunx playwright install --with-deps --only-shell chromium
 
       - name: Run capability
         env:
           CAPABILITY_REQUEST: ${{ github.event.issue.body }}
-        run: node src/dispatch.mjs > capability-result.json
+        run: bun extensions/github/dispatch.ts > capability-result.json
 
       - name: Post structured result
         env:
