@@ -6,7 +6,7 @@ on:
       version:
         description: Release version to package (without v prefix)
         required: true
-        default: "0.1.0"
+        default: "0.1.1"
   push:
     tags:
       - "v*.*.*"
