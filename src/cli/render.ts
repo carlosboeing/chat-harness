@@ -29,6 +29,22 @@ export function renderHuman(
     `state: ${envelope.result.state}`,
   ];
 
+  const operations = envelope.result.operations;
+  if (Array.isArray(operations)) {
+    for (const operation of operations) {
+      if (
+        operation &&
+        typeof operation === "object" &&
+        "action" in operation &&
+        "path" in operation
+      ) {
+        lines.push(
+          `operation: ${String(operation.action)} ${String(operation.path)}`,
+        );
+      }
+    }
+  }
+
   if (envelope.findings.length > 0) {
     lines.push(...envelope.findings.map(renderFinding));
   }

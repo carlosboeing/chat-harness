@@ -10,12 +10,14 @@ import {
   type ExitCode,
 } from "./exit-codes.js";
 import { renderHuman, renderJson } from "./render.js";
+import { renderInteractive } from "./terminal.js";
 import {
   commandEnvelope,
   type CommandEnvelope,
   type CommandName,
   type Finding,
 } from "./result.js";
+import { runDoctor } from "../doctor/command.js";
 import { runSetup } from "../setup/command.js";
 import { runValidate } from "../validation/command.js";
 import {
@@ -51,6 +53,7 @@ export interface CliRuntime {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   handlers: Partial<Record<CommandName, CommandHandler>>;
+  nativeTerminal: boolean;
 }
 
 function defaultRuntime(): CliRuntime {
@@ -61,6 +64,7 @@ function defaultRuntime(): CliRuntime {
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text),
     handlers: {},
+    nativeTerminal: true,
   };
 }
 
@@ -68,6 +72,10 @@ function defaultHandler(
   context: CommandContext,
   runtime: CliRuntime,
 ): Promise<CommandHandlerResult> {
+  if (context.command === "doctor") {
+    return runDoctor(context.workspace);
+  }
+
   if (context.command === "validate") {
     return runValidate(context.workspace);
   }
@@ -128,9 +136,13 @@ function writeEnvelope(
   color: boolean,
   runtime: CliRuntime,
 ): ExitCode {
-  runtime.stdout(
-    json ? renderJson(envelope) : renderHuman(envelope, { color }),
-  );
+  if (!json && color && runtime.isTTY && runtime.nativeTerminal) {
+    renderInteractive(envelope);
+  } else {
+    runtime.stdout(
+      json ? renderJson(envelope) : renderHuman(envelope, { color }),
+    );
+  }
   return exitCodeForEnvelope(envelope);
 }
 
@@ -146,6 +158,10 @@ export async function runCli(
       ...base.handlers,
       ...overrides.handlers,
     },
+    nativeTerminal:
+      overrides.stdout === undefined &&
+      overrides.stderr === undefined &&
+      (overrides.nativeTerminal ?? base.nativeTerminal),
   };
 
   const requestedJson = argv.includes("--json");

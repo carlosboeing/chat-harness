@@ -86,7 +86,7 @@ describe("CLI surface", () => {
           ? "changes_applied"
           : command === "validate"
             ? "failed"
-            : "ready",
+            : "healthy",
       );
     },
   );
@@ -171,6 +171,18 @@ describe("CLI surface", () => {
     expect(code).toBe(0);
     expect(io.stdout()).not.toContain("\u001b[");
     expect(io.stdout()).not.toContain("\u001b[?25");
+  });
+
+  test("missing workspace returns a finding-level failure", async () => {
+    const root = await workspace();
+    const missing = path.join(root, "missing");
+    const io = capture(root);
+
+    const code = await runCli(["doctor", missing, "--json"], io.runtime);
+    expect(code).toBe(1);
+
+    const envelope = JSON.parse(io.stdout());
+    expect(envelope.findings[0].code).toBe("workspace.not_found");
   });
 
   test("non-directory workspace returns a finding-level failure", async () => {
