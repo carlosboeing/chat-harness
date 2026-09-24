@@ -1,8 +1,8 @@
 # v0.1 release readiness
 
-Status: **release candidate — external/manual gates remain**
+Status: **v0.1 released — hosted ChatGPT smoke remains pending**
 
-This document is the implementation-side qualification record for Chat Harness v0.1. It separates implemented/tested behaviour from release actions that require a real hosted-assistant path or explicit maintainer approval.
+This document is the implementation-side qualification record for Chat Harness v0.1. The repository, GitHub Release, and npm package have been published; the separate real hosted ChatGPT binding smoke remains intentionally pending.
 
 ## Deterministic implementation coverage
 
@@ -34,7 +34,7 @@ This document is the implementation-side qualification record for Chat Harness v
 | Node/npm compatibility path | pass | Node 22 vs standalone JSON-equivalence smoke |
 | npm package surface excludes examples/evals/extensions/capability runtime/tests | pass | real `npm pack --dry-run` allowlist check |
 | License/contribution/security basics | pass | repository files |
-| Release automation does not publish implicitly | pass | manual build-only release workflow; no tag/release/npm-publish step |
+| Release automation is explicit and tag-gated | pass | semver tag workflow qualifies, builds, publishes via npm trusted publishing/OIDC, creates GitHub Release assets, then smoke-checks npm |
 
 ## Supported build matrix evidence
 
@@ -94,13 +94,20 @@ This clears the v0.1 GitHub Issue → Actions → typed capability → structure
 
 ## Qualification still pending
 
-These are real evidence/action gates rather than missing architecture:
+One evidence gate remains:
 
 1. **Real ChatGPT host smoke** — requires a ChatGPT Project configured with the documented Project Instructions binding and a retrievable fixture Workspace. It must demonstrate that `AGENTS.md` is effective, Workspace Map/Workstream retrieval works, a fresh session resumes from `Next action`, cross-context Source Policy/transparency behaviour matches the documentation, and CLOSE persists durable state. Until then ChatGPT remains **documented / end-to-end unverified** in `docs/compatibility.md`.
-2. **Canonical repository rename** to `carlosboeing/chat-harness` — explicit maintainer approval gate.
-3. **Authoritative npm name check** immediately before publication. A collision requires an explicit naming/scoping decision; do not silently change package identity.
-4. **External publication actions** — private→public, `v0.1.0` tag, GitHub Release, and npm publish each remain explicit maintainer approval gates.
+
+## Publication state
+
+Completed:
+
+- repository renamed to `carlosboeing/chat-harness` and made public;
+- unscoped npm package `chat-harness` registered and published;
+- GitHub Release `v0.1.0` published from the qualified release-candidate commit with five native binaries, SHA-256 sidecars, and npm tarball;
+- npm trusted publishing/OIDC configured as the durable release path;
+- v0.1.1 release-engineering follow-up prepared on `main`; its corrected tag/release publication is tracked separately from the v0.1 qualification record.
 
 ## Release decision
 
-Do not call v0.1 released or mark ChatGPT as verified until the required hosted smoke and publication gates have actually occurred. No deferred v0.1 architecture should be pulled into the release merely to clear these gates.
+Chat Harness v0.1 is publicly released. Do not mark ChatGPT as end-to-end verified until the real hosted smoke has actually occurred. No deferred architecture should be pulled into a patch release merely to manufacture that evidence.

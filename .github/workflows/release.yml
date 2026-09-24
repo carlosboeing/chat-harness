@@ -212,7 +212,11 @@ jobs:
           TAG: ${{ needs.verify.outputs.tag }}
         shell: bash
         run: |
-          gh release create "${TAG}"             --title "${TAG}"             --notes-file "docs/releases/${TAG}.md"             --verify-tag             dist/release/*
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes-file "docs/releases/${TAG}.md" \
+            --verify-tag \
+            dist/release/*
 
   smoke-published:
     if: github.event_name == 'push'

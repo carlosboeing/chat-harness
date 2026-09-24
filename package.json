@@ -2,7 +2,7 @@
   "name": "chat-harness",
   "version": "0.1.1",
   "private": false,
-  "description": "Harness engineering for AI assistants.",
+  "description": "Harness engineering toolkit for long-running work with ChatGPT, Claude, and other AI assistants.",
   "type": "module",
   "packageManager": "bun@1.4.2",
   "engines": {
@@ -43,11 +43,13 @@
   },
   "keywords": [
     "ai",
+    "ai-assistants",
     "chatgpt",
-    "harness",
+    "claude",
+    "harness-engineering",
     "context-engineering",
-    "agent-harness",
-    "durable-state"
+    "durable-state",
+    "agent-harness"
   ],
   "bin": {
     "chat-harness": "dist/npm/chat-harness.js"

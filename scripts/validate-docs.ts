@@ -44,7 +44,7 @@ for (const required of ["# Chat Harness", "Harness engineering for AI assistants
   if (!readme.toLowerCase().includes(required.toLowerCase())) errors.push(`README.md: missing positioning anchor: ${required}`);
 }
 if (pkg.name !== "chat-harness") errors.push("package.json: canonical package name drifted");
-if (pkg.description !== "Harness engineering for AI assistants.") errors.push("package.json: canonical descriptor drifted");
+if (pkg.description !== "Harness engineering toolkit for long-running work with ChatGPT, Claude, and other AI assistants.") errors.push("package.json: public npm description drifted");
 
 for (const currentDoc of ["README.md", "docs/architecture.md", "docs/concepts.md", "docs/security.md", "docs/compatibility.md", "docs/hosts/chatgpt.md"]) {
   const source = await readFile(path.join(root, currentDoc), "utf8");

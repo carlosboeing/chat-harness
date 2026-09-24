@@ -58,7 +58,7 @@ The secondary npm channel is:
 npm install -g chat-harness
 ```
 
-Package publication is release-gated; until v0.1.0 is published, build from the repository instead.
+The npm package is a secondary distribution channel; standalone GitHub Release binaries remain the primary installation path.
 
 ## Quick start
 
@@ -185,4 +185,4 @@ bun test
 bun run smoke:browser
 ```
 
-The primary distribution is planned as self-contained standalone binaries; the npm/Node path remains a secondary compatibility channel.
+The primary distribution is self-contained standalone binaries; the npm/Node path is a secondary compatibility channel.
