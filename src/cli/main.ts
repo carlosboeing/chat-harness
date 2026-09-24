@@ -1,5 +1,6 @@
+import { realpathSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command, CommanderError } from "commander";
 
 import packageMetadata from "../../package.json" with { type: "json" };
@@ -317,11 +318,19 @@ export async function runCli(
   }
 }
 
-const isEntrypoint =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
+function isCliEntrypoint(metaUrl: string, argv1: string | undefined): boolean {
+  if (argv1 === undefined) return false;
 
-if (isEntrypoint) {
+  try {
+    return realpathSync(fileURLToPath(metaUrl)) === realpathSync(argv1);
+  } catch {
+    // Bun standalone compilation can use a synthetic import.meta.url. Preserve
+    // the direct comparison as a fallback for that runtime.
+    return metaUrl === pathToFileURL(argv1).href;
+  }
+}
+
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
   runCli(process.argv.slice(2))
     .then((code) => {
       process.exitCode = code;
