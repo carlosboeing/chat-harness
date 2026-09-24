@@ -1,7 +1,7 @@
 {
   "name": "chat-harness",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Harness engineering for AI assistants.",
   "type": "module",
   "packageManager": "bun@1.4.2",
@@ -17,17 +17,50 @@
     "test:legacy": "node --test tests/workflow-contract.test.mjs",
     "smoke:browser": "bun scripts/smoke-browser-runtime.ts",
     "validate:docs": "bun scripts/validate-docs.ts",
-    "validate:evals": "bun scripts/validate-evals.ts"
+    "validate:evals": "bun scripts/validate-evals.ts",
+    "build:npm": "bun build src/cli/main.ts --target=node --format=esm --minify --outfile dist/npm/chat-harness.js && bun scripts/prepare-npm.ts",
+    "build:binary": "bun scripts/build-binary.ts",
+    "checksum": "bun scripts/checksum.ts",
+    "validate:package": "bun scripts/validate-package.ts"
   },
-  "dependencies": {
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "7.0.2",
     "@clack/prompts": "1.8.1",
     "commander": "15.0.0",
     "playwright": "1.63.0",
     "ajv": "8.20.0",
     "yaml": "2.9.1"
   },
-  "devDependencies": {
-    "@types/node": "20.19.43",
-    "typescript": "7.0.2"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carlosboeing/chat-harness.git"
+  },
+  "homepage": "https://github.com/carlosboeing/chat-harness#readme",
+  "bugs": {
+    "url": "https://github.com/carlosboeing/chat-harness/issues"
+  },
+  "keywords": [
+    "ai",
+    "chatgpt",
+    "harness",
+    "context-engineering",
+    "agent-harness",
+    "durable-state"
+  ],
+  "bin": {
+    "chat-harness": "dist/npm/chat-harness.js"
+  },
+  "files": [
+    "dist/npm/",
+    "README.md",
+    "LICENSE",
+    "docs/",
+    "templates/",
+    "schemas/"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
