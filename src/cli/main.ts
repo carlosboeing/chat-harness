@@ -16,6 +16,7 @@ import {
   type CommandName,
   type Finding,
 } from "./result.js";
+import { runSetup } from "../setup/command.js";
 import {
   resolveWorkspaceRoot,
   WorkspaceResolutionError,
@@ -32,6 +33,10 @@ export interface CommandHandlerResult {
 export interface CommandContext {
   command: CommandName;
   workspace: string;
+  options: {
+    json: boolean;
+    dryRun: boolean;
+  };
 }
 
 export type CommandHandler = (
@@ -58,7 +63,35 @@ function defaultRuntime(): CliRuntime {
   };
 }
 
-function defaultHandler(): Promise<CommandHandlerResult> {
+function defaultHandler(
+  context: CommandContext,
+  runtime: CliRuntime,
+): Promise<CommandHandlerResult> {
+  if (context.command === "setup") {
+    return runSetup(
+      context.workspace,
+      { dryRun: context.options.dryRun },
+      {
+        applyOptions: {
+          beforeApply: async (plan) => {
+            if (!runtime.isTTY || context.options.json) {
+              return;
+            }
+            const paths = plan.operations.map((operation) => operation.path);
+            runtime.stdout(
+              [
+                "Chat Harness will create:",
+                ...paths.map((managedPath) => `- ${managedPath}`),
+                "Existing user files will not be rewritten.",
+                "",
+              ].join("\n"),
+            );
+          },
+        },
+      },
+    );
+  }
+
   return Promise.resolve({
     result: {
       state: "ready",
@@ -128,18 +161,40 @@ export async function runCli(
     });
 
   const addCommand = (name: CommandName, description: string): void => {
-    program
+    const command = program
       .command(name)
       .description(description)
       .argument("[path]", "Workspace root; defaults to the current directory")
       .option("--json", "Emit the stable machine-readable JSON envelope")
-      .option("--no-color", "Disable ANSI terminal decoration")
-      .action(async (inputPath: string | undefined, options: { json?: boolean }) => {
+      .option("--no-color", "Disable ANSI terminal decoration");
+
+    if (name === "setup") {
+      command.option(
+        "--dry-run",
+        "Inspect and return the exact reconciliation plan without mutation",
+      );
+    }
+
+    command.action(
+      async (
+        inputPath: string | undefined,
+        options: { json?: boolean; dryRun?: boolean },
+      ) => {
         selectedCommand = name;
         selectedPath = inputPath;
         const workspace = await resolveWorkspaceRoot(inputPath, runtime.cwd);
-        const handler = runtime.handlers[name] ?? defaultHandler;
-        const output = await handler({ command: name, workspace });
+        const context: CommandContext = {
+          command: name,
+          workspace,
+          options: {
+            json: Boolean(options.json),
+            dryRun: Boolean(options.dryRun),
+          },
+        };
+        const handler = runtime.handlers[name];
+        const output = handler
+          ? await handler(context)
+          : await defaultHandler(context, runtime);
         const envelope = commandEnvelope({
           command: name,
           workspace,
@@ -148,11 +203,12 @@ export async function runCli(
         });
         exitCode = writeEnvelope(
           envelope,
-          Boolean(options.json),
+          context.options.json,
           color,
           runtime,
         );
-      });
+      },
+    );
   };
 
   addCommand("setup", "Create or reconcile minimal Chat Harness workspace state");
