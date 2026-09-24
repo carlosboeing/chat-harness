@@ -1,0 +1,15 @@
+version: 1
+
+defaults:
+  privacy: personal
+
+rules:
+  - match:
+      path: "Public/**"
+    privacy: public
+  - match:
+      path: "Private/Confidential/**"
+    privacy: confidential
+  - match:
+      path: "Private/Restricted/**"
+    privacy: restricted

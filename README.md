@@ -1,169 +1,162 @@
-# ChatGPT GitHub Capability Bridge
+# Chat Harness
 
-A small, auditable bridge that lets ordinary ChatGPT Project chats invoke **vetted external capabilities** without exposing generic remote execution.
+**Harness engineering for AI assistants.**
 
-The bridge is use-case agnostic. Domain adapters are specific and disposable by default; only adapters that satisfy the durable-promotion rules belong in the active registry on `main`.
+**Bring harness-level discipline to long-running work with ChatGPT, Claude and other AI assistants.**
 
-## At a glance
+Chat Harness is an open-source architecture and toolkit for applying harness engineering around general-purpose AI assistants. It combines context engineering, explicit durable project state, source-of-truth rules, resumable Workstreams, validation, guardrails, and bounded capability extension so substantial multi-session work is easier to resume, verify, and maintain.
 
-```mermaid
-flowchart LR
-    P["ChatGPT Project"] --> T["Private GitHub Issue<br/>typed request"]
-    T --> B["Capability bridge<br/>registry + dispatcher"]
-    B --> R{"Runtime"}
-    R --> N["Node / HTTP"]
-    R --> W["Playwright browser"]
-    R --> F["Future runtime"]
-    N --> A["Bounded capability adapter"]
-    W --> A
-    F --> A
-    A --> O["Structured result<br/>state + evidence + provenance"]
-    O --> P
-```
+It is **not another agent runtime**. The assistant still supplies its models, conversation loop, interfaces, files, connectors, tools, and native execution. Chat Harness adds the project-level engineering layer around those capabilities.
 
-The stable abstraction is:
+## Why it exists
 
-```text
-invoke(capability_name, typed_input) -> structured result
-```
+Coding harnesses made a useful pattern obvious: model quality is only part of reliable long-running work. Instructions, explicit state, context selection, source ownership, verification, checkpoints, recovery, and authority boundaries matter too.
 
-GitHub Issues, Actions, Node and Playwright are implementation choices behind that contract.
+General knowledge work has the same failure modes, but moving research, travel, household administration, career work, or scientific investigation into a coding harness is often the wrong abstraction. Chat Harness applies the useful harness disciplines around the assistant people already use.
 
-## Active durable capabilities
+ChatGPT is the first-class v0.1 environment. The architecture is intended to map to comparable assistants, but support claims are evidence-based rather than inferred from similarity.
 
-| Capability | Runtime | Side effects | Purpose |
-|---|---|---|---|
-| `linkedin.job.lookup` | Node / HTTP | Read-only | Resolve one public LinkedIn job by exact numeric job ID. |
-
-The browser runtime is available on `main`, but there is currently **no durable browser-backed adapter registered**. It was proven with a disposable private-health spike and is now regression-tested with a domain-agnostic local browser smoke test.
-
-## Request and response
-
-Create an owner-authored issue titled:
-
-```text
-[capability] linkedin.job.lookup
-```
-
-with a raw JSON body:
-
-```json
-{
-  "version": 1,
-  "capability": "linkedin.job.lookup",
-  "input": {
-    "job_id": "4468897387"
-  }
-}
-```
-
-An optional `request_id` may be supplied.
-
-The workflow posts one issue comment beginning with `CAPABILITY_RESULT`, followed by structured JSON, then closes the issue.
-
-## Design principles
-
-- **Typed and bounded, not generic.** No arbitrary shell, scripts, unrestricted HTTP, or unrestricted browser control.
-- **Use the simplest reliable execution path.** Prefer native/public API or direct HTTP before browser automation.
-- **Read-only by default.** Consequential actions require a stronger capability-specific approval and security design.
-- **Adapters are disposable by default.** A spike does not become permanent merely because it worked once.
-- **Runtime and transport are replaceable.** Domain Projects should depend on capability contracts, not GitHub Actions or Playwright.
-- **Structured failures matter.** Callers must be able to distinguish not-found, auth boundaries, bot blocks, timeouts, partial evidence and policy failures.
-
-## Safety properties
-
-- private repository;
-- only owner-authored `[capability]` issues execute;
-- allowlisted named capabilities;
-- strict capability-specific input validation;
-- handler-owned network destinations;
-- no caller-controlled hosts, headers, cookies or credentials;
-- HTTPS + allowlisted top-level navigation for browser capabilities;
-- bounded request, response, action, navigation and runtime budgets;
-- least-privilege GitHub workflow permissions;
-- no persistent browser profiles, caches or credentials;
-- CAPTCHA, bot and authentication boundaries are failures, not bypass targets.
-
-## Capability lifecycle
+## Mental model
 
 ```mermaid
 flowchart LR
-    G["Material gap"] --> E{"Existing durable capability?"}
-    E -->|Yes| U["Reuse"]
-    E -->|No| S["Spike on branch"]
-    S --> V["Prove on real workflow"]
-    V --> P{"Promotion criteria met?"}
-    P -->|Yes| D["Durable registry entry"]
-    P -->|No| X["Delete adapter before merge"]
-    V --> I{"Reusable infrastructure?"}
-    I -->|Yes| K["Keep/refactor generic runtime pieces"]
-    I -->|No| X
+    U["User"] --> H["AI assistant host<br/>models + conversations + native tools"]
+    H --> I["AGENTS.md<br/>portable operating instructions"]
+    I --> W["Workspace<br/>durable state + source routing"]
+    W --> S[".chat-harness/<br/>Workstreams + optional Source Policy"]
+    W --> C["Domain corpus / external canon<br/>user-owned"]
+    H --> N["Native capabilities<br/>web / files / apps / MCP"]
+    N --> X{"Material gap?"}
+    X -- "no" --> V["Verify + persist"]
+    X -- "yes" --> E["Bounded Chat Harness capability"]
+    E --> V
 ```
 
-A durable adapter must qualify through either recurring use or a documented recurring workflow requirement. CI enforces the production-registry rules.
+A Workspace is an **ownership and durable-state boundary**, not the complete context universe. Relevant context may live in other Workspaces, repositories, connected apps, assistant context systems, or current public sources. Retrieve it when it materially matters; keep canon in its owning source.
 
-See [`docs/capability-lifecycle.md`](docs/capability-lifecycle.md).
+## Quick start
 
-## Repository layout
+The v0.1 CLI operates on one **local filesystem directory**.
+
+```bash
+chat-harness setup /path/to/project
+chat-harness validate /path/to/project
+chat-harness doctor /path/to/project
+```
+
+Or run from the target directory:
+
+```bash
+chat-harness setup
+chat-harness validate
+chat-harness doctor
+```
+
+`setup` creates only the minimum missing scaffold:
 
 ```text
-.github/workflows/
-  capability-dispatch.yml
-  ci.yml
-
-capabilities/
-  linkedin-job/
-    handler.mjs
-
-docs/
-  design.md
-  capability-lifecycle.md
-
-protocol/
-  request-response.schema.json
-
-scripts/
-  validate-registry.mjs
-  smoke-browser-runtime.mjs
-
-src/
-  browser-runtime.mjs
-  dispatch.mjs
-  resolve-runtime.mjs
-
-tests/
-  browser-runtime.test.mjs
-  linkedin-job.test.mjs
-
-registry.json
-package.json
-package-lock.json
+<Project>/
+├── .chat-harness/
+│   ├── README.md
+│   └── workstreams/
+└── AGENTS.md
 ```
 
-Directory trees stay as text; architecture, workflows, sequence and lifecycle visuals use Mermaid.
+It is intentionally brownfield-safe: it does not reorganize domain content or silently rewrite existing human-authored Markdown. Once instantiated, `AGENTS.md` and the Workspace Map are user-owned.
+
+See [Concepts](docs/concepts.md) and [Architecture](docs/architecture.md) for the model, and [ChatGPT host setup](docs/hosts/chatgpt.md) for the current reference binding.
+
+## The operating loop
+
+For substantial work, the assistant:
+
+1. applies `AGENTS.md`;
+2. orients from the request, Workspace Map, and relevant Workstream;
+3. retrieves high-signal authoritative context, then broadens when material;
+4. reverifies volatile facts;
+5. uses the simplest sufficient authorized capability;
+6. verifies results and evidence;
+7. preserves valuable outputs and leaves durable resumable state.
+
+A Workstream records **where the work is now**, not every conversation that led there.
+
+## Source ownership and Source Policy
+
+`.chat-harness/README.md` is the human-readable Workspace Map. It points to authoritative sources without imposing a root taxonomy.
+
+An optional `.chat-harness/source-policy.yaml` adds a narrow machine-readable privacy classification for user-owned sources. V0.1 supports `public`, `personal`, `confidential`, and `restricted` handling profiles with exact paths or trailing `/**` subtree selectors.
+
+Source Policy is not an IAM system. Chat Harness can deterministically enforce it only on retrieval paths it controls; host-native tools may provide policy-aware behaviour rather than hard enforcement. See [Security](docs/security.md).
+
+## CLI
+
+| Command | Purpose |
+|---|---|
+| `setup` | Reconcile the minimal Chat Harness scaffold without overwriting user-owned content. |
+| `validate` | Check deterministic Workspace, Workstream, lifecycle, Source Policy, and capability invariants. |
+| `doctor` | Diagnose local operational prerequisites without mutating the Workspace. |
+
+All three share stable findings and machine-readable JSON semantics. `validate` and `doctor` support `--json`; terminal output is line-oriented and honours `NO_COLOR` / `--no-color`.
+
+## Bounded capability extension
+
+Native assistant capabilities come first. When a real gap remains, Chat Harness can expose a specific typed external capability rather than generic remote execution.
+
+The repository includes one concrete path under `extensions/github/`: an owner-gated GitHub Issue → Actions transport for public-data, no-credential, read-only capabilities. Its current durable capability is `linkedin.job.lookup`.
+
+The GitHub transport is **persistent**: Issue bodies and result comments become repository data. The registry therefore rejects private/sensitive, credential-bearing, write, consequential, or otherwise unapproved profiles before handler execution.
+
+The shared Playwright helper constrains top-level navigation and execution budgets, but it is **not claimed to be a complete network-egress sandbox**.
+
+See [Capability lifecycle](docs/capability-lifecycle.md).
+
+## Compatibility
+
+Support is tracked as `documented`, `verified`, or `unverified`, with the actual instruction/context path recorded. Architectural applicability alone is not a support claim.
+
+ChatGPT web is the v0.1 reference path. Current vendor documentation describes project-scoped instructions, Project sources, connected apps, and Google Drive access; the end-to-end Chat Harness binding remains unverified until the release smoke is recorded.
+
+See [Compatibility](docs/compatibility.md) and [ChatGPT host setup](docs/hosts/chatgpt.md).
+
+## What Chat Harness does not build
+
+V0.1 deliberately does not include:
+
+- a model-provider abstraction or replacement agent loop;
+- a chat UI, daemon, scheduler, workflow engine, or control plane;
+- a vector-memory/global personal-knowledge database;
+- a generic provider hierarchy or `WorkspaceBackend` API;
+- a generic unrestricted browser, HTTP, shell, or script capability;
+- remote Workspace synchronization or Google Drive management in the CLI;
+- automatic hosted Project Instructions configuration;
+- a Workspace manifest, migration framework, or template-sync engine;
+- a full-screen TUI.
+
+These are not missing abstractions waiting to be filled by default. They require real implementation pressure.
 
 ## Documentation
 
-- [`docs/design.md`](docs/design.md) — current implementation architecture, contracts, runtime model, safety and operability.
-- [`docs/capability-lifecycle.md`](docs/capability-lifecycle.md) — deterministic spike-to-durable lifecycle and CI enforcement.
+- [Architecture](docs/architecture.md)
+- [Concepts](docs/concepts.md)
+- [Security](docs/security.md)
+- [Compatibility](docs/compatibility.md)
+- [ChatGPT host binding](docs/hosts/chatgpt.md)
+- [Alternatives and fit](docs/alternatives.md)
+- [Capability lifecycle](docs/capability-lifecycle.md)
+- [Capability bridge origin](docs/design-history/capability-bridge-origin.md)
 
-Cross-project policy for when ordinary ChatGPT Projects should create or invoke external capabilities remains canonical in:
+Examples and behavioural evals are added as separate surfaces: examples teach how the system feels; evals test specific claims.
 
-`Tech & AI/20 - Knowledge/Guides/chatgpt-capability-extension.md`
+## Development
 
-## Adding a capability
+Development uses Bun and strict TypeScript.
 
-Do not add an adapter merely because one task was awkward.
+```bash
+bun install --frozen-lockfile
+bun run typecheck
+bun run validate
+bun test
+bun run smoke:browser
+```
 
-Before implementation:
-
-1. prove the gap is material and native/fallback options are insufficient;
-2. check whether an existing durable capability fits;
-3. define the smallest useful typed operation;
-4. classify side effects and network boundaries;
-5. choose the simplest runtime;
-6. define verification and failure states.
-
-Unless recurrence is already proven, implement the adapter as a **branch-only spike**. After the real workflow is tested, either promote it deliberately or delete it before merge.
-
-Do not add generic `run_script`, shell execution, unrestricted `fetch_url`, or unrestricted browser capabilities.
+The primary distribution is planned as self-contained standalone binaries; the npm/Node path remains a secondary compatibility channel.
