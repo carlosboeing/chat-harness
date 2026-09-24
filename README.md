@@ -58,7 +58,7 @@ The secondary npm channel is:
 npm install -g chat-harness
 ```
 
-The npm package is a secondary distribution channel; standalone GitHub Release binaries remain the primary installation path.
+The npm package is a secondary distribution channel and requires Node 22.12+; standalone GitHub Release binaries remain the primary installation path.
 
 ## Quick start
 
