@@ -76,6 +76,12 @@ jobs:
           npm pack --dry-run --json > dist/npm-pack.json
           bun run validate:package -- dist/npm-pack.json
 
+      - name: Pack and clean-install npm package
+        run: |
+          mkdir -p dist/package
+          npm pack --pack-destination dist/package
+          bun run smoke:npm-package -- "dist/package/chat-harness-$(node -p "require('./package.json').version").tgz"
+
   browser-smoke:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

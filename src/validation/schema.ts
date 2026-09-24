@@ -1,4 +1,4 @@
-import { createRequire } from "node:module";
+import * as Ajv2020Module from "ajv/dist/2020.js";
 import type { ErrorObject, ValidateFunction } from "ajv";
 
 import lifecycleSchema from "../../schemas/lifecycle/frontmatter.schema.json" with { type: "json" };
@@ -11,11 +11,10 @@ interface AjvLike {
 
 type AjvConstructor = new (options?: Record<string, unknown>) => AjvLike;
 
-const require = createRequire(import.meta.url);
-const ajvModule = require("ajv/dist/2020") as {
-  default?: AjvConstructor;
-} & AjvConstructor;
-const Ajv2020: AjvConstructor = ajvModule.default ?? ajvModule;
+const Ajv2020 = (
+  (Ajv2020Module as { default?: unknown }).default ?? Ajv2020Module
+) as AjvConstructor;
+
 const ajv = new Ajv2020({
   allErrors: true,
   strict: true,

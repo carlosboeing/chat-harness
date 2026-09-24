@@ -3,6 +3,8 @@ import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import packageMetadata from "../../package.json" with { type: "json" };
+
 import { runCli, type CliRuntime } from "../../src/cli/main.js";
 
 const temporaryPaths: string[] = [];
@@ -51,6 +53,15 @@ function capture(
 }
 
 describe("CLI surface", () => {
+  test("--version matches package metadata", async () => {
+    const root = await workspace();
+    const io = capture(root);
+
+    const code = await runCli(["--version"], io.runtime);
+    expect(code).toBe(0);
+    expect(io.stdout().trim()).toBe(packageMetadata.version);
+  });
+
   test("--help exposes only setup, validate, and doctor commands", async () => {
     const root = await workspace();
     const io = capture(root);
