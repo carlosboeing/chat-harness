@@ -91,10 +91,14 @@ Current release-candidate state:
 These are real evidence/action gates rather than missing architecture:
 
 1. **Real ChatGPT host smoke** — requires a ChatGPT Project configured with the documented Project Instructions binding and a retrievable fixture Workspace. It must demonstrate that `AGENTS.md` is effective, Workspace Map/Workstream retrieval works, a fresh session resumes from `Next action`, cross-context Source Policy/transparency behaviour matches the documentation, and CLOSE persists durable state. Until then ChatGPT remains **documented / end-to-end unverified** in `docs/compatibility.md`.
-2. **Real GitHub transport smoke of the new implementation** — issue-triggered workflows use the default branch. Run after the release-candidate implementation is on private `main`, using only synthetic/public data, then verify structured result comment and automatic issue closure.
+2. **Real GitHub transport smoke of the new implementation** — **pass.** Private-default-branch issue #19 triggered workflow run `36013775019`, executed `linkedin.job.lookup` on public job ID `4468897387`, posted an `EXACT_VERIFIED` structured result comment, and closed the issue automatically.
 3. **Canonical repository rename** to `carlosboeing/chat-harness` — explicit maintainer approval gate.
 4. **Authoritative npm name check** immediately before publication. A collision requires an explicit naming/scoping decision; do not silently change package identity.
 5. **External publication actions** — private→public, `v0.1.0` tag, GitHub Release, and npm publish each remain explicit maintainer approval gates.
+
+## Final repository-content sweep
+
+A default-branch code search found no matches for representative secret/private-deployment markers including `BEGIN PRIVATE KEY`, `ghp_`, `sk-`, the maintainer email, or the private Tech & AI workspace name. This is a targeted release check, not a substitute for GitHub's own secret scanning.
 
 ## Release decision
 
