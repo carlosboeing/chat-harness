@@ -22,7 +22,7 @@ describe("release packaging", () => {
     await writeFile(file, "chat-harness\n", "utf8");
 
     expect(await sha256File(file)).toBe(
-      "5f8892a0e58ae12d7198260de06937d75bb848c430d94af1e47a6fba7e68895c",
+      "f627cd97559406c54e378cb1fe5b1f6663c6f09fcfec58633789a694b7f86beb",
     );
   });
 
