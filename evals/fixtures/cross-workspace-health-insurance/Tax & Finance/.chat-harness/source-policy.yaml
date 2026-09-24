@@ -1,0 +1,12 @@
+version: 1
+
+defaults:
+  privacy: confidential
+
+rules:
+  - match:
+      path: "Income/household-summary.md"
+    privacy: confidential
+  - match:
+      path: "Restricted/**"
+    privacy: restricted

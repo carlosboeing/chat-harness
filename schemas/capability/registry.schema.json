@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "capabilities"],
+  "properties": {
+    "version": { "const": 1 },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "description",
+          "handler",
+          "runtime",
+          "authority",
+          "timeout_seconds",
+          "max_output_chars",
+          "network_policy",
+          "security",
+          "input",
+          "lifecycle",
+          "promotion"
+        ],
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "handler": {
+            "type": "string",
+            "pattern": "^capabilities/[a-z0-9-]+/handler\\.ts$"
+          },
+          "runtime": { "enum": ["node", "browser"] },
+          "authority": { "enum": ["read-only", "write", "consequential"] },
+          "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 240 },
+          "max_output_chars": { "type": "integer", "minimum": 1000, "maximum": 100000 },
+          "network_policy": {
+            "type": "object",
+            "required": ["scheme", "hosts", "request_template"],
+            "properties": {
+              "scheme": { "const": "https" },
+              "hosts": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "request_template": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          },
+          "security": {
+            "type": "object",
+            "required": ["data_class", "credentials", "persistent_transport_safe"],
+            "properties": {
+              "data_class": {
+                "enum": ["public", "personal", "confidential", "restricted"]
+              },
+              "credentials": { "enum": ["none", "required"] },
+              "persistent_transport_safe": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          },
+          "input": {
+            "type": "object",
+            "required": ["type", "properties", "additionalProperties"],
+            "properties": {
+              "type": { "const": "object" },
+              "required": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "properties": { "type": "object" },
+              "additionalProperties": { "const": false }
+            },
+            "additionalProperties": true
+          },
+          "lifecycle": { "const": "durable" },
+          "promotion": {
+            "type": "object",
+            "required": ["basis", "evidence", "reviewed_at"],
+            "properties": {
+              "basis": { "enum": ["recurring-use", "recurring-workflow"] },
+              "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "reviewed_at": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

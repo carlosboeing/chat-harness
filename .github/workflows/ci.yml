@@ -15,17 +15,66 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Checkout bridge
+      - name: Checkout Chat Harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Node dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Type-check TypeScript
+        run: bun run typecheck
 
       - name: Validate durable capability registry
-        run: npm run validate
+        run: bun run validate
+
+      - name: Validate documentation
+        run: bun run validate:docs
+
+      - name: Validate evaluation fixtures
+        run: bun run validate:evals
 
       - name: Run unit tests
-        run: npm test
+        run: bun run test
+
+  distribution-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build npm CLI
+        run: bun run build:npm
+
+      - name: Build Linux x64 standalone binary
+        run: bun run build:binary -- bun-linux-x64 dist/bin/chat-harness-linux-x64
+
+      - name: Set up Node 22 compatibility runtime
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Compare standalone and Node JSON behaviour
+        run: bun scripts/smoke-distributions.ts dist/bin/chat-harness-linux-x64 dist/npm/chat-harness.js
+
+      - name: Inspect npm package contents
+        run: |
+          npm pack --dry-run --json > dist/npm-pack.json
+          bun run validate:package -- dist/npm-pack.json
 
   browser-smoke:
     if: github.event_name == 'pull_request'
@@ -33,14 +82,19 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Checkout bridge
+      - name: Checkout Chat Harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Node dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Install Chromium
-        run: npx playwright install --with-deps --only-shell chromium
+        run: bunx playwright install --with-deps --only-shell chromium
 
       - name: Run domain-agnostic browser runtime smoke test
-        run: npm run smoke:browser
+        run: bun run smoke:browser

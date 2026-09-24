@@ -3,9 +3,9 @@
   "capabilities": {
     "linkedin.job.lookup": {
       "description": "Resolve one public LinkedIn job by numeric job ID using LinkedIn's unauthenticated guest job endpoint.",
-      "handler": "capabilities/linkedin-job/handler.mjs",
+      "handler": "capabilities/linkedin-job/handler.ts",
       "runtime": "node",
-      "side_effects": "read-only",
+      "authority": "read-only",
       "timeout_seconds": 15,
       "max_output_chars": 30000,
       "network_policy": {
@@ -17,11 +17,14 @@
         ],
         "request_template": "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
       },
+      "security": {
+        "data_class": "public",
+        "credentials": "none",
+        "persistent_transport_safe": true
+      },
       "input": {
         "type": "object",
-        "required": [
-          "job_id"
-        ],
+        "required": ["job_id"],
         "properties": {
           "job_id": {
             "type": "string",

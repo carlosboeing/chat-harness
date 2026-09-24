@@ -1,0 +1,15 @@
+version: 1
+
+defaults:
+  privacy: personal
+
+rules:
+  - match:
+      path: "Public/**"
+    privacy: public
+  - match:
+      path: "School/Correspondence/**"
+    privacy: confidential
+  - match:
+      path: "Restricted/**"
+    privacy: restricted
