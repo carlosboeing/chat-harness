@@ -27,3 +27,32 @@ test("capability dispatch keeps the frozen owner-gated least-privilege transport
     /concurrency:\s*\n\s*group:\s*capability-\$\{\{ github\.event\.issue\.number \}\}\s*\n\s*cancel-in-progress:\s*false/,
   );
 });
+
+
+const releaseWorkflowPath = new URL(
+  "../.github/workflows/release.yml",
+  import.meta.url,
+);
+
+test("release workflow publishes only from explicit release intent", async () => {
+  const workflow = await fs.readFile(releaseWorkflowPath, "utf8");
+
+  assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*- main/);
+  assert.match(workflow, /tags:\s*\n\s*- "v\[0-9\]\+\.\[0-9\]\+\.\[0-9\]\+"/);
+  assert.match(
+    workflow,
+    /ordinary main update: package version is unchanged .*; no release/,
+  );
+  assert.match(workflow, /missing release notes: docs\/releases\/\$\{TAG\}\.md/);
+  assert.match(workflow, /release version must increase:/);
+  assert.match(workflow, /git tag "\$\{TAG\}" "\$\(git rev-parse HEAD\)"/);
+  assert.match(workflow, /npm publish .*--access public --provenance/);
+  assert.match(
+    workflow,
+    /if: needs\.detect\.outputs\.should_release == 'true' && needs\.detect\.outputs\.publish_enabled == 'true'/,
+  );
+
+  const tagIndex = workflow.indexOf("Create release tag");
+  const publishIndex = workflow.indexOf("Publish npm package using OIDC");
+  assert.ok(tagIndex >= 0 && publishIndex > tagIndex);
+});
