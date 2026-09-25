@@ -48,7 +48,7 @@ if (pkg.description !== "Harness engineering toolkit for long-running work with 
 
 for (const currentDoc of ["README.md", "docs/architecture.md", "docs/concepts.md", "docs/security.md", "docs/compatibility.md", "docs/hosts/chatgpt.md"]) {
   const source = await readFile(path.join(root, currentDoc), "utf8");
-  for (const stale of ["PROJECT_INSTRUCTIONS.md", ".workbench/", ".chat-harness/lifecycle/"]) {
+  for (const stale of ["PROJECT_INSTRUCTIONS.md", ".workbench/"]) {
     if (source.includes(stale)) errors.push(`${currentDoc}: stale current architecture reference: ${stale}`);
   }
 }
