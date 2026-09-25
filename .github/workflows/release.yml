@@ -79,26 +79,7 @@ jobs:
               exit 0
             fi
 
-            node - "${PREVIOUS_VERSION}" "${CURRENT_VERSION}" <<'NODE'
-              const [previous, current] = process.argv.slice(2);
-              const parse = (value) => {
-                if (!/^\d+\.\d+\.\d+$/.test(value)) {
-                  throw new Error(`release versions must be stable x.y.z SemVer: ${value}`);
-                }
-                return value.split(".").map(Number);
-              };
-              const a = parse(previous);
-              const b = parse(current);
-              for (let i = 0; i < 3; i += 1) {
-                if (b[i] > a[i]) process.exit(0);
-                if (b[i] < a[i]) {
-                  console.error(`release version must increase: ${previous} -> ${current}`);
-                  process.exit(1);
-                }
-              }
-              console.error(`release version did not increase: ${previous} -> ${current}`);
-              process.exit(1);
-NODE
+            node -e 'const [previous,current]=process.argv.slice(1); const parse=(value)=>{ if(!/^\\d+\\.\\d+\\.\\d+$/.test(value)) throw new Error("release versions must be stable x.y.z SemVer: "+value); return value.split(".").map(Number); }; const a=parse(previous); const b=parse(current); for(let i=0;i<3;i+=1){ if(b[i]>a[i]) process.exit(0); if(b[i]<a[i]){ console.error("release version must increase: "+previous+" -> "+current); process.exit(1); } } console.error("release version did not increase: "+previous+" -> "+current); process.exit(1);' "${PREVIOUS_VERSION}" "${CURRENT_VERSION}"
 
             VERSION="${CURRENT_VERSION}"
             TAG="v${VERSION}"
