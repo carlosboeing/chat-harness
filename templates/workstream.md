@@ -1,22 +1,24 @@
 ---
 status: active
-created: 2026-09-24
+created: YYYY-MM-DD
 ---
 
 # Workstream title
 
 ## Objective
+State the independent ongoing objective.
 
-State the coherent ongoing objective.
+## Current direction
+State the current approach or direction concisely.
 
-## Current state
+## Durable state
+Capture only material progress, decisions/rationale, accepted or rejected options worth preserving, and other state needed to resume safely.
 
-Capture only durable state needed to resume safely: material progress, decisions, exclusions, dependencies, and relevant source/artifact locations.
+## Blockers / open questions
+List current blockers, dependencies, or unresolved questions. Use “None” when there are none.
+
+## Relevant artifacts / sources
+List only high-signal artifact/source locations needed to orient future work. This is not an allowlist and does not replace canonical ownership.
 
 ## Next action
-
 State the next executable action.
-
-## Relevant sources
-
-Optional. List high-signal orientation sources; this is not an allowlist.
