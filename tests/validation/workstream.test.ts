@@ -29,7 +29,7 @@ function document(status: string, extraFrontmatter = "", next = true): string {
     "",
     "Complete the objective.",
     "",
-    "## Current state",
+    "## Current direction",
     "",
     "Current state is known.",
     ...(next ? ["", "## Next action", "", "Continue implementation."] : []),

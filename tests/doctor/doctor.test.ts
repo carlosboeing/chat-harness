@@ -58,7 +58,7 @@ async function snapshot(root: string): Promise<string[]> {
 }
 
 describe("doctor", () => {
-  test("is read-only on a healthy minimal workspace", async () => {
+  test("is read-only on a healthy v0.2 workspace", async () => {
     const root = await workspace();
     await runSetup(root, { dryRun: false });
     const before = await snapshot(root);
@@ -85,7 +85,7 @@ describe("doctor", () => {
 
     expect(output.result.state).toBe("healthy");
     expect(output.findings.filter((finding) => finding.code === "doctor.scaffold_missing").length)
-      .toBe(4);
+      .toBe(15);
   });
 
   test("detects standalone, npm, and development runtime modes", () => {

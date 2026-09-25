@@ -55,16 +55,27 @@ async function snapshotTree(root: string): Promise<Record<string, string>> {
 }
 
 describe("setup reconciliation", () => {
-  test("empty existing directory gets only minimal scaffolding", async () => {
+  test("empty existing directory gets the v0.2 scaffold", async () => {
     const root = await workspace();
 
     const output = await runSetup(root, { dryRun: false });
     expect(output.result.state).toBe("changes_applied");
     expect(output.result.operations.map((item) => item.path)).toEqual([
       "AGENTS.md",
+      "_inbox",
       ".chat-harness",
+      ".chat-harness/WORKSPACE.md",
       ".chat-harness/README.md",
+      ".chat-harness/source-policy.yaml",
       ".chat-harness/workstreams",
+      ".chat-harness/workbench",
+      ".chat-harness/workbench/0-ideas",
+      ".chat-harness/workbench/1-research",
+      ".chat-harness/workbench/2-analysis",
+      ".chat-harness/workbench/3-plans",
+      ".chat-harness/workbench/4-reviews",
+      ".chat-harness/procedures",
+      ".chat-harness/temp",
     ]);
 
     const tree = await snapshotTree(root);
@@ -72,7 +83,7 @@ describe("setup reconciliation", () => {
     expect(tree[".chat-harness"]).toBe("directory");
     expect(tree[".chat-harness/README.md"]).toContain("# Workspace Map");
     expect(tree[".chat-harness/workstreams"]).toBe("directory");
-    expect(tree[".chat-harness/source-policy.yaml"]).toBeUndefined();
+    expect(tree[".chat-harness/source-policy.yaml"]).toContain("version: 1");
     expect(tree["Knowledge"]).toBeUndefined();
     expect(tree["Research"]).toBeUndefined();
   });
@@ -105,7 +116,7 @@ describe("setup reconciliation", () => {
     const root = await workspace();
     await mkdir(path.join(root, "Domain"), { recursive: true });
     await writeFile(path.join(root, "Domain", "record.txt"), "domain sentinel\n");
-    await writeFile(path.join(root, "AGENTS.md"), "custom agents\n");
+    await writeFile(path.join(root, "AGENTS.md"), "<!-- chat-harness-managed: agents -->\n# stale\n");
     await mkdir(path.join(root, ".chat-harness"));
     await writeFile(
       path.join(root, ".chat-harness", "README.md"),
@@ -118,11 +129,9 @@ describe("setup reconciliation", () => {
 
     const output = await runSetup(root, { dryRun: false });
     expect(output.result.state).toBe("changes_applied");
-    expect(output.result.operations.map((item) => item.path)).toEqual([
-      ".chat-harness/workstreams",
-    ]);
-    expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toBe(
-      "custom agents\n",
+    expect(output.result.operations.map((item) => item.path)).toContain("AGENTS.md");
+    expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain(
+      "# Chat Harness Project Instructions",
     );
     expect(
       await readFile(path.join(root, ".chat-harness", "README.md"), "utf8"),
