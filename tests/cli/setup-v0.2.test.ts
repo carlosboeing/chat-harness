@@ -42,7 +42,8 @@ describe("setup v0.2 CLI", () => {
     expect(envelope.result.host_action).toContain("complete current AGENTS.md");
     expect(await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8")).toContain("evidence-grounded");
     expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain("chat-harness-managed: agents");
-    expect((await lstat(path.join(root, "Profile"))).isDirectory()).toBe(true);\n    expect((await lstat(path.join(root, "Opportunities"))).isDirectory()).toBe(true);
+    expect((await lstat(path.join(root, "Profile"))).isDirectory()).toBe(true);
+    expect((await lstat(path.join(root, "Opportunities"))).isDirectory()).toBe(true);
   });
 
   test("omitted specialist is deterministically general in non-interactive mode", async () => {
