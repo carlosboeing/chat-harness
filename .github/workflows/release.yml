@@ -70,21 +70,36 @@ jobs:
                 node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).version))"
             )"
 
-            if [ "${CURRENT_VERSION}" = "${PREVIOUS_VERSION}" ]; then
-              echo "ordinary main update: package version is unchanged (${CURRENT_VERSION}); no release"
+            if ! printf '%s' "${PREVIOUS_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::previous package version is not stable x.y.z SemVer: ${PREVIOUS_VERSION}"
+              exit 1
+            fi
+
+            if ! printf '%s' "${CURRENT_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::current package version is not stable x.y.z SemVer: ${CURRENT_VERSION}"
+              exit 1
+            fi
+
+            VERSION="${CURRENT_VERSION}"
+            TAG="v${VERSION}"
+
+            if [ "${CURRENT_VERSION}" != "${PREVIOUS_VERSION}" ]; then
+              node -e 'const [previous,current]=process.argv.slice(1); const a=previous.split(".").map(Number); const b=current.split(".").map(Number); for(let i=0;i<3;i+=1){ if(b[i]>a[i]) process.exit(0); if(b[i]<a[i]){ console.error("release version must increase: "+previous+" -> "+current); process.exit(1); } } console.error("release version did not increase: "+previous+" -> "+current); process.exit(1);' "${PREVIOUS_VERSION}" "${CURRENT_VERSION}"
+              echo "release version increased: ${PREVIOUS_VERSION} -> ${CURRENT_VERSION}"
+              SHOULD_RELEASE=true
+              PUBLISH_ENABLED=true
+            elif git show-ref --verify --quiet "refs/tags/${TAG}"; then
+              echo "ordinary main update: package version is unchanged (${CURRENT_VERSION}) and ${TAG} already exists; no release"
               printf 'should_release=false\n' >> "${GITHUB_OUTPUT}"
               printf 'publish_enabled=false\n' >> "${GITHUB_OUTPUT}"
               printf 'version=\n' >> "${GITHUB_OUTPUT}"
               printf 'tag=\n' >> "${GITHUB_OUTPUT}"
               exit 0
+            else
+              echo "pending release recovery: package version ${CURRENT_VERSION} is unchanged but ${TAG} does not exist"
+              SHOULD_RELEASE=true
+              PUBLISH_ENABLED=true
             fi
-
-            node -e 'const [previous,current]=process.argv.slice(1); const parse=(value)=>{ if(!/^\\d+\\.\\d+\\.\\d+$/.test(value)) throw new Error("release versions must be stable x.y.z SemVer: "+value); return value.split(".").map(Number); }; const a=parse(previous); const b=parse(current); for(let i=0;i<3;i+=1){ if(b[i]>a[i]) process.exit(0); if(b[i]<a[i]){ console.error("release version must increase: "+previous+" -> "+current); process.exit(1); } } console.error("release version did not increase: "+previous+" -> "+current); process.exit(1);' "${PREVIOUS_VERSION}" "${CURRENT_VERSION}"
-
-            VERSION="${CURRENT_VERSION}"
-            TAG="v${VERSION}"
-            SHOULD_RELEASE=true
-            PUBLISH_ENABLED=true
           else
             echo "event is not a release path; no release"
             printf 'should_release=false\n' >> "${GITHUB_OUTPUT}"
