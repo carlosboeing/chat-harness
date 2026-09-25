@@ -8,7 +8,7 @@ created: 2026-09-24
 ## Objective
 Complete the remaining synthetic enrolment administration without duplicating records or reading unrelated restricted material.
 
-## Current state
+## Current direction
 The school requested one signed consent form and confirmation of the orientation date. The relevant message is under `School/Correspondence/`; the orientation event is owned by the connected family calendar. No restricted record is currently required.
 
 ## Next action
