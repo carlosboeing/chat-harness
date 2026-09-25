@@ -9,7 +9,7 @@ import {
 } from "./specialists.js";
 
 export interface InteractiveSetupRequest {
-  specialist?: SpecialistId;
+  specialist?: SpecialistId | undefined;
   scaffoldDomain: boolean;
   replaceAgents: boolean;
   replaceWorkspace: boolean;
