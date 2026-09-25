@@ -42,7 +42,15 @@ test("release workflow publishes only from explicit release intent", async () =>
   assert.match(workflow, /tags:\s*\n\s*- "v\[0-9\]\+\.\[0-9\]\+\.\[0-9\]\+"/);
   assert.match(
     workflow,
-    /ordinary main update: package version is unchanged .*; no release/,
+    /ordinary main update: package version is unchanged .* already exists; no release/,
+  );
+  assert.match(
+    workflow,
+    /pending release recovery: package version .* does not exist/,
+  );
+  assert.match(
+    workflow,
+    /git show-ref --verify --quiet "refs\/tags\/\$\{TAG\}"/,
   );
   assert.match(workflow, /missing release notes: docs\/releases\/\$\{TAG\}\.md/);
   assert.match(workflow, /release version must increase:/);

@@ -70,21 +70,668 @@ jobs:
                 node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).version))"
             )"
 
-            if [ "${CURRENT_VERSION}" = "${PREVIOUS_VERSION}" ]; then
-              echo "ordinary main update: package version is unchanged (${CURRENT_VERSION}); no release"
+            if ! printf '%s' "${PREVIOUS_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+          else
+            echo "event is not a release path; no release"
+            printf 'should_release=false\n' >> "${GITHUB_OUTPUT}"
+            printf 'publish_enabled=false\n' >> "${GITHUB_OUTPUT}"
+            printf 'version=\n' >> "${GITHUB_OUTPUT}"
+            printf 'tag=\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if ! printf '%s' "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::release version must be stable x.y.z SemVer: ${VERSION}"
+            exit 1
+          fi
+
+          if [ "${CURRENT_VERSION}" != "${VERSION}" ]; then
+            echo "::error::package.json version ${CURRENT_VERSION} does not match release ${VERSION}"
+            exit 1
+          fi
+
+          if [ ! -f "docs/releases/${TAG}.md" ]; then
+            echo "::error::missing release notes: docs/releases/${TAG}.md"
+            exit 1
+          fi
+
+          printf 'should_release=%s\n' "${SHOULD_RELEASE}" >> "${GITHUB_OUTPUT}"
+          printf 'publish_enabled=%s\n' "${PUBLISH_ENABLED}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${VERSION}" >> "${GITHUB_OUTPUT}"
+          printf 'tag=%s\n' "${TAG}" >> "${GITHUB_OUTPUT}"
+
+  verify:
+    if: needs.detect.outputs.should_release == 'true'
+    needs: detect
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run deterministic qualification gates
+        run: |
+          bun run typecheck
+          bun run validate
+          bun run validate:docs
+          bun run validate:evals
+          bun run test
+
+  native-binary:
+    if: needs.detect.outputs.should_release == 'true'
+    needs: [detect, verify]
+    name: ${{ matrix.asset }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: bun-linux-x64
+            asset: chat-harness-linux-x64
+          - runner: ubuntu-24.04-arm
+            target: bun-linux-arm64
+            asset: chat-harness-linux-arm64
+          - runner: macos-15-intel
+            target: bun-darwin-x64
+            asset: chat-harness-darwin-x64
+          - runner: macos-15
+            target: bun-darwin-arm64
+            asset: chat-harness-darwin-arm64
+          - runner: windows-2025
+            target: bun-windows-x64
+            asset: chat-harness-windows-x64.exe
+
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build native standalone binary
+        run: bun run build:binary -- ${{ matrix.target }} dist/release/${{ matrix.asset }}
+
+      - name: Smoke binary without language runtimes on PATH
+        run: bun scripts/smoke-built-binary.ts dist/release/${{ matrix.asset }}
+
+      - name: Generate SHA-256
+        run: bun run checksum -- dist/release/${{ matrix.asset }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.asset }}
+          path: |
+            dist/release/${{ matrix.asset }}
+            dist/release/${{ matrix.asset }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  npm-package:
+    if: needs.detect.outputs.should_release == 'true'
+    needs: [detect, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build Node-compatible CLI
+        run: bun run build:npm
+
+      - name: Validate package contents
+        run: |
+          mkdir -p dist/release
+          npm pack --dry-run --json > dist/npm-pack.json
+          bun run validate:package -- dist/npm-pack.json
+
+      - name: Pack npm tarball
+        run: npm pack --pack-destination dist/release
+
+      - name: Smoke clean-installed npm package under Node 24
+        run: bun run smoke:npm-package -- "dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz"
+
+      - name: Generate package checksum
+        shell: bash
+        run: |
+          TARBALL="dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz"
+          bun run checksum -- "${TARBALL}"
+
+      - name: Upload npm build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chat-harness-npm
+          path: |
+            dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz
+            dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: needs.detect.outputs.should_release == 'true' && needs.detect.outputs.publish_enabled == 'true'
+    needs: [detect, verify, native-binary, npm-package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 24 for trusted publishing
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v8.0.0
+        with:
+          path: dist/release
+          merge-multiple: true
+
+      - name: Check publication state
+        id: state
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_SHA="$(git rev-parse HEAD)"
+          TAG_EXISTS=false
+          NPM_EXISTS=false
+
+          git fetch --tags --force
+          if git show-ref --verify --quiet "refs/tags/${TAG}"; then
+            TAG_EXISTS=true
+            TAG_SHA="$(git rev-list -n 1 "${TAG}")"
+            if [ "${TAG_SHA}" != "${RELEASE_SHA}" ]; then
+              echo "::error::${TAG} already points at ${TAG_SHA}, expected ${RELEASE_SHA}"
+              exit 1
+            fi
+          fi
+
+          set +e
+          NPM_OUTPUT="$(npm view "chat-harness@${VERSION}" version --registry=https://registry.npmjs.org 2>&1)"
+          NPM_STATUS=$?
+          set -e
+
+          if [ "${NPM_STATUS}" -eq 0 ]; then
+            NPM_EXISTS=true
+            REMOTE_SHASUM="$(npm view "chat-harness@${VERSION}" dist.shasum --registry=https://registry.npmjs.org)"
+            LOCAL_SHASUM="$(sha1sum "dist/release/chat-harness-${VERSION}.tgz" | awk '{print $1}')"
+            if [ "${REMOTE_SHASUM}" != "${LOCAL_SHASUM}" ]; then
+              echo "::error::npm already contains chat-harness@${VERSION}, but its tarball does not match this release build"
+              exit 1
+            fi
+            if [ "${TAG_EXISTS}" != "true" ]; then
+              echo "::error::npm already contains chat-harness@${VERSION}, but ${TAG} does not exist; refusing to adopt an external publication"
+              exit 1
+            fi
+          elif printf '%s\n' "${NPM_OUTPUT}" | grep -qE 'E404|404 Not Found'; then
+            NPM_EXISTS=false
+          else
+            printf '%s\n' "${NPM_OUTPUT}"
+            echo "::error::npm registry preflight failed unexpectedly"
+            exit 1
+          fi
+
+          printf 'tag_exists=%s\n' "${TAG_EXISTS}" >> "${GITHUB_OUTPUT}"
+          printf 'npm_exists=%s\n' "${NPM_EXISTS}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create release tag
+        if: steps.state.outputs.tag_exists != 'true'
+        shell: bash
+        env:
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}" "$(git rev-parse HEAD)"
+          git push origin "refs/tags/${TAG}"
+
+      - name: Publish npm package using OIDC
+        if: steps.state.outputs.npm_exists != 'true'
+        run: npm publish "dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz" --access public --provenance
+
+      - name: Create or reconcile GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.detect.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}"               --title "${TAG}"               --notes-file "docs/releases/${TAG}.md"
+            gh release upload "${TAG}" dist/release/* --clobber
+          else
+            gh release create "${TAG}"               --title "${TAG}"               --notes-file "docs/releases/${TAG}.md"               --verify-tag               dist/release/*
+          fi
+
+  smoke-published:
+    if: needs.detect.outputs.should_release == 'true' && needs.detect.outputs.publish_enabled == 'true'
+    needs: [detect, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Wait for npm propagation and smoke published CLI
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 10); do
+            OUTPUT="$(npx --yes "chat-harness@${VERSION}" --version 2>/dev/null || true)"
+            if [ "${OUTPUT}" = "${VERSION}" ]; then
+              echo "published artifact verified after ${attempt} attempt(s)"
+              exit 0
+            fi
+            echo "published package not installable yet (attempt ${attempt}/10); retrying in 30s"
+            sleep 30
+          done
+
+          echo "::error::chat-harness@${VERSION} was published but did not become installable within 5 minutes"
+          exit 1
+; then
+              echo "::error::previous package version is not stable x.y.z SemVer: ${PREVIOUS_VERSION}"
+              exit 1
+            fi
+
+            if ! printf '%s' "${CURRENT_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+          else
+            echo "event is not a release path; no release"
+            printf 'should_release=false\n' >> "${GITHUB_OUTPUT}"
+            printf 'publish_enabled=false\n' >> "${GITHUB_OUTPUT}"
+            printf 'version=\n' >> "${GITHUB_OUTPUT}"
+            printf 'tag=\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if ! printf '%s' "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::release version must be stable x.y.z SemVer: ${VERSION}"
+            exit 1
+          fi
+
+          if [ "${CURRENT_VERSION}" != "${VERSION}" ]; then
+            echo "::error::package.json version ${CURRENT_VERSION} does not match release ${VERSION}"
+            exit 1
+          fi
+
+          if [ ! -f "docs/releases/${TAG}.md" ]; then
+            echo "::error::missing release notes: docs/releases/${TAG}.md"
+            exit 1
+          fi
+
+          printf 'should_release=%s\n' "${SHOULD_RELEASE}" >> "${GITHUB_OUTPUT}"
+          printf 'publish_enabled=%s\n' "${PUBLISH_ENABLED}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${VERSION}" >> "${GITHUB_OUTPUT}"
+          printf 'tag=%s\n' "${TAG}" >> "${GITHUB_OUTPUT}"
+
+  verify:
+    if: needs.detect.outputs.should_release == 'true'
+    needs: detect
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run deterministic qualification gates
+        run: |
+          bun run typecheck
+          bun run validate
+          bun run validate:docs
+          bun run validate:evals
+          bun run test
+
+  native-binary:
+    if: needs.detect.outputs.should_release == 'true'
+    needs: [detect, verify]
+    name: ${{ matrix.asset }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: bun-linux-x64
+            asset: chat-harness-linux-x64
+          - runner: ubuntu-24.04-arm
+            target: bun-linux-arm64
+            asset: chat-harness-linux-arm64
+          - runner: macos-15-intel
+            target: bun-darwin-x64
+            asset: chat-harness-darwin-x64
+          - runner: macos-15
+            target: bun-darwin-arm64
+            asset: chat-harness-darwin-arm64
+          - runner: windows-2025
+            target: bun-windows-x64
+            asset: chat-harness-windows-x64.exe
+
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build native standalone binary
+        run: bun run build:binary -- ${{ matrix.target }} dist/release/${{ matrix.asset }}
+
+      - name: Smoke binary without language runtimes on PATH
+        run: bun scripts/smoke-built-binary.ts dist/release/${{ matrix.asset }}
+
+      - name: Generate SHA-256
+        run: bun run checksum -- dist/release/${{ matrix.asset }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.asset }}
+          path: |
+            dist/release/${{ matrix.asset }}
+            dist/release/${{ matrix.asset }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  npm-package:
+    if: needs.detect.outputs.should_release == 'true'
+    needs: [detect, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build Node-compatible CLI
+        run: bun run build:npm
+
+      - name: Validate package contents
+        run: |
+          mkdir -p dist/release
+          npm pack --dry-run --json > dist/npm-pack.json
+          bun run validate:package -- dist/npm-pack.json
+
+      - name: Pack npm tarball
+        run: npm pack --pack-destination dist/release
+
+      - name: Smoke clean-installed npm package under Node 24
+        run: bun run smoke:npm-package -- "dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz"
+
+      - name: Generate package checksum
+        shell: bash
+        run: |
+          TARBALL="dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz"
+          bun run checksum -- "${TARBALL}"
+
+      - name: Upload npm build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chat-harness-npm
+          path: |
+            dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz
+            dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: needs.detect.outputs.should_release == 'true' && needs.detect.outputs.publish_enabled == 'true'
+    needs: [detect, verify, native-binary, npm-package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 24 for trusted publishing
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v8.0.0
+        with:
+          path: dist/release
+          merge-multiple: true
+
+      - name: Check publication state
+        id: state
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_SHA="$(git rev-parse HEAD)"
+          TAG_EXISTS=false
+          NPM_EXISTS=false
+
+          git fetch --tags --force
+          if git show-ref --verify --quiet "refs/tags/${TAG}"; then
+            TAG_EXISTS=true
+            TAG_SHA="$(git rev-list -n 1 "${TAG}")"
+            if [ "${TAG_SHA}" != "${RELEASE_SHA}" ]; then
+              echo "::error::${TAG} already points at ${TAG_SHA}, expected ${RELEASE_SHA}"
+              exit 1
+            fi
+          fi
+
+          set +e
+          NPM_OUTPUT="$(npm view "chat-harness@${VERSION}" version --registry=https://registry.npmjs.org 2>&1)"
+          NPM_STATUS=$?
+          set -e
+
+          if [ "${NPM_STATUS}" -eq 0 ]; then
+            NPM_EXISTS=true
+            REMOTE_SHASUM="$(npm view "chat-harness@${VERSION}" dist.shasum --registry=https://registry.npmjs.org)"
+            LOCAL_SHASUM="$(sha1sum "dist/release/chat-harness-${VERSION}.tgz" | awk '{print $1}')"
+            if [ "${REMOTE_SHASUM}" != "${LOCAL_SHASUM}" ]; then
+              echo "::error::npm already contains chat-harness@${VERSION}, but its tarball does not match this release build"
+              exit 1
+            fi
+            if [ "${TAG_EXISTS}" != "true" ]; then
+              echo "::error::npm already contains chat-harness@${VERSION}, but ${TAG} does not exist; refusing to adopt an external publication"
+              exit 1
+            fi
+          elif printf '%s\n' "${NPM_OUTPUT}" | grep -qE 'E404|404 Not Found'; then
+            NPM_EXISTS=false
+          else
+            printf '%s\n' "${NPM_OUTPUT}"
+            echo "::error::npm registry preflight failed unexpectedly"
+            exit 1
+          fi
+
+          printf 'tag_exists=%s\n' "${TAG_EXISTS}" >> "${GITHUB_OUTPUT}"
+          printf 'npm_exists=%s\n' "${NPM_EXISTS}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create release tag
+        if: steps.state.outputs.tag_exists != 'true'
+        shell: bash
+        env:
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}" "$(git rev-parse HEAD)"
+          git push origin "refs/tags/${TAG}"
+
+      - name: Publish npm package using OIDC
+        if: steps.state.outputs.npm_exists != 'true'
+        run: npm publish "dist/release/chat-harness-${{ needs.detect.outputs.version }}.tgz" --access public --provenance
+
+      - name: Create or reconcile GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.detect.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}"               --title "${TAG}"               --notes-file "docs/releases/${TAG}.md"
+            gh release upload "${TAG}" dist/release/* --clobber
+          else
+            gh release create "${TAG}"               --title "${TAG}"               --notes-file "docs/releases/${TAG}.md"               --verify-tag               dist/release/*
+          fi
+
+  smoke-published:
+    if: needs.detect.outputs.should_release == 'true' && needs.detect.outputs.publish_enabled == 'true'
+    needs: [detect, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+
+    steps:
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Wait for npm propagation and smoke published CLI
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 10); do
+            OUTPUT="$(npx --yes "chat-harness@${VERSION}" --version 2>/dev/null || true)"
+            if [ "${OUTPUT}" = "${VERSION}" ]; then
+              echo "published artifact verified after ${attempt} attempt(s)"
+              exit 0
+            fi
+            echo "published package not installable yet (attempt ${attempt}/10); retrying in 30s"
+            sleep 30
+          done
+
+          echo "::error::chat-harness@${VERSION} was published but did not become installable within 5 minutes"
+          exit 1
+; then
+              echo "::error::current package version is not stable x.y.z SemVer: ${CURRENT_VERSION}"
+              exit 1
+            fi
+
+            VERSION="${CURRENT_VERSION}"
+            TAG="v${VERSION}"
+
+            if [ "${CURRENT_VERSION}" != "${PREVIOUS_VERSION}" ]; then
+              node -e 'const [previous,current]=process.argv.slice(1); const a=previous.split(".").map(Number); const b=current.split(".").map(Number); for(let i=0;i<3;i+=1){ if(b[i]>a[i]) process.exit(0); if(b[i]<a[i]){ console.error("release version must increase: "+previous+" -> "+current); process.exit(1); } } console.error("release version did not increase: "+previous+" -> "+current); process.exit(1);' "${PREVIOUS_VERSION}" "${CURRENT_VERSION}"
+              echo "release version increased: ${PREVIOUS_VERSION} -> ${CURRENT_VERSION}"
+              SHOULD_RELEASE=true
+              PUBLISH_ENABLED=true
+            elif git show-ref --verify --quiet "refs/tags/${TAG}"; then
+              echo "ordinary main update: package version is unchanged (${CURRENT_VERSION}) and ${TAG} already exists; no release"
               printf 'should_release=false\n' >> "${GITHUB_OUTPUT}"
               printf 'publish_enabled=false\n' >> "${GITHUB_OUTPUT}"
               printf 'version=\n' >> "${GITHUB_OUTPUT}"
               printf 'tag=\n' >> "${GITHUB_OUTPUT}"
               exit 0
+            else
+              echo "pending release recovery: package version ${CURRENT_VERSION} is unchanged but ${TAG} does not exist"
+              SHOULD_RELEASE=true
+              PUBLISH_ENABLED=true
             fi
-
-            node -e 'const [previous,current]=process.argv.slice(1); const parse=(value)=>{ if(!/^\\d+\\.\\d+\\.\\d+$/.test(value)) throw new Error("release versions must be stable x.y.z SemVer: "+value); return value.split(".").map(Number); }; const a=parse(previous); const b=parse(current); for(let i=0;i<3;i+=1){ if(b[i]>a[i]) process.exit(0); if(b[i]<a[i]){ console.error("release version must increase: "+previous+" -> "+current); process.exit(1); } } console.error("release version did not increase: "+previous+" -> "+current); process.exit(1);' "${PREVIOUS_VERSION}" "${CURRENT_VERSION}"
-
-            VERSION="${CURRENT_VERSION}"
-            TAG="v${VERSION}"
-            SHOULD_RELEASE=true
-            PUBLISH_ENABLED=true
           else
             echo "event is not a release path; no release"
             printf 'should_release=false\n' >> "${GITHUB_OUTPUT}"
