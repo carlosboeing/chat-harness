@@ -1,54 +1,38 @@
 import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { Command, CommanderError } from "commander";
+import { Command, CommanderError, Option } from "commander";
 
 import packageMetadata from "../../package.json" with { type: "json" };
 
-import {
-  EXIT_INTERNAL,
-  EXIT_SUCCESS,
-  EXIT_USAGE,
-  exitCodeForEnvelope,
-  type ExitCode,
-} from "./exit-codes.js";
+import { EXIT_INTERNAL, EXIT_SUCCESS, EXIT_USAGE, exitCodeForEnvelope, type ExitCode } from "./exit-codes.js";
 import { renderHuman, renderJson } from "./render.js";
 import { renderInteractive } from "./terminal.js";
-import {
-  commandEnvelope,
-  type CommandEnvelope,
-  type CommandName,
-  type Finding,
-} from "./result.js";
+import { commandEnvelope, type CommandEnvelope, type CommandName, type Finding } from "./result.js";
 import { runDoctor } from "../doctor/command.js";
 import { runSetup } from "../setup/command.js";
+import { resolveInteractiveSetup } from "../setup/interactive.js";
+import { SPECIALIST_IDS, type SpecialistId } from "../setup/specialists.js";
 import { runValidate } from "../validation/command.js";
-import {
-  resolveWorkspaceRoot,
-  WorkspaceResolutionError,
-} from "../workspace/resolve.js";
+import { resolveWorkspaceRoot, WorkspaceResolutionError } from "../workspace/resolve.js";
 
 export interface CommandHandlerResult {
-  result: {
-    state: string;
-    [key: string]: unknown;
-  };
+  result: { state: string; [key: string]: unknown };
   findings?: Finding[];
 }
-
 export interface CommandContext {
   command: CommandName;
   workspace: string;
   options: {
     json: boolean;
     dryRun: boolean;
+    specialist: SpecialistId;
+    scaffoldDomain: boolean;
+    replaceAgents: boolean;
+    replaceWorkspace: boolean;
   };
 }
-
-export type CommandHandler = (
-  context: CommandContext,
-) => Promise<CommandHandlerResult>;
-
+export type CommandHandler = (context: CommandContext) => Promise<CommandHandlerResult>;
 export interface CliRuntime {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -71,34 +55,27 @@ function defaultRuntime(): CliRuntime {
   };
 }
 
-function defaultHandler(
-  context: CommandContext,
-  runtime: CliRuntime,
-): Promise<CommandHandlerResult> {
-  if (context.command === "doctor") {
-    return runDoctor(context.workspace);
-  }
-
-  if (context.command === "validate") {
-    return runValidate(context.workspace);
-  }
-
+function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<CommandHandlerResult> {
+  if (context.command === "doctor") return runDoctor(context.workspace);
+  if (context.command === "validate") return runValidate(context.workspace);
   if (context.command === "setup") {
     return runSetup(
       context.workspace,
-      { dryRun: context.options.dryRun },
+      {
+        dryRun: context.options.dryRun,
+        specialist: context.options.specialist,
+        scaffoldDomain: context.options.scaffoldDomain,
+        replaceAgents: context.options.replaceAgents,
+        replaceWorkspace: context.options.replaceWorkspace,
+      },
       {
         applyOptions: {
           beforeApply: async (plan) => {
-            if (!runtime.isTTY || context.options.json) {
-              return;
-            }
-            const paths = plan.operations.map((operation) => operation.path);
+            if (!runtime.isTTY || context.options.json) return;
             runtime.stdout(
               [
-                "Chat Harness will create:",
-                ...paths.map((managedPath) => `- ${managedPath}`),
-                "Existing user files will not be rewritten.",
+                "Chat Harness setup plan:",
+                ...plan.operations.map((operation) => `- ${operation.action}: ${operation.path}`),
                 "",
               ].join("\n"),
             );
@@ -107,60 +84,27 @@ function defaultHandler(
       },
     );
   }
-
-  return Promise.resolve({
-    result: {
-      state: "ready",
-    },
-  });
+  return Promise.resolve({ result: { state: "ready" } });
 }
 
-function shouldUseColor(
-  argv: readonly string[],
-  runtime: CliRuntime,
-): boolean {
-  return (
-    runtime.isTTY &&
-    !argv.includes("--no-color") &&
-    runtime.env.NO_COLOR === undefined
-  );
+function shouldUseColor(argv: readonly string[], runtime: CliRuntime): boolean {
+  return runtime.isTTY && !argv.includes("--no-color") && runtime.env.NO_COLOR === undefined;
 }
-
-function workspaceHint(
-  inputPath: string | undefined,
-  cwd: string,
-): string {
+function workspaceHint(inputPath: string | undefined, cwd: string): string {
   return path.resolve(cwd, inputPath ?? ".");
 }
-
-function writeEnvelope(
-  envelope: CommandEnvelope,
-  json: boolean,
-  color: boolean,
-  runtime: CliRuntime,
-): ExitCode {
-  if (!json && color && runtime.isTTY && runtime.nativeTerminal) {
-    renderInteractive(envelope);
-  } else {
-    runtime.stdout(
-      json ? renderJson(envelope) : renderHuman(envelope, { color }),
-    );
-  }
+function writeEnvelope(envelope: CommandEnvelope, json: boolean, color: boolean, runtime: CliRuntime): ExitCode {
+  if (!json && color && runtime.isTTY && runtime.nativeTerminal) renderInteractive(envelope);
+  else runtime.stdout(json ? renderJson(envelope) : renderHuman(envelope, { color }));
   return exitCodeForEnvelope(envelope);
 }
 
-export async function runCli(
-  argv: readonly string[],
-  overrides: Partial<CliRuntime> = {},
-): Promise<ExitCode> {
+export async function runCli(argv: readonly string[], overrides: Partial<CliRuntime> = {}): Promise<ExitCode> {
   const base = defaultRuntime();
   const runtime: CliRuntime = {
     ...base,
     ...overrides,
-    handlers: {
-      ...base.handlers,
-      ...overrides.handlers,
-    },
+    handlers: { ...base.handlers, ...overrides.handlers },
     nativeTerminal:
       overrides.stdout === undefined &&
       overrides.stderr === undefined &&
@@ -193,149 +137,137 @@ export async function runCli(
       .option("--no-color", "Disable ANSI terminal decoration");
 
     if (name === "setup") {
-      command.option(
-        "--dry-run",
-        "Inspect and return the exact reconciliation plan without mutation",
-      );
+      command
+        .option("--dry-run", "Inspect and return the exact reconciliation plan without mutation")
+        .addOption(
+          new Option("--specialist <id>", "Seed WORKSPACE.md with a setup-time specialist")
+            .choices([...SPECIALIST_IDS]),
+        )
+        .option("--scaffold-domain", "Create the selected specialist's additive domain starter folders")
+        .option("--replace-agents", "Explicitly replace an existing unmanaged AGENTS.md")
+        .option("--replace-workspace", "Explicitly replace WORKSPACE.md with the selected specialist seed");
     }
 
-    command.action(
-      async (
-        inputPath: string | undefined,
-        options: { json?: boolean; dryRun?: boolean },
-      ) => {
-        selectedCommand = name;
-        selectedPath = inputPath;
-        const workspace = await resolveWorkspaceRoot(inputPath, runtime.cwd);
-        const context: CommandContext = {
-          command: name,
-          workspace,
-          options: {
-            json: Boolean(options.json),
-            dryRun: Boolean(options.dryRun),
-          },
-        };
-        const handler = runtime.handlers[name];
-        const output = handler
-          ? await handler(context)
-          : await defaultHandler(context, runtime);
-        const envelope = commandEnvelope({
-          command: name,
-          workspace,
-          result: output.result,
-          ...(output.findings ? { findings: output.findings } : {}),
-        });
-        exitCode = writeEnvelope(
-          envelope,
-          context.options.json,
-          color,
-          runtime,
-        );
+    command.action(async (
+      inputPath: string | undefined,
+      options: {
+        json?: boolean;
+        dryRun?: boolean;
+        specialist?: SpecialistId;
+        scaffoldDomain?: boolean;
+        replaceAgents?: boolean;
+        replaceWorkspace?: boolean;
       },
-    );
+    ) => {
+      selectedCommand = name;
+      selectedPath = inputPath;
+      const workspace = await resolveWorkspaceRoot(inputPath, runtime.cwd);
+      let setup = {
+        specialist: options.specialist ?? ("general" as SpecialistId),
+        scaffoldDomain: Boolean(options.scaffoldDomain),
+        replaceAgents: Boolean(options.replaceAgents),
+        replaceWorkspace: Boolean(options.replaceWorkspace),
+      };
+
+      if (
+        name === "setup" &&
+        runtime.isTTY &&
+        runtime.nativeTerminal &&
+        !options.json
+      ) {
+        const interactive = await resolveInteractiveSetup(
+          workspace,
+          {
+            specialist: options.specialist,
+            scaffoldDomain: Boolean(options.scaffoldDomain),
+            replaceAgents: Boolean(options.replaceAgents),
+            replaceWorkspace: Boolean(options.replaceWorkspace),
+          },
+          runtime.stdout,
+        );
+        if (interactive.cancelled) {
+          const envelope = commandEnvelope({
+            command: name,
+            workspace,
+            result: { state: "cancelled" },
+          });
+          exitCode = writeEnvelope(envelope, false, color, runtime);
+          return;
+        }
+        setup = interactive;
+      }
+
+      const context: CommandContext = {
+        command: name,
+        workspace,
+        options: {
+          json: Boolean(options.json),
+          dryRun: Boolean(options.dryRun),
+          ...setup,
+        },
+      };
+      const handler = runtime.handlers[name];
+      const output = handler ? await handler(context) : await defaultHandler(context, runtime);
+      const envelope = commandEnvelope({
+        command: name,
+        workspace,
+        result: output.result,
+        ...(output.findings ? { findings: output.findings } : {}),
+      });
+      exitCode = writeEnvelope(envelope, context.options.json, color, runtime);
+    });
   };
 
-  addCommand("setup", "Create or reconcile minimal Chat Harness workspace state");
+  addCommand("setup", "Create or reconcile the Chat Harness v0.2 Workspace scaffold");
   addCommand("validate", "Validate deterministic Chat Harness workspace contracts");
   addCommand("doctor", "Diagnose local Chat Harness environment prerequisites");
 
   try {
     await program.parseAsync(["node", "chat-harness", ...argv]);
-    if (selectedCommand === undefined && argv.length === 0) {
-      runtime.stdout(program.helpInformation());
-    }
+    if (selectedCommand === undefined && argv.length === 0) runtime.stdout(program.helpInformation());
     return exitCode;
   } catch (error) {
-    if (error instanceof CommanderError) {
-      return error.exitCode === 0 ? EXIT_SUCCESS : EXIT_USAGE;
-    }
-
+    if (error instanceof CommanderError) return error.exitCode === 0 ? EXIT_SUCCESS : EXIT_USAGE;
     if (error instanceof WorkspaceResolutionError && selectedCommand) {
       const envelope = commandEnvelope({
         command: selectedCommand,
         workspace: workspaceHint(selectedPath, runtime.cwd),
         result: { state: "failed" },
-        findings: [
-          {
-            code: error.code,
-            severity: "error",
-            message: error.message,
-            location: error.location,
-          },
-        ],
+        findings: [{ code: error.code, severity: "error", message: error.message, location: error.location }],
       });
       return writeEnvelope(envelope, requestedJson, color, runtime);
     }
-
     if (selectedCommand) {
       const envelope = commandEnvelope({
         command: selectedCommand,
         workspace: workspaceHint(selectedPath, runtime.cwd),
         result: { state: "execution_failure" },
-        findings: [
-          {
-            code: "cli.internal_error",
-            severity: "error",
-            message: "The command failed unexpectedly.",
-          },
-        ],
+        findings: [{ code: "cli.internal_error", severity: "error", message: "The command failed unexpectedly." }],
         success: false,
       });
-
-      if (requestedJson) {
-        runtime.stdout(renderJson(envelope));
-      } else {
-        runtime.stderr(renderHuman(envelope, { color }));
-      }
+      if (requestedJson) runtime.stdout(renderJson(envelope));
+      else runtime.stderr(renderHuman(envelope, { color }));
       return EXIT_INTERNAL;
     }
-
     if (requestedJson) {
-      runtime.stdout(
-        JSON.stringify(
-          {
-            version: 1,
-            command: "unknown",
-            workspace: workspaceHint(undefined, runtime.cwd),
-            success: false,
-            result: { state: "execution_failure" },
-            findings: [
-              {
-                code: "cli.internal_error",
-                severity: "error",
-                message: "The CLI failed unexpectedly.",
-              },
-            ],
-          },
-          null,
-          2,
-        ) + "\n",
-      );
-    } else {
-      runtime.stderr("Chat Harness failed unexpectedly.\n");
-    }
+      runtime.stdout(JSON.stringify({
+        version: 1,
+        command: "unknown",
+        workspace: workspaceHint(undefined, runtime.cwd),
+        success: false,
+        result: { state: "execution_failure" },
+        findings: [{ code: "cli.internal_error", severity: "error", message: "The CLI failed unexpectedly." }],
+      }, null, 2) + "\n");
+    } else runtime.stderr("Chat Harness failed unexpectedly.\n");
     return EXIT_INTERNAL;
   }
 }
 
 function isCliEntrypoint(metaUrl: string, argv1: string | undefined): boolean {
   if (argv1 === undefined) return false;
-
-  try {
-    return realpathSync(fileURLToPath(metaUrl)) === realpathSync(argv1);
-  } catch {
-    // Bun standalone compilation can use a synthetic import.meta.url. Preserve
-    // the direct comparison as a fallback for that runtime.
-    return metaUrl === pathToFileURL(argv1).href;
-  }
+  try { return realpathSync(fileURLToPath(metaUrl)) === realpathSync(argv1); }
+  catch { return metaUrl === pathToFileURL(argv1).href; }
 }
-
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
-  runCli(process.argv.slice(2))
-    .then((code) => {
-      process.exitCode = code;
-    })
-    .catch(() => {
-      process.exitCode = EXIT_INTERNAL;
-    });
+  runCli(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch(() => { process.exitCode = EXIT_INTERNAL; });
 }
