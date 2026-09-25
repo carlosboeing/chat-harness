@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import YAML from "yaml";
 
 const workflowPath = new URL(
   "../.github/workflows/capability-dispatch.yml",
@@ -55,4 +56,14 @@ test("release workflow publishes only from explicit release intent", async () =>
   const tagIndex = workflow.indexOf("Create release tag");
   const publishIndex = workflow.indexOf("Publish npm package using OIDC");
   assert.ok(tagIndex >= 0 && publishIndex > tagIndex);
+});
+
+
+test("GitHub workflows are syntactically valid YAML", async () => {
+  for (const path of [workflowPath, releaseWorkflowPath]) {
+    const source = await fs.readFile(path, "utf8");
+    const parsed = YAML.parse(source);
+    assert.equal(typeof parsed, "object");
+    assert.ok(parsed !== null);
+  }
 });
