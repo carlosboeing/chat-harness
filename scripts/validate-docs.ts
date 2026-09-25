@@ -40,7 +40,7 @@ for (const file of files) {
 
 const readme = await readFile(path.join(root, "README.md"), "utf8");
 const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as {name?: string; description?: string};
-for (const required of ["# Chat Harness", "Harness engineering for AI assistants.", "not another agent runtime", "ChatGPT", ".chat-harness/"]) {
+for (const required of ["# Chat Harness", "Harness engineering for AI assistants.", "not another agent runtime", "WORKSPACE.md", ".chat-harness/"]) {
   if (!readme.toLowerCase().includes(required.toLowerCase())) errors.push(`README.md: missing positioning anchor: ${required}`);
 }
 if (pkg.name !== "chat-harness") errors.push("package.json: canonical package name drifted");
@@ -48,7 +48,7 @@ if (pkg.description !== "Harness engineering toolkit for long-running work with 
 
 for (const currentDoc of ["README.md", "docs/architecture.md", "docs/concepts.md", "docs/security.md", "docs/compatibility.md", "docs/hosts/chatgpt.md"]) {
   const source = await readFile(path.join(root, currentDoc), "utf8");
-  for (const stale of ["PROJECT_INSTRUCTIONS.md", ".workbench/"]) {
+  for (const stale of ["PROJECT_INSTRUCTIONS.md", ".workbench/", ".chat-harness/lifecycle/"]) {
     if (source.includes(stale)) errors.push(`${currentDoc}: stale current architecture reference: ${stale}`);
   }
 }

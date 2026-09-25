@@ -48,7 +48,7 @@ describe("release packaging", () => {
       "dist/npm/chat-harness.js",
       ".chat-harness/workstreams/private.md",
       "examples/travel-planning/Bookings/confirmed.md",
-      "evals/scenarios/v0.1.json",
+      "evals/scenarios/v0.2.json",
       "extensions/github/dispatch.ts",
       "capabilities/linkedin-job/handler.ts",
       "tests/setup/setup.test.ts",

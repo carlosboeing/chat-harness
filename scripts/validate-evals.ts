@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const catalogPath = path.join(root, "evals", "scenarios", "v0.1.json");
+const catalogPath = path.join(root, "evals", "scenarios", "v0.2.json");
 
 interface Scenario {
   id: string;
