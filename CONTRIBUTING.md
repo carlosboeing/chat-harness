@@ -52,3 +52,20 @@ Keep changes coherent and explain:
 - any compatibility claim that needs current host verification.
 
 Do not include private workspace data, secrets, production credentials, or model chain-of-thought in fixtures or logs.
+
+
+## Releases
+
+The normal release path is a release pull request, not a manually pushed tag.
+
+A release PR must:
+
+- increase the stable `x.y.z` version in `package.json`;
+- add matching release notes at `docs/releases/vx.y.z.md`;
+- pass the normal protected-main checks.
+
+When that PR merges to `main`, `.github/workflows/release.yml` compares the new package version with the previous `main` commit. Ordinary merges with no version change are explicit no-ops. A coherent version bump causes the workflow to qualify the exact merge commit, build and smoke the standalone and npm artifacts, create the matching Git tag, publish to npm through trusted publishing/OIDC, create the GitHub Release, and smoke the installed registry artifact.
+
+The tag-push trigger remains as a recovery/maintainer escape hatch. Do not normally push release tags by hand.
+
+A manual `workflow_dispatch` run is build/qualification-only and never publishes.
