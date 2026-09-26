@@ -193,9 +193,9 @@ Documentation:
           "after",
           `
 Behaviour:
-  Interactive setup explains choices before asking for consent and shows the
-  exact create/replace plan before writing. Existing content not in that plan
-  is left unchanged.
+  Interactive setup explains what Chat Harness will do, shows the complete
+  resulting Workspace structure with human-readable status labels, and asks
+  for approval before writing. Existing unrelated content is left unchanged.
 
   If --specialist is omitted, interactive setup asks what the Workspace is
   mainly for; non-interactive setup uses general.
