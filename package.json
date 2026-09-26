@@ -1,6 +1,6 @@
 {
   "name": "chat-harness",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": false,
   "description": "Harness engineering toolkit for long-running work with ChatGPT, Claude, and other AI assistants.",
   "type": "module",
