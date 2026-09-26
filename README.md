@@ -81,7 +81,7 @@ For a standalone installation, rerun the installer; it downloads the current rel
 
 ## Quick start
 
-The normal workflow is to run Chat Harness **from inside the folder you want to use as a Workspace**:
+The normal workflow is to run Chat Harness **from inside the folder you want to use as a Workspace**. For the current ChatGPT reference setup, use a folder stored in Google Drive so ChatGPT can access the same up-to-date files as a Project source:
 
 ```bash
 cd /path/to/your/project
@@ -102,21 +102,21 @@ Chat Harness does not search parent directories for a Workspace.
 
 ```text
 <Project>/
-├── AGENTS.md
 ├── _inbox/
-└── .chat-harness/
-    ├── WORKSPACE.md
-    ├── README.md
-    ├── source-policy.yaml
-    ├── workstreams/
-    ├── workbench/
-    │   ├── 0-ideas/
-    │   ├── 1-research/
-    │   ├── 2-analysis/
-    │   ├── 3-plans/
-    │   └── 4-reviews/
-    ├── procedures/
-    └── temp/
+├── .chat-harness/
+│   ├── procedures/
+│   ├── temp/
+│   ├── workbench/
+│   │   ├── 0-ideas/
+│   │   ├── 1-research/
+│   │   ├── 2-analysis/
+│   │   ├── 3-plans/
+│   │   └── 4-reviews/
+│   ├── workstreams/
+│   ├── README.md
+│   ├── source-policy.yaml
+│   └── WORKSPACE.md
+└── AGENTS.md
 ```
 
 It is intentionally brownfield-safe: existing user-owned Workspace and domain content is preserved, a recognizably Chat Harness-managed `AGENTS.md` can be refreshed, and unknown same-name content is never silently adopted.
@@ -161,7 +161,7 @@ A specialist gives a new Workspace domain-specific starting guidance by seeding 
 Built-in specialists are `general`, `research`, `tech`, `tax`, `finance`, `career`, `shopping`, and `travel`.
 
 ```bash
-chat-harness setup /path/to/project --specialist research
+chat-harness setup --specialist research
 ```
 
 Specialists capture durable domain judgement and evidence standards. Procedures remain separate: a specialist describes **how the Workspace generally works**; a Procedure describes **how a recurring task is performed**.
@@ -213,7 +213,7 @@ All commands accept an optional `[path]`. When it is omitted, Chat Harness uses 
 | `chat-harness validate` | Check the scaffold, Workstreams, and Source Policy without changing files. | Confirm the Workspace still satisfies Chat Harness contracts. |
 | `chat-harness doctor` | Check Workspace health and local prerequisites without changing files. | Diagnose environment or installation problems. |
 
-Interactive `setup` explains choices before asking for consent and shows the exact create/replace plan before writing.
+Interactive `setup` explains choices before asking for consent, shows the complete resulting Workspace tree with human-readable status labels, and asks for approval before writing.
 
 Common setup options:
 
