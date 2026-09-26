@@ -112,6 +112,12 @@ export async function smokeInstalledNpmPackage(
         throw new Error(`installed ${command} help does not describe the Workspace path`);
       }
     }
+    for (const command of ["update", "uninstall"]) {
+      if (!help.includes(command)) {
+        throw new Error(`installed CLI help is missing command: ${command}`);
+      }
+      run(bin, [command, "--help"], root);
+    }
 
     const setupHelp = run(bin, ["setup", "--help"], root).stdout;
     if (!setupHelp.includes("--specialist <id>") || !setupHelp.includes("travel")) {
