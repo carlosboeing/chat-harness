@@ -38,7 +38,16 @@ export function renderInteractive(envelope: CommandEnvelope): void {
     else log.info(text);
   }
 
-  outro(envelope.success ? "Done" : "Completed with findings", {
+  const hostAction = envelope.result.host_action;
+  if (typeof hostAction === "string" && hostAction.length > 0) {
+    log.info(`Next steps:\n${hostAction}`);
+  }
+
+  outro(envelope.result.state === "cancelled"
+    ? "Setup cancelled; no changes were applied"
+    : envelope.success
+      ? "Done"
+      : "Completed with findings", {
     withGuide: false,
   });
 }
