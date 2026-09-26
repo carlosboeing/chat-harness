@@ -8,80 +8,45 @@ Engineering the context, state, authority, verification, and recovery environmen
 
 ## Workspace
 
-An ownership and durable resume boundary for a body of work. It is not an information silo: relevant authorized context may be federated from other Workspaces, repositories, connected apps, assistant context systems, and public sources.
+The durable ownership and resume boundary for a body of work. It is not an information silo: relevant authorized context may be federated from other Workspaces, repositories, connected apps, assistant context systems, and public sources.
 
 ## AGENTS.md
 
-The canonical self-contained generic Chat Harness behavior. The complete file is the portable Project Instructions artifact.
-
-Chat Harness owns a recognizably managed `AGENTS.md`; setup may refresh that managed file wholesale. Unknown/unmanaged same-name content is preserved as a brownfield collision.
-
-For ChatGPT, copy the complete current file into Project Instructions.
+The canonical portable source of generic Chat Harness behavior. A host that can consume it directly should do so; ChatGPT uses the complete file as the basis for Project Instructions.
 
 ## WORKSPACE.md
 
-The one Workspace-specific instruction extension: specialist/domain role, judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
+The single Workspace-specific instruction extension. It captures domain role, judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
 
-It is seeded at setup and then becomes user-owned.
+It is seeded during setup and then user-owned.
 
 ## Specialist
 
-A setup-time seed for `WORKSPACE.md`. A specialist captures durable domain judgement and evidence standards; it is not a separate agent, runtime mode, inheritance hierarchy, or procedure package.
+A setup-time seed for `WORKSPACE.md`. A specialist captures durable domain judgement and evidence standards; it is not a separate agent, runtime mode, inheritance hierarchy, or Procedure package.
 
 See [Specialists](specialists.md).
 
 ## Workspace Map
 
-`.chat-harness/README.md`: a compact user-owned orientation and routing/index document. It points to authoritative domain sources, important locations, Procedures, and Workstreams.
-
-It is not another instruction file or machine manifest.
+`.chat-harness/README.md`, a human-readable orientation and source-routing document. It says where authoritative information lives and points to important Workstreams and Procedures. It is not a Workspace manifest or machine routing registry.
 
 ## Workstream
 
-A coherent, compact resume point for an ongoing objective.
+A coherent resumable unit of ongoing work.
 
 > **independent objective + independent next action + likely future continuation = Workstream**
 
-A Workstream holds objective, current direction, material durable state/rationale, blockers/open questions, relevant artifacts/sources, and an explicit Next action. It is continuously maintained and compacted rather than used as a transcript.
-
-A Workstream does not override stronger canonical domain evidence.
+A Workstream stores enough current state to resume safely. It is neither a transcript nor a primary domain record, and its relevant sources are not an information-access boundary.
 
 ## Workbench
 
-Substantial durable working artifacts produced during chats:
+Durable working artifacts produced during substantial work, organized as ideas, research, analysis, plans, and reviews.
 
-- **ideas** — brainstorms, hypotheses, questions, concepts, option generation;
-- **research** — discovery, evidence collection, investigations, experiments;
-- **analysis** — synthesis, comparison, strategy, design, decision analysis, modelling;
-- **plans** — implementation, action, booking, compliance, experiment plans;
-- **reviews** — reviews, audits, critiques, evaluations, retrospectives.
-
-The taxonomy is organizational, not a state machine. Workstreams and Workbench are parallel outputs from work.
-
-## Procedure
-
-Reusable detailed methodology for a recurring class of work.
-
-A useful distinction:
-
-```text
-WORKSPACE specialist = who/how this Workspace generally works
-Procedure            = how a specific recurring task is performed
-```
-
-## _inbox
-
-Visible human/automation → assistant intake. Contents are user-owned.
-
-## temp
-
-Assistant → assistant non-canonical transient space. Promote valuable results before closeout and clean disposable harness-created material when appropriate.
+These categories describe the artifact, not a required lifecycle. Workstreams and Workbench are parallel outputs.
 
 ## Durable project state
 
-Explicit inspectable state outside transient conversation history: objective, current direction, material decisions, dependencies, source/artifact references, blockers, and next action.
-
-This is more precise than calling the system “memory.”
+Explicit inspectable state outside transient conversation history: objective, current direction, material decisions, dependencies, source/artifact references, blockers, and next action. This is more precise than calling the system “memory.”
 
 ## Source of truth
 
@@ -89,30 +54,56 @@ The source that owns a fact, record, artifact, or instruction. Retrieval conveni
 
 ## Source Policy
 
-The narrow `.chat-harness/source-policy.yaml` contract for privacy/source handling. It is not IAM, a Workspace manifest, specialist configuration, or general behavior configuration.
+The `.chat-harness/source-policy.yaml` contract for privacy/source handling. It classifies user-owned sources as `public`, `personal`, `confidential`, or `restricted`.
+
+It is narrow source-handling policy, not IAM, a Workspace manifest, specialist configuration, or general configuration.
+
+## Procedure
+
+Reusable methodology for recurring work. A Procedure may be Markdown, a playbook, a host-native Skill, or another readable form. Stable methodology remains separate from changing Workstream state.
+
+A useful distinction is: **specialist = how this Workspace generally works; Procedure = how a recurring task is performed.**
 
 ## Checkpoint
 
-A material durable update that makes interruption and recovery safe.
+A material durable update that makes interruption and recovery safe. An updated Workstream plus references to material artifacts normally supplies the checkpoint; there is no separate checkpoint database object.
 
-Useful triggers include a meaningful direction change, decision-relevant finding, accepted/rejected option, blocker/dependency change, valuable artifact update, next-action change, phase boundary, or substantial handoff.
+Checkpoint material changes rather than chat noise, and never persist private chain-of-thought.
 
-Avoid checkpoint noise. Never persist private chain-of-thought.
+## Artifact
+
+A meaningful durable output such as a report, itinerary, design, spreadsheet, or decision record. Not every intermediate file is an Artifact.
+
+## _inbox
+
+Visible user/automation → assistant intake. Its contents are user-owned.
+
+## temp
+
+Assistant → assistant non-canonical transient space. Promote valuable results before closeout.
 
 ## Capability
 
-A bounded ability available to the assistant: native host tool, app/connector, MCP, or Chat Harness-managed extension.
+Any bounded ability available to the assistant: native web/files, an app/connector, MCP, or a Chat Harness-managed extension.
+
+## CapabilityProvider
+
+The Chat Harness-managed external extension boundary whose contract, policy, transport/runtime, and structured result semantics Chat Harness controls. Host-native tools are not wrapped behind this interface for symmetry.
 
 ## Context engineering
 
 Deliberate selection and routing of instructions, current Workstream state, canonical sources, volatile-source refreshes, and capability descriptions. The default is minimum high-value context first, with progressive broadening when material.
 
+## CREATE and CLOSE
+
+**CREATE**: before adding durable canon, check whether an existing artifact already owns that truth.
+
+**CLOSE**: before substantial handoff or interruption, persist valuable outputs to their durable home and leave current resumable Workstream state.
+
 ## Action Transparency
 
-Explain meaningful external mutations at goal level without narrating routine mechanics. Transparency is not authorization.
+Explain meaningful external mutations before they happen without narrating routine tool mechanics. Consequential actions still require explicit approval; transparency is not authorization.
 
-## Related documentation
+## Host binding
 
-- [Architecture](architecture.md)
-- [Specialists](specialists.md)
-- [Security](security.md)
+The minimum host-specific glue that makes canonical `AGENTS.md` instructions and relevant Workspace context effective when a host cannot consume them directly. Host bindings are operational configuration, not competing instruction canon.

@@ -1,110 +1,59 @@
 # Specialists
 
-Specialists give a new Workspace a useful domain-specific starting point without turning Chat Harness into a multi-agent runtime.
+Specialists give a new Workspace useful domain-specific guidance without turning Chat Harness into a multi-agent runtime.
 
-A specialist is a **setup-time seed for `.chat-harness/WORKSPACE.md`**. It answers questions such as:
+A specialist is a **setup-time seed for `.chat-harness/WORKSPACE.md`**. It defines the kind of judgement the assistant should apply, the strongest evidence for the domain, important failure modes and boundaries, and what good output should look like.
 
-- What kind of judgement should the assistant apply here?
-- Which evidence is strongest for this domain?
-- Which facts need current verification?
-- What failure modes should the assistant actively avoid?
-- What domain boundaries or approval constraints matter?
-- What does good output look like?
+After setup, `WORKSPACE.md` is user-owned. There is no runtime specialist inheritance, composition, or template synchronization.
 
-After setup, `WORKSPACE.md` is user-owned and canonical for that Workspace. There is no runtime specialist inheritance, composition, precedence system, or template synchronization.
-
-## Choosing a specialist
+## Choose a specialist
 
 ```bash
 chat-harness setup /path/to/project --specialist tech
 ```
 
-If `--specialist` is omitted, interactive setup asks and defaults to `general`. Non-interactive setup uses `general` deterministically.
+If `--specialist` is omitted, interactive setup asks and defaults to `general`; non-interactive setup uses `general`.
 
-| ID | Best fit | What the seed emphasizes |
+| Specialist | Best fit | Emphasis |
 |---|---|---|
-| `general` | Broad ongoing knowledge work | factual integrity, source quality, currentness, explicit uncertainty, pragmatic output |
-| `research` | Investigations and evidence synthesis | precise framing, primary evidence, provenance, contradictory evidence, uncertainty, separation of evidence from interpretation |
-| `tech` | Software engineering and technical research | Principal/Staff+ judgement, real repo inspection, maintainability, operability, security, debugging, cost, ecosystem maturity, reversibility, anti-overengineering |
-| `tax` | Tax research and preparation | jurisdiction, tax period, entity/capacity, primary tax authority and legislation, factual integrity, ownership/treatment distinctions, conservative handling of unsupported positions |
-| `finance` | Personal or product financial analysis | goals, horizon, liquidity, risk, fees, tax, friction, scenarios, authoritative provider documents, historical-vs-forward-looking discipline |
-| `career` | Career positioning and opportunity work | evidence-grounded claims, no invented metrics/scope, private/public evidence boundaries, current company/process facts, restrained human writing |
-| `shopping` | Product/service purchasing research | buyer fit, broad-enough discovery, true net cost, reliability/support, ownership friction, current availability/terms, dependable economics vs uncertain promotions |
-| `travel` | Travel research and itinerary work | traveller fit, transfer/time realism, current entry/schedule/seasonality facts, confirmed-vs-proposed distinction, non-overpacked plans, approval before bookings/cancellations |
+| `general` | Broad knowledge work | factual integrity, source quality, currentness, explicit uncertainty, pragmatic output |
+| `research` | Evidence-heavy investigation | precise framing, primary evidence, provenance, contradictory evidence, reproducibility |
+| `tech` | Engineering and technical research | Principal/Staff+ judgement, real repositories, maintainability, operability, security, cost, anti-overengineering |
+| `tax` | Tax research and planning | jurisdiction and tax period, primary authority, ownership/treatment distinctions, conservative factual discipline |
+| `finance` | Financial analysis | goals, horizon, liquidity, risk, fees, tax, scenarios, provider evidence |
+| `career` | Career positioning | evidence-grounded claims, no invented achievements, current opportunity facts, restrained writing |
+| `shopping` | Purchase research | buyer fit, broad discovery, true net cost, reliability, support, current terms |
+| `travel` | Travel planning | traveller fit, realistic logistics, current entry/schedule facts, confirmed vs proposed plans |
 
-## What specialists are not
+These descriptions summarize the templates implemented by setup; the generated `WORKSPACE.md` contains the actual guidance.
 
-A specialist is **not**:
+## Specialist vs Procedure
 
-- a separate agent;
-- a model selection;
-- a runtime mode;
-- a procedure package;
-- a hierarchy of inherited prompts;
-- a permanent upstream template that overwrites your changes.
-
-This separation is deliberate:
+Specialists and Procedures solve different problems:
 
 ```text
-WORKSPACE specialist = who/how this Workspace generally works
-Procedure            = how a specific recurring task is performed
+Specialist = how this Workspace generally works
+Procedure  = how a recurring task is performed
 ```
 
-Chat Harness always scaffolds `.chat-harness/procedures/`, but specialist selection does not automatically install Procedures.
+Selecting a specialist does not install Procedures or create a separate agent.
 
-## Customizing the seed
+## Customize the Workspace
 
-The generated `WORKSPACE.md` is meant to be edited. Add the domain invariants, evidence sources, approval boundaries, output conventions, and judgement rules that are specific to your real Workspace.
+The generated `WORKSPACE.md` is meant to evolve. Add the domain invariants, preferred evidence sources, approval boundaries, output conventions, and judgement rules that are specific to the real Workspace.
 
-Keep generic Chat Harness behavior out of it. Generic startup, retrieval, persistence, checkpointing, and recovery behavior belongs in the managed root `AGENTS.md`.
+Keep generic Chat Harness behavior in `AGENTS.md`. For ChatGPT, copy the complete `AGENTS.md` into Project Instructions and leave specialist/domain guidance in `WORKSPACE.md`.
 
-Likewise, do not copy the specialist into ChatGPT Project Instructions. For the ChatGPT binding, Project Instructions contain the **complete `AGENTS.md`**; the assistant retrieves `WORKSPACE.md` as the Workspace-specific extension.
+Setup does not silently overwrite an existing `WORKSPACE.md`; replacement requires an explicit choice.
 
-## Existing WORKSPACE.md
+## Optional domain folders
 
-Setup does not silently overwrite an existing `WORKSPACE.md`.
+Specialists can also suggest a small domain folder layout, but those folders are not core architecture. Interactive setup defaults to no domain scaffolding; non-interactive setup requires `--scaffold-domain`.
 
-In interactive setup, the safe default is to keep the current file. You can explicitly choose to replace it with the selected specialist template, preview the template, or cancel. In non-interactive use, replacement requires an explicit option.
-
-This matters because specialist templates are starting points. Once a Workspace exists, its own `WORKSPACE.md` is the source of truth.
-
-## Optional domain scaffolding
-
-Some specialists can suggest a small domain folder layout. Those folders are **not core Chat Harness architecture**.
-
-Interactive setup defaults to **no**. Non-interactive setup requires explicit opt-in:
-
-```bash
-chat-harness setup /path/to/project --specialist tech --scaffold-domain
-```
-
-Domain scaffolding is additive only: missing exact paths may be created; existing directories are reused; file/type clashes or unsafe paths are reported and left untouched. Chat Harness does not fuzzy-match, rename, move, merge, or reorganize an existing corpus.
-
-## Examples
-
-A technical Workspace might begin with:
-
-```bash
-chat-harness setup ~/Projects/platform-research --specialist tech
-```
-
-A tax Workspace:
-
-```bash
-chat-harness setup ~/Documents/tax --specialist tax
-```
-
-A broad household or personal-admin Workspace can simply use:
-
-```bash
-chat-harness setup ~/Documents/household --specialist general
-```
-
-The specialist changes the initial Workspace-specific operating guidance, not the core scaffold or runtime architecture.
+Domain scaffolding is additive only. Chat Harness does not rename, move, merge, fuzzy-match, or reorganize an existing corpus.
 
 ## Related documentation
 
 - [Architecture](architecture.md) — instruction ownership and runtime retrieval.
 - [Concepts](concepts.md) — canonical terminology.
-- [ChatGPT host binding](hosts/chatgpt.md) — where `AGENTS.md` and `WORKSPACE.md` belong in ChatGPT.
-- [Security](security.md) — authority, Source Policy, and approval boundaries.
+- [ChatGPT host binding](hosts/chatgpt.md) — where `AGENTS.md` and `WORKSPACE.md` belong.

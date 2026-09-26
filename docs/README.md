@@ -1,59 +1,34 @@
 # Chat Harness documentation
 
-This directory contains the current architecture, operating model, host bindings, security model, and maintainer references for Chat Harness.
-
-If you are new to the project, start with the root [README](../README.md) for the product story and quick start. Use this page as the map for everything deeper.
+The root [README](../README.md) explains what Chat Harness is, why it exists, and how to get started. This page is the map for the deeper documentation.
 
 ## Start here
 
-1. **[README](../README.md)** — what Chat Harness is, why it exists, installation, quick start, and the mental model.
-2. **[Architecture](architecture.md)** — how the host, instructions, Workspace state, domain sources, and bounded capabilities fit together.
-3. **[Concepts](concepts.md)** — the vocabulary: Workspace, Workstream, Workbench, Procedure, Source Policy, and related terms.
-4. **[Specialists](specialists.md)** — choose and customize a setup-time specialist seed.
-5. **[ChatGPT host binding](hosts/chatgpt.md)** — make a Chat Harness Workspace effective inside a ChatGPT Project.
+1. [Architecture](architecture.md) — system boundaries, Workspace structure, ownership, recovery, and capability model.
+2. [Concepts](concepts.md) — canonical terminology.
+3. [Specialists](specialists.md) — built-in Workspace specialist seeds and how to use them.
+4. [ChatGPT host binding](hosts/chatgpt.md) — connect a Workspace to a ChatGPT Project.
 
-A typical first setup is:
+For most users, those four documents plus the root README cover the operating model.
 
-```bash
-chat-harness setup /path/to/project --specialist tech
-chat-harness validate /path/to/project
-chat-harness doctor /path/to/project
-```
+## Reference
 
-For ChatGPT, then copy the **entire generated `AGENTS.md`** into Project Instructions. The Workspace-specific specialist guidance stays in `.chat-harness/WORKSPACE.md`.
+- [Security and trust boundaries](security.md) — Source Policy, authority, approvals, prompt injection, and extension security.
+- [Compatibility](compatibility.md) — evidence-based host support.
+- [Alternatives and fit](alternatives.md) — when plain assistant Projects, coding harnesses, or self-hosted runtimes may fit better.
+- [Capability lifecycle](capability-lifecycle.md) — how bounded external capabilities are promoted and maintained.
 
-## Understand the model
+## See it in practice
 
-| Document | Use it when you want to understand… |
-|---|---|
-| [Architecture](architecture.md) | system boundaries, instruction ownership, runtime recovery, brownfield behavior, and capability boundaries |
-| [Concepts](concepts.md) | the canonical meaning of Chat Harness terms |
-| [Specialists](specialists.md) | what each built-in specialist optimizes for and what setup does with it |
-| [Security](security.md) | Source Policy, authority, approvals, prompt-injection boundaries, and extension security |
-| [Compatibility](compatibility.md) | what support is documented, verified, or not yet verified |
-| [Alternatives and fit](alternatives.md) | when plain assistant Projects, coding harnesses, or self-hosted runtimes may fit better |
-| [Capability lifecycle](capability-lifecycle.md) | how a bounded external capability is designed, promoted, and maintained |
+The repository includes four synthetic [example Workspaces](../examples/) covering family administration, a job opportunity, scientific research, and travel planning. They show the scaffold, Workspace-specific instructions, source routing, and Workstreams in realistic layouts.
 
-## Host bindings
+[Behavioural evals](../evals/README.md) encode required and forbidden behaviors separately from the examples.
 
-Host bindings explain the small amount of host-specific setup needed to make the portable Workspace model effective.
-
-- [ChatGPT Projects](hosts/chatgpt.md) — current reference hosted binding.
-
-Chat Harness keeps host-specific glue narrow. The host still owns its model, native conversation/tool loop, UI, and built-in capabilities.
-
-## Maintainers and contributors
+## Maintainers and project history
 
 - [Contributing](../CONTRIBUTING.md) — development gates, design rules, PR expectations, and releases.
-- [Security policy](../SECURITY.md) — how to report a vulnerability.
-- [Design history](design-history/capability-bridge-origin.md) — historical rationale for the original capability bridge.
-- [Historical capability-bridge design](design.md) — pointer from the superseded standalone design to the current architecture.
+- [Security policy](../SECURITY.md) — vulnerability reporting.
+- [Design history](design-history/capability-bridge-origin.md) — origin of the bounded capability bridge.
 - [Release records](releases/) — version-specific release notes and qualification history.
 
-Historical documents may contain version-specific terminology by design. They are records of what shipped or how the architecture evolved; they are not the current user-facing contract.
-
-## Documentation conventions
-
-Current product documentation should describe **the current architecture directly**, rather than narrating old-versus-new versions. Version-specific language belongs in release notes and historical design/qualification records.
-
-Keep concepts in one canonical place and link to them rather than creating competing definitions. The root README should stay approachable and explanatory; detailed contracts belong in the focused documents above.
+Historical documents intentionally retain version-specific terminology. Current product documentation describes the current architecture directly.
