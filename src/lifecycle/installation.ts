@@ -47,7 +47,8 @@ export function metadataPathForExecutable(executablePath: string): string {
 
 export function parseInstallationMetadata(source: string): InstallationMetadata | null {
   try {
-    const normalized = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;\n    const value = JSON.parse(normalized) as Partial<InstallationMetadata>;
+    const normalized = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
+    const value = JSON.parse(normalized) as Partial<InstallationMetadata>;
     if (value.schema !== 1) return null;
     if (value.channel !== "standalone" && value.channel !== "development") return null;
     return { schema: 1, channel: value.channel };
