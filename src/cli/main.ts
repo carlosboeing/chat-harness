@@ -13,6 +13,7 @@ import { commandEnvelope, type CommandEnvelope, type CommandName, type Finding }
 import { runDoctor } from "../doctor/command.js";
 import { runSetup } from "../setup/command.js";
 import { resolveInteractiveSetup } from "../setup/interactive.js";
+import { buildSetupStructure, renderSetupTree } from "../setup/presentation.js";
 import { SPECIALIST_IDS, type SpecialistId } from "../setup/specialists.js";
 import { runValidate } from "../validation/command.js";
 import { resolveWorkspaceRoot, WorkspaceResolutionError } from "../workspace/resolve.js";
@@ -76,26 +77,25 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
           beforeApply: async (plan) => {
             if (!runtime.isTTY || !runtime.nativeTerminal || context.options.json) return;
 
-            const create = plan.operations.filter((operation) => operation.action !== "replace_file");
-            const replace = plan.operations.filter((operation) => operation.action === "replace_file");
             runtime.stdout(
               [
                 "",
-                "Ready to set up Chat Harness.",
+                "Review your Workspace",
                 "",
-                ...(create.length > 0
-                  ? ["Will create:", ...create.map((operation) => `  - ${operation.path}`), ""]
-                  : []),
-                ...(replace.length > 0
-                  ? ["Will replace:", ...replace.map((operation) => `  - ${operation.path}`), ""]
-                  : []),
-                "Everything else in the Workspace will be left unchanged.",
+                "Here's how the Chat Harness part of this Workspace will look after setup:",
+                "",
+                renderSetupTree(
+                  plan.workspace,
+                  buildSetupStructure(plan, "planned"),
+                ),
+                "",
+                "Anything else already in this folder will be left exactly as it is.",
                 "",
               ].join("\n"),
             );
 
             const answer = await confirm({
-              message: "Apply these changes?",
+              message: "Set up this Workspace now?",
               initialValue: true,
             });
             return !isCancel(answer) && answer;
