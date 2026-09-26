@@ -93,7 +93,7 @@ describe("CLI surface", () => {
     expect(output).toContain("--specialist <id>");
     expect(output).toContain("general");
     expect(output).toContain("travel");
-    expect(output).toContain("Everything else");
+    expect(output).toContain("is left unchanged");
     expect(output).toContain("--json disables interactive prompts");
     expect(output).toContain("chat-harness setup --specialist travel");
     expect(output).toContain("ChatGPT setup guide:");
