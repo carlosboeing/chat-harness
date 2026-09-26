@@ -4,12 +4,14 @@ The root [README](../README.md) explains what Chat Harness is, why it exists, an
 
 ## Start here
 
-1. [Architecture](architecture.md) — system boundaries, Workspace structure, ownership, recovery, and capability model.
-2. [Concepts](concepts.md) — canonical terminology.
-3. [Specialists](specialists.md) — built-in Workspace specialist seeds and how to use them.
-4. [ChatGPT host binding](hosts/chatgpt.md) — connect a Workspace to a ChatGPT Project.
+1. [Getting started](getting-started.md) — beginner-friendly installation, setup, and ChatGPT connection.
+2. [CLI reference](cli.md) — commands, options, safety behavior, JSON output, and exit codes.
+3. [Specialists](specialists.md) — built-in Workspace starting guidance and optional folders.
+4. [ChatGPT setup](hosts/chatgpt.md) — connect a Workspace to a ChatGPT Project.
+5. [Concepts](concepts.md) — canonical terminology.
+6. [Architecture](architecture.md) — system boundaries, Workspace structure, ownership, recovery, and capability model.
 
-For most users, those four documents plus the root README cover the operating model.
+If you are new to Chat Harness, start with Getting Started rather than the architecture documents.
 
 ## Reference
 
