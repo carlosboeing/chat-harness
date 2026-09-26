@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     run(binary, ["--version"], workspace, env);
 
     const rootHelp = run(binary, ["--help"], workspace, env);
-    for (const command of ["setup", "validate", "doctor"]) {
+    for (const command of ["setup", "validate", "doctor", "update", "uninstall"]) {
       if (!rootHelp.includes(command)) {
         throw new Error(`standalone help is missing command: ${command}`);
       }
