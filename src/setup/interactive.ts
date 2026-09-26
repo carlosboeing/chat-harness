@@ -205,7 +205,6 @@ async function resolveDomainScaffold(
 export async function resolveInteractiveSetup(
   workspace: string,
   request: InteractiveSetupRequest,
-  write: (text: string) => void,
 ): Promise<InteractiveSetupResult> {
   const inspection = await inspectWorkspace(workspace);
   const workspaceFile = inspection.observations.find(
