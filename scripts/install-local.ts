@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { buildBinary } from "./build-binary.js";
+import { writeInstallationMetadata } from "../src/lifecycle/installation.js";
 
 type ExecFn = typeof execFileSync;
 
@@ -110,6 +111,8 @@ export async function main(): Promise<void> {
     console.log("\n3. Verifying installed version...");
     verifyInstalledVersion(installed, version);
     console.log(`✓ ${installed} --version => ${version}`);
+    writeInstallationMetadata(installed, "development");
+    console.log("✓ Recorded development-install provenance");
 
     const active = findExecutableOnPath("chat-harness");
     console.log("\n4. Checking PATH...");
