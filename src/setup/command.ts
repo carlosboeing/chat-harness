@@ -24,7 +24,7 @@ export interface SetupCommandOutput {
     state: "no_changes" | "changes_planned" | "changes_applied" | "cancelled" | "user_action_required" | "execution_failure";
     operations: ReadonlyArray<SetupOperation>;
     specialist: SpecialistId;
-    host_action: string;
+    host_action?: string;
   };
   findings: Finding[];
 }
@@ -36,7 +36,7 @@ export async function runSetup(workspace: string, options: SetupCommandOptions, 
   const snapshot = await inspect(workspace);
   const domain = resolved.scaffoldDomain ? await inspectDomainScaffold(workspace, specialist) : [];
   const plan = buildSetupPlan(snapshot, resolved, domain);
-  const result = (state: SetupCommandOutput["result"]["state"], operations: ReadonlyArray<SetupOperation>) => ({ state, operations, specialist, host_action: HOST_ACTION });
+  const result = (state: SetupCommandOutput["result"]["state"], operations: ReadonlyArray<SetupOperation>) => ({\n    state,\n    operations,\n    specialist,\n    ...(state === "changes_applied" || state === "no_changes" ? { host_action: HOST_ACTION } : {}),\n  });
 
   if (plan.findings.some((finding) => finding.severity === "error")) return { result: result("user_action_required", plan.operations), findings: [...plan.findings] };
   if (plan.operations.length === 0) return { result: result("no_changes", []), findings: [] };
