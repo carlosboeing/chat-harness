@@ -52,12 +52,17 @@ export function runtimeFindings(
 
   if (mode === "npm") {
     const version = facts.nodeVersion ? parseVersion(facts.nodeVersion) : null;
-    if (!version || version[0] < 20) {
+    const compatible =
+      version !== null &&
+      (version[0] > 22 ||
+        (version[0] === 22 &&
+          (version[1] > 12 || (version[1] === 12 && version[2] >= 0))));
+    if (!compatible) {
       return [
         {
           code: "doctor.node_unsupported",
           severity: "error",
-          message: "npm installation requires Node.js 20 or newer.",
+          message: "npm installation requires Node.js 22.12.0 or newer.",
           remediation: "Install a supported Node.js runtime.",
         },
       ];
