@@ -62,6 +62,15 @@ describe("CLI surface", () => {
     expect(io.stdout().trim()).toBe(packageMetadata.version);
   });
 
+  test("--version can identify a local development build", async () => {
+    const root = await workspace();
+    const io = capture(root, { version: "0.2.0-f6bff65" });
+
+    const code = await runCli(["--version"], io.runtime);
+    expect(code).toBe(0);
+    expect(io.stdout().trim()).toBe("0.2.0-f6bff65");
+  });
+
   test("--help exposes only setup, validate, and doctor commands", async () => {
     const root = await workspace();
     const io = capture(root);
