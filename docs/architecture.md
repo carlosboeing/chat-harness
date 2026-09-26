@@ -1,20 +1,34 @@
 # Architecture
 
-Chat Harness shapes execution around an existing AI assistant rather than replacing its model/tool loop.
+Chat Harness applies harness engineering around an existing AI assistant. The assistant owns the model, native conversation/tool loop, UI, and built-in capabilities. Chat Harness owns the project-level conventions and deterministic tooling that make long-running work easier to resume, verify, and maintain.
 
 ## Boundary
 
 ```mermaid
 flowchart TB
-    H["AI assistant host<br/>models + native tools"] --> A["AGENTS.md<br/>generic harness behavior"]
-    A --> W["WORKSPACE.md<br/>Workspace-specific behavior"]
-    W --> M["Workspace Map<br/>routing/index"]
-    M --> S["Workstreams / Procedures / authoritative sources"]
-    S --> O["Domain corpus + external canon<br/>user-owned"]
-    H --> C["Bounded capabilities"]
+    subgraph Host["AI assistant"]
+      M["Model + native loop"]
+      T["Web / files / apps / connectors / MCP"]
+    end
+    subgraph Harness["Chat Harness"]
+      A["AGENTS.md<br/>generic behavior"]
+      W["WORKSPACE.md<br/>Workspace-specific behavior"]
+      S["Workstreams + Workbench + Procedures"]
+      V["setup / validate / doctor"]
+      E["Bounded external extensions"]
+    end
+    C["User/domain corpus<br/>canonical sources"]
+    H[".chat-harness/<br/>harness state"]
+    Host --> Harness
+    Harness --> H
+    Harness --> C
 ```
 
-## v0.2 core scaffold
+Chat Harness is not an agent runtime, orchestration platform, or memory database. It shapes execution around the host rather than reimplementing it.
+
+## Workspace
+
+A Workspace is an ownership and durable-state boundary:
 
 ```text
 <Project>/
@@ -35,61 +49,110 @@ flowchart TB
     └── temp/
 ```
 
-No universal domain taxonomy is imposed.
+The user/domain owns the rest of the corpus. Chat Harness does not impose a universal domain taxonomy or reorganize existing content.
 
-## Instruction ownership
+A Workspace is also not an information silo. Relevant authorized context may live in repositories, connected apps, other Workspaces, assistant context systems, or current public sources. Canon stays with its owning source.
 
-`AGENTS.md` is a self-contained generic Chat Harness Project Instructions file. A deterministic managed marker allows setup to recognize and replace a Chat Harness-owned copy wholesale. Unknown `AGENTS.md` content is a brownfield collision.
+## Portable instructions and Workspace instructions
 
-`WORKSPACE.md` is the single Workspace-specific instruction extension. Specialist templates are setup-time seeds only; after creation the file is Workspace/user-owned. There is no specialist inheritance, composition, or update synchronization.
+`AGENTS.md` is the canonical portable source of generic Chat Harness behavior. A deterministic managed marker allows setup to recognize and refresh a Chat Harness-owned copy. Unknown `AGENTS.md` content is treated as a brownfield collision rather than silently adopted.
 
-The Workspace Map is user-owned routing/index state, not instructions or machine configuration.
+`.chat-harness/WORKSPACE.md` is the single Workspace-specific instruction extension: role, domain judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
 
-## Runtime recovery
+[Specialists](specialists.md) seed `WORKSPACE.md` during setup. After creation, it is user-owned. There is no specialist inheritance, runtime composition, or template synchronization.
 
-For substantial work the host should load WORKSPACE + Map, determine whether the request continues an objective, inspect relevant active/parked Workstreams **before** reconstructing state from chat/memory, resume from Next action, and load only relevant Procedures/canonical sources.
+A host that cannot consume `AGENTS.md` directly uses a narrow host binding. The binding makes the canonical instructions effective without becoming a second instruction canon. ChatGPT Project Instructions are the reference binding; see [ChatGPT host setup](hosts/chatgpt.md).
 
-A new Workstream is justified by:
+## Operating protocol
 
-> independent objective + independent next action + likely future continuation
+For substantial work:
 
-Checkpoint only material changes. Before substantial handoff, reconcile current durable state and promote valuable transient output.
+1. apply `AGENTS.md` and load `WORKSPACE.md` plus the Workspace Map;
+2. determine whether the request continues an existing objective;
+3. inspect relevant active or parked Workstreams before reconstructing state from chat history or model memory;
+4. resume matching state from its Next action, or create a qualifying Workstream;
+5. retrieve the minimum relevant Procedures and authoritative context, broadening when material;
+6. reverify volatile facts;
+7. use the simplest sufficient authorized capability;
+8. verify results and evidence;
+9. checkpoint material changes and reconcile durable state before substantial handoff.
 
-## Workstream vs Workbench
+A Workstream is a context entry point, not an information boundary.
 
-A Workstream is compact continuously maintained objective state. Workbench is durable working output.
+## Source ownership
+
+`.chat-harness/README.md` is the human-readable **Workspace Map**. It records routing and ownership, not machine configuration.
+
+A Workstream is the durable resume point for one continuing objective. Domain facts remain authoritative in the record that owns them. Search indexes, assistant memory, summaries, and derived reports do not become canon merely because they are convenient.
+
+Before creating durable canon, perform a targeted **CREATE** ownership check. Before substantial handoff, **CLOSE** by preserving materially valuable outputs and making the active Workstream resumable.
+
+When shared durable state may have changed, refresh and reconcile before overwriting it.
+
+## Workstreams, Workbench, Inbox, and temp
+
+A Workstream is justified when there is an independent objective, an independent next action, and likely future continuation. It stores compact current state rather than conversation history.
+
+Workbench holds substantial durable working artifacts under five organizational categories: ideas, research, analysis, plans, and reviews. The categories are not lifecycle phases; Workstreams and Workbench are parallel outputs from work.
+
+`_inbox/` is visible user/automation → assistant intake and remains user-owned.
+
+`.chat-harness/temp/` is assistant → assistant non-canonical transient storage. Valuable content should be promoted before closeout.
+
+## Source Policy
+
+`.chat-harness/source-policy.yaml` is narrow machine-readable privacy/source-handling policy. It is not a Workspace manifest or general configuration system.
+
+Privacy profiles are `public`, `personal`, `confidential`, and `restricted`. The owning Workspace's policy governs its sources and cannot be silently weakened by a consuming Workspace.
+
+For Chat Harness-controlled source reads, policy is resolved before protected content access. Host-native retrieval paths that Chat Harness cannot intercept are policy-aware rather than hard-enforced. See [Security](security.md).
+
+## CLI architecture and brownfield safety
+
+The CLI surface is intentionally small:
+
+- `setup` — inspect, plan, reconcile, and verify the Workspace scaffold;
+- `validate` — deterministic local integrity checks;
+- `doctor` — read-only operational diagnosis.
+
+Setup creates missing managed paths, can refresh a recognized Chat Harness-managed `AGENTS.md`, preserves user-owned Workspace/domain content by default, and surfaces unknown same-name collisions. Optional domain scaffolding is additive only.
+
+It does not rename, move, merge, fuzzy-match, or semantically reorganize an existing domain corpus.
+
+## Capability model
+
+`Capability` is broad: native assistant tools, apps/connectors, MCP, and Chat Harness-managed extensions can all be capabilities.
+
+`CapabilityProvider` is deliberately narrower: it describes only a Chat Harness-managed external extension boundary. Chat Harness does not invent a common executable interface over host-native tools for symmetry.
+
+Escalation is:
 
 ```text
-                         ┌──────────────► Workstream
-Chat(s) ─────────────────┼──────────────► Workbench
-                         └──────────────► Domain corpus
+native assistant capability
+  -> app / connector
+  -> MCP or comparable host extension
+  -> Chat Harness-managed bounded capability
+  -> specialist worker when genuinely needed
 ```
 
-Workbench taxonomy is organizational, not lifecycle state. v0.2 has no lifecycle validator, phase engine, or v0.1 migration layer.
+A durable external capability has a stable identity, strict typed request, authority/security profile, handler-owned network policy, execution budgets, structured failure/result semantics, and lifecycle evidence.
 
-## Inbox and temp
+The GitHub extension is one implementation of this boundary, not the center of the architecture.
 
-`_inbox/` is human/automation → assistant intake and remains user-owned.
+## Authority and transparency
 
-`.chat-harness/temp/` is assistant → assistant non-canonical transient storage. Valuable content should be promoted before closeout; disposable harness-created temp material may be cleaned.
+Autonomous read execution requires a capability to be safe, already authorized, and read-only. Consequential actions require explicit human approval at the action boundary unless already explicitly authorized.
 
-## Source ownership and Source Policy
+Portable instructions also require **Action Transparency** before meaningful external mutations and proportional notice before non-obvious private/sensitive cross-context reads. Routine mechanics are not narrated.
 
-The Workspace is federated rather than siloed. Canonical ownership remains explicit across repositories, apps, other Workspaces, and public sources.
+## Evaluation and compatibility
 
-Source Policy remains narrow privacy/source-handling configuration. Deterministic enforcement applies only to paths Chat Harness controls; host-native reads may only be instruction-governed.
+Compatibility is capability- and evidence-based, not inferred from vendor similarity. The repository records `documented`, `verified`, and `unverified` host paths in [compatibility.md](compatibility.md).
 
-## Setup and brownfield safety
+[Examples](../examples/) show how the architecture feels in realistic Workspaces; [evals](../evals/README.md) encode falsifiable required and forbidden behavior.
 
-Setup follows explicit ownership:
-- missing core path → create;
-- recognized Chat Harness-owned AGENTS → refresh wholesale;
-- unknown same-name user content → preserve and surface;
-- existing WORKSPACE/Map/Source Policy → user-owned unless explicit replacement is requested;
-- optional domain scaffold → exact additive paths only.
+## Non-goals
 
-There is no v0.1 detector, migrator, lifecycle converter, upgrade command, or version database. Old `.chat-harness/lifecycle/` content, if present, is ignored as unrelated extra content.
+Chat Harness deliberately has no replacement agent loop, model-provider abstraction, workflow engine, scheduler, database, universal domain taxonomy, runtime specialist hierarchy, semantic migration framework, remote storage manager, full-screen TUI, or generic arbitrary shell/HTTP/browser capability.
 
-## Capability/security boundary
-
-The Workspace redesign does not weaken capability rules: host-native capability first, bounded extension only for a real gap, retrieved content is not authority, meaningful mutation is transparent, and consequential side effects require explicit approval unless already authorized.
+These abstractions should be earned by real implementation pressure.

@@ -28,7 +28,7 @@ Chat Harness instead assumes an existing general-purpose assistant is already us
 | Native host evolution | inherited | operator integrates changes |
 | Arbitrary local authority | intentionally limited | often broader/configurable |
 | Project-level durable state discipline | core focus | runtime-specific |
-| Model/provider independence | not a v0.1 goal | often a primary feature |
+| Model/provider independence | not a goal | often a primary feature |
 
 Neither approach is universally superior. They optimize different boundaries.
 
