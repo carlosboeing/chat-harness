@@ -73,7 +73,13 @@ export function verifyInstalledVersion(
 }
 
 function localEntrypoint(version: string): string {
-  return `import { runCli } from "../../src/cli/main.ts";\n\nconst code = await runCli(process.argv.slice(2), { version: ${JSON.stringify(version)} });\nprocess.exitCode = code;\n`;
+  return [
+    'process.env.CHAT_HARNESS_SUPPRESS_AUTO_RUN = "1";',
+    'const { runCli } = await import("../../src/cli/main.ts");',
+    `const code = await runCli(process.argv.slice(2), { version: ${JSON.stringify(version)} });`,
+    "process.exitCode = code;",
+    "",
+  ].join("\\n");
 }
 
 export async function main(): Promise<void> {
