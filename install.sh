@@ -29,7 +29,15 @@ else
 fi
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT INT TERM
+stage=""
+metadata_tmp=""
+cleanup() {
+  rm -rf "$tmp"
+  [ -z "$stage" ] || rm -f "$stage"
+  [ -z "$metadata_tmp" ] || rm -f "$metadata_tmp"
+}
+trap cleanup EXIT INT TERM
+
 curl -fsSL "$base/$asset" -o "$tmp/$asset"
 curl -fsSL "$base/$asset.sha256" -o "$tmp/$asset.sha256"
 
@@ -45,5 +53,19 @@ else
 fi
 
 mkdir -p "$INSTALL_DIR"
-install -m 0755 "$tmp/$asset" "$INSTALL_DIR/chat-harness"
-echo "Installed chat-harness to $INSTALL_DIR/chat-harness"
+destination="$INSTALL_DIR/chat-harness"
+stage="$INSTALL_DIR/.chat-harness-install.$$"
+install -m 0755 "$tmp/$asset" "$stage"
+mv -f "$stage" "$destination"
+stage=""
+
+metadata="$INSTALL_DIR/.chat-harness-install.json"
+metadata_tmp="$metadata.tmp.$$"
+(
+  umask 077
+  printf '%s\n' '{"schema":1,"channel":"standalone"}' > "$metadata_tmp"
+)
+mv -f "$metadata_tmp" "$metadata"
+metadata_tmp=""
+
+echo "Installed chat-harness to $destination"

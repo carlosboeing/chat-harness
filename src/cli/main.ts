@@ -9,8 +9,16 @@ import packageMetadata from "../../package.json" with { type: "json" };
 import { EXIT_INTERNAL, EXIT_SUCCESS, EXIT_USAGE, exitCodeForEnvelope, type ExitCode } from "./exit-codes.js";
 import { renderHuman, renderJson } from "./render.js";
 import { renderInteractive } from "./terminal.js";
-import { commandEnvelope, type CommandEnvelope, type CommandName, type Finding } from "./result.js";
+import { commandEnvelope, type CommandEnvelope, type CommandName, type Finding, type WorkspaceCommandName } from "./result.js";
 import { runDoctor } from "../doctor/command.js";
+import {
+  defaultLifecycleDependencies,
+  inspectCurrentInstallation,
+  runUninstall,
+  runUpdate,
+  type LifecycleDependencies,
+} from "../lifecycle/command.js";
+import { runWindowsLifecycleHelper } from "../lifecycle/windows.js";
 import { runSetup } from "../setup/command.js";
 import { resolveInteractiveSetup } from "../setup/interactive.js";
 import { buildSetupStructure, renderSetupTree } from "../setup/presentation.js";
@@ -23,7 +31,7 @@ export interface CommandHandlerResult {
   findings?: Finding[];
 }
 export interface CommandContext {
-  command: CommandName;
+  command: WorkspaceCommandName;
   workspace: string;
   options: {
     json: boolean;
@@ -41,7 +49,8 @@ export interface CliRuntime {
   isTTY: boolean;
   stdout: (text: string) => void;
   stderr: (text: string) => void;
-  handlers: Partial<Record<CommandName, CommandHandler>>;
+  handlers: Partial<Record<WorkspaceCommandName, CommandHandler>>;
+  lifecycle: LifecycleDependencies;
   nativeTerminal: boolean;
   version: string;
 }
@@ -54,6 +63,7 @@ function defaultRuntime(): CliRuntime {
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text),
     handlers: {},
+    lifecycle: defaultLifecycleDependencies,
     nativeTerminal: true,
     version: packageMetadata.version,
   };
@@ -128,6 +138,27 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
       (overrides.nativeTerminal ?? base.nativeTerminal),
   };
 
+  if (argv[0] === "__lifecycle-helper") {
+    try {
+      if (process.platform !== "win32") {
+        throw new Error("Windows lifecycle helpers can run only on Windows.");
+      }
+      const jobPath = argv[1];
+      if (!jobPath || argv.length !== 2) {
+        throw new Error("Invalid lifecycle helper invocation.");
+      }
+      await runWindowsLifecycleHelper(jobPath);
+      return EXIT_SUCCESS;
+    } catch (error) {
+      runtime.stderr(
+        "Chat Harness lifecycle helper failed: " +
+        (error instanceof Error ? error.message : String(error)) +
+        "\n",
+      );
+      return EXIT_INTERNAL;
+    }
+  }
+
   const requestedJson = argv.includes("--json");
   const color = shouldUseColor(argv, runtime);
   let selectedCommand: CommandName | undefined;
@@ -137,7 +168,7 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
   const program = new Command();
   program
     .name("chat-harness")
-    .description("Create, validate, and diagnose Chat Harness Workspaces for AI assistants.")
+    .description("Create, validate, diagnose, update, and uninstall Chat Harness.")
     .version(runtime.version)
     .showHelpAfterError("(run with --help for usage)")
     .addHelpText(
@@ -148,13 +179,16 @@ Examples:
   chat-harness setup --specialist travel
   chat-harness validate
   chat-harness doctor
+  chat-harness update --check
+  chat-harness update
+  chat-harness uninstall
 
-Commands default to the current directory and do not search parent directories
-for a Workspace. Pass [path] only when targeting another existing directory.
+Workspace commands default to the current directory and do not search parent
+directories. Pass [path] only when targeting another existing directory.
 
 Exit codes:
   0  Success
-  1  A setup, validation, or health finding requires attention
+  1  A command finding requires attention
   2  Invalid command-line usage
   3  Unexpected internal failure
 
@@ -168,7 +202,7 @@ Documentation:
       writeErr: (output) => runtime.stderr(output),
     });
 
-  const addCommand = (name: CommandName, description: string): void => {
+  const addCommand = (name: WorkspaceCommandName, description: string): void => {
     const command = program
       .command(name)
       .description(description)
@@ -319,13 +353,171 @@ Examples:
   addCommand("validate", "Validate Workspace scaffold, Workstreams, and Source Policy");
   addCommand("doctor", "Diagnose Workspace health and local prerequisites");
 
+  program
+    .command("update")
+    .description("Update the installed Chat Harness CLI through its owning channel")
+    .option("--check", "Check whether an update is available without modifying anything")
+    .option("--json", "Emit the stable machine-readable JSON envelope")
+    .option("--no-color", "Disable ANSI terminal decoration")
+    .addHelpText(
+      "after",
+      `
+Behaviour:
+  Standalone installs use the latest stable GitHub Release and verify the
+  release SHA-256 sidecar before replacement. Global npm installs delegate to
+  npm. Local development builds are never replaced by a published release.
+
+  update changes Chat Harness software only. It never migrates or modifies
+  Workspace data. Use setup/validate separately after a Workspace contract
+  change.
+
+Examples:
+  chat-harness update --check
+  chat-harness update
+  chat-harness update --json
+`,
+    )
+    .action(async (options: { check?: boolean; json?: boolean }) => {
+      selectedCommand = "update";
+      const output = await runUpdate(
+        runtime.version,
+        { check: Boolean(options.check), json: Boolean(options.json) },
+        runtime.lifecycle,
+      );
+      const envelope = commandEnvelope({
+        command: "update",
+        result: output.result,
+        ...(output.findings ? { findings: output.findings } : {}),
+      });
+      exitCode = writeEnvelope(
+        envelope,
+        Boolean(options.json),
+        color,
+        runtime,
+      );
+    });
+
+  program
+    .command("uninstall")
+    .description("Remove the installed Chat Harness CLI without touching Workspace data")
+    .option("--yes", "Skip the uninstall confirmation")
+    .option("--json", "Emit the stable machine-readable JSON envelope")
+    .option("--no-color", "Disable ANSI terminal decoration")
+    .addHelpText(
+      "after",
+      `
+Safety:
+  uninstall removes only the Chat Harness CLI and its install metadata.
+  AGENTS.md, .chat-harness/, _inbox/, Workstreams, Workbench artifacts,
+  domain/project files, and remote Workspace content are never removed.
+
+  In non-interactive or --json use, pass --yes to authorize removal.
+
+Examples:
+  chat-harness uninstall
+  chat-harness uninstall --yes
+  chat-harness uninstall --yes --json
+`,
+    )
+    .action(async (options: { yes?: boolean; json?: boolean }) => {
+      selectedCommand = "uninstall";
+      const installation = inspectCurrentInstallation(
+        runtime.version,
+        runtime.lifecycle,
+      );
+      const canMutate =
+        installation.channel !== "unknown" &&
+        !(
+          installation.channel === "development" &&
+          installation.provenance === "runtime"
+        );
+
+      if (!options.yes && canMutate) {
+        if (runtime.isTTY && runtime.nativeTerminal && !options.json) {
+          note(
+            [
+              "Chat Harness " + runtime.version,
+              "Installation: " + installation.channel,
+              "Path: " + installation.executablePath,
+              "",
+              "This removes the Chat Harness CLI only.",
+              "Your Workspaces and project files will not be changed.",
+            ].join("\n"),
+            "Uninstall Chat Harness",
+          );
+          const answer = await confirm({
+            message: "Uninstall Chat Harness?",
+            initialValue: false,
+          });
+          if (isCancel(answer) || !answer) {
+            const envelope = commandEnvelope({
+              command: "uninstall",
+              result: {
+                state: "cancelled",
+                current: runtime.version,
+                channel: installation.channel,
+                path: installation.executablePath,
+              },
+            });
+            exitCode = writeEnvelope(envelope, false, color, runtime);
+            return;
+          }
+        } else {
+          const envelope = commandEnvelope({
+            command: "uninstall",
+            result: {
+              state: "confirmation_required",
+              current: runtime.version,
+              channel: installation.channel,
+              path: installation.executablePath,
+            },
+            findings: [{
+              code: "lifecycle.confirmation_required",
+              severity: "error",
+              message: "Uninstall requires explicit confirmation in non-interactive mode.",
+              remediation: "Run chat-harness uninstall --yes. Workspace data will not be changed.",
+            }],
+          });
+          exitCode = writeEnvelope(
+            envelope,
+            Boolean(options.json),
+            color,
+            runtime,
+          );
+          return;
+        }
+      }
+
+      const output = await runUninstall(
+        runtime.version,
+        { json: Boolean(options.json) },
+        runtime.lifecycle,
+      );
+      const envelope = commandEnvelope({
+        command: "uninstall",
+        result: output.result,
+        ...(output.findings ? { findings: output.findings } : {}),
+      });
+      exitCode = writeEnvelope(
+        envelope,
+        Boolean(options.json),
+        color,
+        runtime,
+      );
+    });
+
+  const isWorkspaceCommand = (
+    command: CommandName | undefined,
+  ): command is WorkspaceCommandName =>
+    command === "setup" || command === "validate" || command === "doctor";
+
   try {
     await program.parseAsync(["node", "chat-harness", ...argv]);
     if (selectedCommand === undefined && argv.length === 0) runtime.stdout(program.helpInformation());
     return exitCode;
   } catch (error) {
     if (error instanceof CommanderError) return error.exitCode === 0 ? EXIT_SUCCESS : EXIT_USAGE;
-    if (error instanceof WorkspaceResolutionError && selectedCommand) {
+    if (error instanceof WorkspaceResolutionError && isWorkspaceCommand(selectedCommand)) {
       const envelope = commandEnvelope({
         command: selectedCommand,
         workspace: workspaceHint(selectedPath, runtime.cwd),
@@ -337,7 +529,9 @@ Examples:
     if (selectedCommand) {
       const envelope = commandEnvelope({
         command: selectedCommand,
-        workspace: workspaceHint(selectedPath, runtime.cwd),
+        ...(isWorkspaceCommand(selectedCommand)
+          ? { workspace: workspaceHint(selectedPath, runtime.cwd) }
+          : {}),
         result: { state: "execution_failure" },
         findings: [{ code: "cli.internal_error", severity: "error", message: "The command failed unexpectedly." }],
         success: false,

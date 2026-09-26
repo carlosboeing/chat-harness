@@ -41,6 +41,8 @@ function setupStructure(envelope: CommandEnvelope): SetupStructureEntry[] {
 }
 
 function renderSetupInteractive(envelope: CommandEnvelope): void {
+  if (!envelope.workspace) throw new Error("setup result is missing its Workspace path");
+  const workspace = envelope.workspace;
   const structure = setupStructure(envelope);
   const state = envelope.result.state;
 
@@ -55,7 +57,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
 
     if (structure.length > 0) {
       note(
-        renderSetupTree(envelope.workspace, structure),
+        renderSetupTree(workspace, structure),
         "Workspace ready",
       );
 
@@ -75,7 +77,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.info(`Workspace: ${envelope.workspace}`);
     if (structure.length > 0) {
       note(
-        renderSetupTree(envelope.workspace, structure),
+        renderSetupTree(workspace, structure),
         "Workspace structure",
       );
     }
@@ -85,7 +87,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.info(`Workspace: ${envelope.workspace}`);
     if (structure.length > 0) {
       note(
-        renderSetupTree(envelope.workspace, structure),
+        renderSetupTree(workspace, structure),
         "Workspace preview",
       );
     }
@@ -128,8 +130,18 @@ export function renderInteractive(envelope: CommandEnvelope): void {
   }
 
   intro(`Chat Harness ${envelope.command}`, { withGuide: false });
-  log.info(`workspace: ${envelope.workspace}`);
+  if (envelope.workspace) log.info(`workspace: ${envelope.workspace}`);
   log.step(`state: ${envelope.result.state}`);
+
+  for (const [label, key] of [
+    ["Current", "current"],
+    ["Latest", "latest"],
+    ["Channel", "channel"],
+    ["Path", "path"],
+  ] as const) {
+    const value = envelope.result[key];
+    if (typeof value === "string" && value.length > 0) log.info(`${label}: ${value}`);
+  }
 
   for (const finding of envelope.findings) {
     const text = [

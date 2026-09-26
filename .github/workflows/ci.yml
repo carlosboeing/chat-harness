@@ -77,7 +77,9 @@ jobs:
         run: bun run install:local
 
       - name: Verify local development binary executes
-        run: /tmp/chat-harness-local-bin/chat-harness --version
+        run: |
+          /tmp/chat-harness-local-bin/chat-harness --version
+          /tmp/chat-harness-local-bin/chat-harness update --check --json
 
       - name: Inspect npm package contents
         run: |
@@ -89,6 +91,31 @@ jobs:
           mkdir -p dist/package
           npm pack --pack-destination dist/package
           bun run smoke:npm-package -- "dist/package/chat-harness-$(node -p "require('./package.json').version").tgz"
+
+  windows-lifecycle:
+    runs-on: windows-2025
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run Windows lifecycle tests
+        run: bun test tests/lifecycle/windows.test.ts
+
+      - name: Build Windows x64 standalone binary
+        run: bun run build:binary -- bun-windows-x64 dist/bin/chat-harness-windows-x64.exe
+
+      - name: Smoke Windows standalone lifecycle help
+        run: bun scripts/smoke-built-binary.ts dist/bin/chat-harness-windows-x64.exe
 
   browser-smoke:
     if: github.event_name == 'pull_request'

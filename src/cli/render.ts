@@ -23,11 +23,21 @@ export function renderHuman(
   const renderedHeading = options.color
     ? `${ANSI_BOLD}${heading}${ANSI_RESET}`
     : heading;
-  const lines = [
-    renderedHeading,
-    `workspace: ${envelope.workspace}`,
-    `state: ${envelope.result.state}`,
-  ];
+  const lines = [renderedHeading];
+  if (envelope.workspace) lines.push(`workspace: ${envelope.workspace}`);
+  lines.push(`state: ${envelope.result.state}`);
+
+  for (const [label, key] of [
+    ["current", "current"],
+    ["latest", "latest"],
+    ["channel", "channel"],
+    ["path", "path"],
+  ] as const) {
+    const value = envelope.result[key];
+    if (typeof value === "string" && value.length > 0) {
+      lines.push(`${label}: ${value}`);
+    }
+  }
 
   const operations = envelope.result.operations;
   if (Array.isArray(operations)) {

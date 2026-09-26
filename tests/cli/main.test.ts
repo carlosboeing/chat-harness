@@ -71,7 +71,7 @@ describe("CLI surface", () => {
     expect(io.stdout().trim()).toBe("0.2.0-f6bff65");
   });
 
-  test("--help exposes only setup, validate, and doctor commands", async () => {
+  test("--help exposes workspace and lifecycle commands", async () => {
     const root = await workspace();
     const io = capture(root);
 
@@ -79,14 +79,16 @@ describe("CLI surface", () => {
     expect(code).toBe(0);
 
     const output = io.stdout();
-    expect(output).toContain("Create, validate, and diagnose Chat Harness Workspaces");
+    expect(output).toContain("Create, validate, diagnose, update, and uninstall Chat Harness");
     expect(output).toContain("chat-harness setup --specialist travel");
     expect(output).toContain("current directory");
-    expect(output).toContain("do not search parent directories");
+    expect(output.replace(/\s+/g, " ")).toContain("do not search parent directories");
     expect(output).toContain("Exit codes:");
     expect(output).toContain("setup");
     expect(output).toContain("validate");
     expect(output).toContain("doctor");
+    expect(output).toContain("update");
+    expect(output).toContain("uninstall");
     expect(output).not.toContain("init");
     expect(output).not.toContain("migrate");
     expect(output).not.toContain("upgrade");

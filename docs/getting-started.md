@@ -49,11 +49,22 @@ Then verify the installed version:
 chat-harness --version
 ```
 
-If you installed Chat Harness previously with npm, update it with:
+After installation, you do not need to remember which install command you used. Check for an update or update the CLI with:
 
 ```bash
-npm install -g chat-harness@latest
+chat-harness update --check
+chat-harness update
 ```
+
+Chat Harness detects standalone versus global npm installations. Standalone updates keep SHA-256 verification; npm installations are updated through npm. Local development builds and unknown/custom installations are not silently replaced.
+
+To remove Chat Harness later:
+
+```bash
+chat-harness uninstall
+```
+
+Uninstall removes the CLI only. It does **not** remove `AGENTS.md`, `.chat-harness/`, `_inbox/`, Workstreams, Workbench artifacts, project files, or Google Drive Workspace content.
 
 ## 2. Open your Workspace folder in Terminal
 
@@ -188,7 +199,7 @@ Chat Harness is designed to make the assistant retrieve the right durable state 
 
 ### Do I have to pass a folder path to every command?
 
-No. The normal pattern is:
+No. Only Workspace commands use a Workspace path. The normal pattern is:
 
 ```bash
 cd /path/to/your/project
@@ -197,7 +208,7 @@ chat-harness validate
 chat-harness doctor
 ```
 
-The optional `[path]` argument is only needed when you want to target another existing directory.
+The optional `[path]` argument is only needed when you want to target another existing directory. `update` and `uninstall` operate on the installed CLI and do not accept a Workspace path.
 
 ### Does Chat Harness search parent folders automatically?
 
