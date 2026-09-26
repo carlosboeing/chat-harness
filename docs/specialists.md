@@ -71,8 +71,8 @@ Specialists can also suggest a small domain folder layout, but those folders are
 | `tech` | `Projects/` |
 | `tax` | `Tax/` |
 | `finance` | `Finance/` |
-| `career` | `Profile/`, `Opportunities/` |
-| `shopping` | `Research/`, `Purchases/` |
+| `career` | `Opportunities/`, `Profile/` |
+| `shopping` | `Purchases/`, `Research/` |
 | `travel` | `Trips/` |
 
 Domain scaffolding is additive only. Chat Harness does not rename, move, merge, fuzzy-match, or reorganize an existing corpus.
