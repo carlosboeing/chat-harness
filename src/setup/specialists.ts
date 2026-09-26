@@ -149,8 +149,8 @@ export const SPECIALIST_DOMAIN_PATHS: Readonly<Record<SpecialistId, readonly str
   tech: ["Projects"],
   tax: ["Tax"],
   finance: ["Finance"],
-  career: ["Profile", "Opportunities"],
-  shopping: ["Research", "Purchases"],
+  career: ["Opportunities", "Profile"],
+  shopping: ["Purchases", "Research"],
   travel: ["Trips"],
 };
 
