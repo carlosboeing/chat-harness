@@ -42,7 +42,7 @@ A Workspace is an ownership and durable-state boundary:
     ├── workbench/
     │   ├── 0-ideas/
     │   ├── 1-research/
-    │   ├── 2-analysis/
+    │   ├── 2-decisions/
     │   ├── 3-plans/
     │   └── 4-reviews/
     ├── procedures/
@@ -65,17 +65,18 @@ A host that cannot consume `AGENTS.md` directly uses a narrow host binding. The 
 
 ## Operating protocol
 
-For substantial work:
+Classify each request as **Answer-only** or **Work**. Answer-only is reserved for direct disposable requests; ambiguity biases toward Work.
+
+For every Work objective:
 
 1. apply `AGENTS.md` and load `WORKSPACE.md` plus the Workspace Map;
-2. determine whether the request continues an existing objective;
-3. inspect relevant active or parked Workstreams before reconstructing state from chat history or model memory;
-4. resume matching state from its Next action, or create a qualifying Workstream;
+2. inspect relevant active or parked Workstreams before reconstructing state from chat history or model memory;
+3. resume matching state from its Next action, or create the Workstream immediately;
+4. create/resume each Workbench artifact whose trigger applies;
 5. retrieve the minimum relevant Procedures and authoritative context, broadening when material;
-6. reverify volatile facts;
-7. use the simplest sufficient authorized capability;
-8. verify results and evidence;
-9. checkpoint material changes and reconcile durable state before substantial handoff.
+6. reverify volatile facts and use the simplest sufficient authorized capability;
+7. verify results and every durable write;
+8. checkpoint material changes and reconcile durable state before handoff.
 
 A Workstream is a context entry point, not an information boundary.
 
@@ -91,9 +92,9 @@ When shared durable state may have changed, refresh and reconcile before overwri
 
 ## Workstreams, Workbench, Inbox, and temp
 
-A Workstream is justified when there is an independent objective, an independent next action, and likely future continuation. It stores compact current state rather than conversation history.
+A Workstream stores compact current state for one independent Work objective rather than conversation history.
 
-Workbench holds substantial durable working artifacts under five organizational categories: ideas, research, analysis, plans, and reviews. The categories are not lifecycle phases; Workstreams and Workbench are parallel outputs from work.
+Workbench holds raw Markdown working artifacts under five trigger-based categories: ideas frame open-ended objectives; research establishes evidence; decisions turn evidence into direction; plans make direction executable; reviews evaluate an existing thing. These are artifact purposes, not mandatory lifecycle stages; Workstreams and Workbench are parallel outputs from work.
 
 `_inbox/` is visible user/automation → assistant intake and remains user-owned.
 

@@ -106,7 +106,7 @@ Your folder/
 │   ├── workbench/
 │   │   ├── 0-ideas/
 │   │   ├── 1-research/
-│   │   ├── 2-analysis/
+│   │   ├── 2-decisions/
 │   │   ├── 3-plans/
 │   │   └── 4-reviews/
 │   ├── workstreams/
@@ -165,7 +165,7 @@ chat-harness validate
 chat-harness doctor
 ```
 
-- `validate` checks the Chat Harness file and Workstream contracts.
+- `validate` checks the Chat Harness scaffold plus Workstream and Workbench Markdown/frontmatter contracts.
 - `doctor` checks local Workspace health and installation prerequisites.
 
 If both look healthy, the local side is ready.
@@ -173,6 +173,10 @@ If both look healthy, the local side is ready.
 ## 7. Start using the Project
 
 Open a new conversation inside the configured ChatGPT Project and work normally.
+
+For direct disposable questions, Chat Harness does not create durable state. For Work such as planning a trip, designing/building something, research, comparison, troubleshooting, implementation, or review, the assistant should proactively create/resume a Workstream and the triggered Workbench artifacts without waiting to be told to save.
+
+Workbench text is raw Markdown with required YAML frontmatter. The five categories are `0-ideas/`, `1-research/`, `2-decisions/`, `3-plans/`, and `4-reviews/`; they describe artifact purpose rather than a mandatory waterfall.
 
 For example, in a travel Workspace:
 

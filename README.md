@@ -109,7 +109,7 @@ Chat Harness does not search parent directories for a Workspace.
 │   ├── workbench/
 │   │   ├── 0-ideas/
 │   │   ├── 1-research/
-│   │   ├── 2-analysis/
+│   │   ├── 2-decisions/
 │   │   ├── 3-plans/
 │   │   └── 4-reviews/
 │   ├── workstreams/
@@ -136,7 +136,7 @@ The scaffold separates generic harness behavior from Workspace-specific knowledg
 - **`WORKSPACE.md`** — Workspace-specific role, judgement, evidence standards, boundaries, and approvals.
 - **Workspace Map** (`.chat-harness/README.md`) — human-readable routing to authoritative sources, important locations, Procedures, and Workstreams.
 - **Workstreams** — compact current resume state for continuing objectives.
-- **Workbench** — substantial working artifacts such as research, analysis, plans, and reviews.
+- **Workbench** — durable Markdown working artifacts: ideas, research, decisions, plans, and reviews.
 - **Procedures** — reusable methodology for recurring tasks.
 - **Source Policy** — narrow machine-readable privacy/source-handling rules.
 
@@ -170,20 +170,9 @@ See [Specialists](docs/specialists.md) for the built-in seeds and setup behavior
 
 ## The operating loop
 
-For substantial work, the assistant:
+The assistant first classifies each request as **Answer-only** or **Work**. Direct, disposable lookups stay Answer-only. Planning, building, research, comparison, decisions, reviews, troubleshooting, implementation, and other resumable objectives are Work; ambiguity biases toward Work.
 
-1. applies `AGENTS.md` and the Workspace-specific instructions;
-2. orients from the request, Workspace Map, and relevant Workstream;
-3. inspects matching durable state before reconstructing it from chat history or model memory;
-4. retrieves high-signal authoritative context, then broadens when material;
-5. reverifies volatile facts;
-6. uses the simplest sufficient authorized capability;
-7. verifies results and evidence;
-8. preserves valuable outputs and leaves durable resumable state.
-
-A useful Workstream heuristic is:
-
-> **independent objective + independent next action + likely future continuation**
+For every Work objective, the assistant proactively resumes or creates the Workstream before extended execution, creates each Workbench artifact when its trigger occurs, retrieves only the relevant authoritative context, verifies results, and leaves durable resumable state. It never waits for the user to ask it to save progress.
 
 A Workstream records **where the work is now**, not every conversation that led there.
 
@@ -193,7 +182,7 @@ Workstreams and Workbench are parallel outputs from work.
 
 A **Workstream** is compact, continuously maintained resume state: objective, current direction, material rationale, blockers/open questions, relevant sources/artifacts, and an explicit Next action.
 
-The **Workbench** holds substantial durable working artifacts under five organizational categories: ideas, research, analysis, plans, and reviews. These are not workflow phases and work does not need to move through them in order.
+The **Workbench** holds raw Markdown artifacts under five purpose-driven categories: ideas (frame an open-ended objective), research (establish evidence), decisions (turn evidence into direction), plans (make direction executable), and reviews (evaluate an existing thing). These are trigger-based artifact classes, not a required waterfall.
 
 ## Source ownership and Source Policy
 
