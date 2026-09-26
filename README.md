@@ -1,5 +1,11 @@
 # Chat Harness
 
+[![release](https://img.shields.io/github/v/release/carlosboeing/chat-harness)](https://github.com/carlosboeing/chat-harness/releases)
+[![CI](https://github.com/carlosboeing/chat-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosboeing/chat-harness/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/chat-harness)](https://www.npmjs.com/package/chat-harness)
+[![license](https://img.shields.io/github/license/carlosboeing/chat-harness)](LICENSE)
+[![status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange.svg)](https://github.com/carlosboeing/chat-harness/releases)
+
 **Harness engineering for AI assistants.**
 
 **Bring harness-level discipline to long-running work with ChatGPT, Claude and other AI assistants.**
