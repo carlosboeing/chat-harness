@@ -79,7 +79,7 @@ function localEntrypoint(version: string): string {
     `const code = await runCli(process.argv.slice(2), { version: ${JSON.stringify(version)} });`,
     "process.exitCode = code;",
     "",
-  ].join("\\n");
+  ].join("\n");
 }
 
 export async function main(): Promise<void> {
