@@ -234,4 +234,18 @@ describe("setup reconciliation", () => {
     expect(output.result.state).toBe("execution_failure");
     expect(output.findings[0]?.code).toBe("setup.verification_failed");
   });
+
+  test("final approval hook can cancel before any mutation", async () => {
+    const root = await workspace();
+
+    const output = await runSetup(
+      root,
+      { dryRun: false },
+      { applyOptions: { beforeApply: () => false } },
+    );
+
+    expect(output.result.state).toBe("cancelled");
+    expect(await readdir(root)).toEqual([]);
+  });
+
 });
