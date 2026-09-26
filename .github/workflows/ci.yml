@@ -77,7 +77,7 @@ jobs:
           set -euo pipefail
           export CHAT_HARNESS_BIN_DIR="$RUNNER_TEMP/chat-harness-local-bin"
           bun run install:local
-          "$CHAT_HARNESS_BIN_DIR/chat-harness" --version | grep -qE '^0\\.2\\.0-[0-9a-f]+$'
+          "$CHAT_HARNESS_BIN_DIR/chat-harness" --version | grep -qE '^0\.2\.0-[0-9a-f]+$'
 
       - name: Inspect npm package contents
         run: |
