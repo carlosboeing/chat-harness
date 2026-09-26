@@ -369,6 +369,9 @@ function isCliEntrypoint(metaUrl: string, argv1: string | undefined): boolean {
   try { return realpathSync(fileURLToPath(metaUrl)) === realpathSync(argv1); }
   catch { return metaUrl === pathToFileURL(argv1).href; }
 }
-if (isCliEntrypoint(import.meta.url, process.argv[1])) {
+if (
+  process.env.CHAT_HARNESS_SUPPRESS_AUTO_RUN !== "1" &&
+  isCliEntrypoint(import.meta.url, process.argv[1])
+) {
   runCli(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch(() => { process.exitCode = EXIT_INTERNAL; });
 }
