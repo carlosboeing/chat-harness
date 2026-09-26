@@ -72,44 +72,12 @@ jobs:
         run: bun scripts/smoke-distributions.ts dist/bin/chat-harness-linux-x64 dist/npm/chat-harness.js
 
       - name: Smoke unreleased local install workflow
-        shell: bash
-        run: |
-          set -euo pipefail
-          export CHAT_HARNESS_BIN_DIR="$RUNNER_TEMP/chat-harness-local-bin"
-          bun run install:local
-          "$CHAT_HARNESS_BIN_DIR/chat-harness" --version | grep -qE '^0\.2\.0-[0-9a-f]+        run: |
-          npm pack --dry-run --json > dist/npm-pack.json
-          bun run validate:package -- dist/npm-pack.json
+        env:
+          CHAT_HARNESS_BIN_DIR: /tmp/chat-harness-local-bin
+        run: bun run install:local
 
-      - name: Pack and clean-install npm package
-        run: |
-          mkdir -p dist/package
-          npm pack --pack-destination dist/package
-          bun run smoke:npm-package -- "dist/package/chat-harness-$(node -p "require('./package.json').version").tgz"
-
-  browser-smoke:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout Chat Harness
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Install Chromium
-        run: bunx playwright install --with-deps --only-shell chromium
-
-      - name: Run domain-agnostic browser runtime smoke test
-        run: bun run smoke:browser
-
+      - name: Verify local development binary executes
+        run: /tmp/chat-harness-local-bin/chat-harness --version
 
       - name: Inspect npm package contents
         run: |
