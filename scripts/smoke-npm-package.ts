@@ -108,8 +108,8 @@ export async function smokeInstalledNpmPackage(
         throw new Error(`installed CLI help is missing command: ${command}`);
       }
       const commandHelp = run(bin, [command, "--help"], root).stdout;
-      if (!commandHelp.includes("current directory")) {
-        throw new Error(`installed ${command} help does not explain the default Workspace path`);
+      if (!commandHelp.includes("Workspace root")) {
+        throw new Error(`installed ${command} help does not describe the Workspace path`);
       }
     }
 
