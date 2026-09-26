@@ -165,7 +165,7 @@ export function detectInstallation(probe: InstallationProbe): InstallationInfo {
     channel: "development",
     version: probe.version,
     executablePath,
-    packageRoot: packageRoot ?? undefined,
+    ...(packageRoot ? { packageRoot } : {}),
     provenance: "runtime",
     detail: "source/runtime execution rather than a managed standalone or global npm install",
   };
@@ -203,7 +203,7 @@ export function currentInstallationProbe(version: string): InstallationProbe {
     homeDir: os.homedir(),
     standalone,
     executablePath: standalone ? process.execPath : (process.argv[1] ?? process.execPath),
-    entryPath: process.argv[1],
+    ...(process.argv[1] ? { entryPath: process.argv[1] } : {}),
     npmGlobalRoot: standalone ? null : npmGlobalRoot(),
     readText: safeRead,
     realpath: safeRealpath,
