@@ -49,6 +49,11 @@ export function renderHuman(
     lines.push(...envelope.findings.map(renderFinding));
   }
 
+  const hostAction = envelope.result.host_action;
+  if (typeof hostAction === "string" && hostAction.length > 0) {
+    lines.push("", "Next steps:", hostAction);
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
