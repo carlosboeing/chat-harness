@@ -13,7 +13,7 @@ Use Answer-only only when all are true: direct answer/quick lookup; no multi-ste
 
 Use Work when any apply: the user asks to plan, design, build, research, investigate, compare, decide, prepare, organize, review, audit, troubleshoot, implement, or manage something; it may need multiple steps, decisions, sources, artifacts, follow-up/resumption; or it creates/changes a durable project, plan, system, purchase, trip, application, case, or decision.
 
-When uncertain, choose **Work**. If Answer-only becomes Work, start this lifecycle immediately.
+When uncertain, choose **Work**. Answer-only may retrieve the minimum sources needed to answer; classification controls durable persistence, not source access. If Answer-only becomes Work, start this lifecycle immediately.
 
 ## Work lifecycle
 
