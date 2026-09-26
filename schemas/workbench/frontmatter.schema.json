@@ -19,7 +19,12 @@
         "properties": { "status": { "const": "superseded" } },
         "required": ["status"]
       },
-      "then": { "required": ["superseded_by"] }
+      "then": {
+        "required": ["superseded_by"],
+        "properties": {
+          "superseded_by": { "type": "string", "minLength": 1 }
+        }
+      }
     },
     {
       "if": {
