@@ -128,8 +128,18 @@ export function renderInteractive(envelope: CommandEnvelope): void {
   }
 
   intro(`Chat Harness ${envelope.command}`, { withGuide: false });
-  log.info(`workspace: ${envelope.workspace}`);
+  if (envelope.workspace) log.info(`workspace: ${envelope.workspace}`);
   log.step(`state: ${envelope.result.state}`);
+
+  for (const [label, key] of [
+    ["Current", "current"],
+    ["Latest", "latest"],
+    ["Channel", "channel"],
+    ["Path", "path"],
+  ] as const) {
+    const value = envelope.result[key];
+    if (typeof value === "string" && value.length > 0) log.info(`${label}: ${value}`);
+  }
 
   for (const finding of envelope.findings) {
     const text = [
