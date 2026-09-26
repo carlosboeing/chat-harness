@@ -1,5 +1,5 @@
 import path from "node:path";
-import { confirm, isCancel, select } from "@clack/prompts";
+import { confirm, intro, isCancel, log, note, select } from "@clack/prompts";
 
 import { inspectWorkspace } from "../workspace/inspect.js";
 import { inspectDomainScaffold } from "./plan.js";
@@ -47,41 +47,48 @@ function detectWorkspaceSpecialist(source: string): SpecialistId | null {
 function writeIntroduction(
   workspace: string,
   existingWorkspace: boolean,
-  write: (text: string) => void,
 ): void {
-  const lines = existingWorkspace
-    ? [
-        "",
-        "Chat Harness setup",
-        "",
+  intro("Chat Harness setup", { withGuide: false });
+
+  if (existingWorkspace) {
+    log.info(
+      [
         "Chat Harness is already set up in this folder.",
         "I'll check that its working files are up to date and show you any changes",
         "before anything is modified.",
-      ]
-    : [
-        "",
-        "Chat Harness setup",
-        "",
+      ].join("\n"),
+    );
+  } else {
+    log.info(
+      [
         "Chat Harness turns this folder into an ongoing Workspace for an AI assistant.",
         "It adds instructions and a small set of working files so the assistant can",
         "understand the Workspace, keep track of ongoing work, and continue it later.",
+      ].join("\n"),
+    );
+
+    note(
+      [
+        "If you'll use this Workspace with ChatGPT, make sure this is a Google Drive",
+        "folder before continuing.",
         "",
-        "If you plan to use this Workspace with ChatGPT, keep it in Google Drive so",
-        "ChatGPT can use the same up-to-date folder as a Project source.",
-        "",
+        "ChatGPT will connect to this folder so it can keep using the latest Workspace",
+        "files as they change over time.",
+      ].join("\n"),
+      "Important",
+    );
+
+    log.info(
+      [
         "Your existing files will not be moved, renamed, or deleted.",
         "Nothing will change until you review and approve the setup.",
-      ];
+      ].join("\n"),
+    );
+  }
 
-  write(
-    [
-      ...lines,
-      "",
-      "You're setting up:",
-      `  ${workspaceName(workspace)}`,
-      `  ${workspace}`,
-      "",
-    ].join("\n"),
+  note(
+    [workspaceName(workspace), workspace].join("\n"),
+    "You're setting up",
   );
 }
 
@@ -122,7 +129,6 @@ async function resolveDomainScaffold(
   workspace: string,
   specialist: SpecialistId,
   requested: boolean,
-  write: (text: string) => void,
 ): Promise<boolean | null> {
   if (requested) return true;
 
@@ -134,55 +140,54 @@ async function resolveDomainScaffold(
     (observation) =>
       observation.kind !== "missing" && observation.kind !== "directory",
   );
-
-  write(
-    [
-      "",
-      `Organizing your ${specialistLabel(specialist).toLocaleLowerCase()} work`,
-      "",
-      domainIntro(specialist),
-      "",
-      "These folders are optional. Chat Harness will still work if you prefer your",
-      "existing folder structure.",
-      "",
-      `${workspaceName(workspace)}/`,
-      ...observations.map((observation, index) => {
-        const last = index === observations.length - 1;
-        const status =
-          observation.kind === "directory"
-            ? "already there"
-            : observation.kind === "missing"
-              ? "new"
-              : "name already in use";
-        return `${last ? "└──" : "├──"} ${observation.path}/    ${status}`;
-      }),
-      "",
-      ...paths.flatMap((domainPath) => {
-        const description = SPECIALIST_DOMAIN_DESCRIPTIONS[specialist][domainPath];
-        return description ? [`${domainPath}/`, `  ${description}`] : [];
-      }),
-      "",
-    ].join("\n"),
-  );
+  const title = `${specialistLabel(specialist)} organization`;
 
   if (collisions.length > 0) {
-    write(
+    note(
       [
-        "I can't add the suggested folder structure because one or more names are",
-        "already used by something that is not a folder. I'll keep your existing",
-        "structure and continue with the core Chat Harness setup.",
+        "Chat Harness can't add the suggested folder structure because one or more",
+        "names are already used by something that isn't a folder.",
         "",
+        "Your existing structure will be kept and setup can continue safely.",
       ].join("\n"),
+      title,
     );
     return false;
   }
 
   if (observations.every((observation) => observation.kind === "directory")) {
-    write(
-      `The suggested ${specialistLabel(specialist).toLocaleLowerCase()} folder structure is already in place. No additional folders are needed.\n\n`,
+    note(
+      [
+        ...observations.map((observation) => `✓ ${observation.path}/   already there`),
+        "",
+        `No additional ${specialistLabel(specialist).toLocaleLowerCase()} folders are needed.`,
+      ].join("\n"),
+      title,
     );
     return true;
   }
+
+  const folderLines = observations.flatMap((observation) => {
+    const status = observation.kind === "directory" ? "already there" : "new";
+    const description =
+      SPECIALIST_DOMAIN_DESCRIPTIONS[specialist][observation.path];
+    return [
+      `${observation.path}/   ${status}`,
+      ...(description ? [`  ${description}`] : []),
+    ];
+  });
+
+  note(
+    [
+      domainIntro(specialist),
+      "",
+      "These folders are optional. Chat Harness will still work with your existing",
+      "folder structure.",
+      "",
+      ...folderLines,
+    ].join("\n"),
+    title,
+  );
 
   const missingCount = observations.filter(
     (observation) => observation.kind === "missing",
@@ -208,7 +213,7 @@ export async function resolveInteractiveSetup(
   );
   const existingWorkspace = workspaceFile?.kind === "file";
 
-  writeIntroduction(workspace, existingWorkspace, write);
+  writeIntroduction(workspace, existingWorkspace);
 
   const detectedSpecialist =
     workspaceFile?.kind === "file"
@@ -218,9 +223,7 @@ export async function resolveInteractiveSetup(
   let specialist: SpecialistId;
   if (request.specialist) {
     specialist = request.specialist;
-    write(
-      `${specialistLabel(specialist)} was selected from the command you ran.\n\n`,
-    );
+    log.info(`${specialistLabel(specialist)} was selected from the command you ran.`);
   } else if (existingWorkspace) {
     specialist = detectedSpecialist ?? "general";
   } else {
@@ -236,15 +239,12 @@ export async function resolveInteractiveSetup(
     !isManagedAgentsSource(agents.content ?? "") &&
     !replaceAgents
   ) {
-    write(
+    note(
       [
-        "",
-        "An existing AGENTS.md was found",
-        "",
         "Chat Harness uses AGENTS.md for its main instructions to AI assistants.",
         "This file was not created by Chat Harness, so I won't replace it automatically.",
-        "",
       ].join("\n"),
+      "Existing AGENTS.md found",
     );
 
     while (true) {
@@ -268,9 +268,7 @@ export async function resolveInteractiveSetup(
       });
       if (isCancel(action) || action === "cancel") return { cancelled: true };
       if (action === "preview") {
-        write(
-          `\n--- Chat Harness AGENTS.md preview ---\n${AGENTS_TEMPLATE}--- end preview ---\n\n`,
-        );
+        note(AGENTS_TEMPLATE.trimEnd(), "Chat Harness AGENTS.md preview");
         continue;
       }
       replaceAgents = true;
@@ -285,15 +283,12 @@ export async function resolveInteractiveSetup(
     detectedSpecialist !== request.specialist;
 
   if (workspaceFile?.kind === "file" && explicitlyChangingSpecialist && !replaceWorkspace) {
-    write(
+    note(
       [
-        "",
-        "Existing Workspace instructions found",
-        "",
         "This Workspace already has its own instructions. Chat Harness normally keeps",
         "them because they may contain information you've added over time.",
-        "",
       ].join("\n"),
+      "Existing Workspace instructions found",
     );
 
     while (true) {
@@ -318,8 +313,9 @@ export async function resolveInteractiveSetup(
       });
       if (isCancel(action) || action === "cancel") return { cancelled: true };
       if (action === "preview") {
-        write(
-          `\n--- ${specialistLabel(specialist)} WORKSPACE.md preview ---\n${workspaceTemplate(specialist)}--- end preview ---\n\n`,
+        note(
+          workspaceTemplate(specialist).trimEnd(),
+          `${specialistLabel(specialist)} WORKSPACE.md preview`,
         );
         continue;
       }
@@ -337,7 +333,6 @@ export async function resolveInteractiveSetup(
       workspace,
       specialist,
       scaffoldDomain,
-      write,
     );
     if (resolvedDomain === null) return { cancelled: true };
     scaffoldDomain = resolvedDomain;
