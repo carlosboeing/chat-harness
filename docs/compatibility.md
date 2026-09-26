@@ -1,50 +1,26 @@
 # Compatibility
 
-Chat Harness tracks host compatibility by **capability and evidence**, not by a speculative vendor-version matrix.
+Chat Harness tracks host compatibility by capability and evidence rather than assuming similar products behave identically.
 
 Status meanings:
+- **documented** — vendor documentation supports the required primitive;
+- **verified** — the exact Chat Harness path has been exercised;
+- **unverified** — architectural mapping exists without an end-to-end support claim.
 
-- **documented** — current vendor documentation says the relevant host capability exists;
-- **verified** — Chat Harness has exercised the exact path in a real smoke/eval scenario;
-- **unverified** — the architecture may map, but no tested support claim is made.
+## ChatGPT Projects
 
-## ChatGPT web
+ChatGPT is the reference hosted binding for v0.2.
 
-| Field | Current record |
-|---|---|
-| Status | **documented**; end-to-end Chat Harness binding **unverified** |
-| Surface | ChatGPT web, Projects |
-| Reference role | v0.1 first-class host |
-| Canonical instructions | `AGENTS.md` in the Workspace, reached through a narrow Project Instructions binding |
-| Context path | Project sources and connected apps; Google Drive files/folders can be added as project sources or accessed through the connected app |
-| Last documentation check | 2026-09-24 |
-| Release verification | Pending Phase 9 real-host smoke |
+The binding contract is intentionally simple: copy the **entire current `AGENTS.md`** into ChatGPT Project Instructions, and make the Workspace retrievable by the Project. Do not maintain a second hand-written “minimal binding” or merge specialist text into Project Instructions; Workspace-specific behavior remains in `.chat-harness/WORKSPACE.md`.
 
-Current OpenAI documentation says Project Instructions are scoped to the project and override global custom instructions. It also documents adding Google Drive files/folders and Slack channels as Project sources and using connected apps from project chats. Google Drive added inside a Project is accessed on demand rather than pre-synced.
+The host must be able to retrieve WORKSPACE, Workspace Map, relevant Workstreams/Procedures, and authoritative sources for the runtime contract to work. Availability of connected sources/actions still depends on the user's plan, workspace configuration, permissions, region, and host surface.
 
-That documents the primitives needed for the binding. It does **not** prove that the Chat Harness `AGENTS.md` bootstrap, Workstream recovery, Source Policy-aware cross-context behaviour, and persistence loop are effective end-to-end.
+Source Policy is mechanically enforceable only on Chat Harness-controlled access paths. On host-native retrieval paths without an enforcement hook it is an instruction-level behavior, not IAM.
 
-Material limitations:
+## Other assistants
 
-- app/source availability varies by plan, region, surface, workspace settings, and connected-account permissions;
-- personal/individual Google Drive connections provide live access rather than a personal synced index;
-- `doctor` cannot introspect hidden server-side feature flags or entitlement state;
-- Source Policy on host-native retrieval is policy-aware behaviour where Chat Harness does not control the underlying read boundary.
+The architecture is portable, but support remains evidence-based. A host that can consume `AGENTS.md` directly may not need the ChatGPT copy step. Similar primitives alone do not establish verified compatibility.
 
-Authoritative references:
+## Reverification
 
-- https://help.openai.com/en/articles/10169521-projects-in-chatgpt
-- https://help.openai.com/en/articles/10929079-google-drive-app-and-setup-in-chatgpt
-- https://help.openai.com/en/articles/20001052
-
-## Claude and other assistants
-
-Status: **unverified**.
-
-The architecture deliberately uses portable concepts, but v0.1 does not claim tested Claude or other-host integration merely because similar primitives exist.
-
-## Reverification policy
-
-Reverify when preparing a release where the claim matters, after a material vendor change, when a user reports a regression, when a host smoke fails, or before adding a new support claim.
-
-Chat Harness semver versions Chat Harness software/contracts, not hosted product releases.
+Reverify after material host behavior changes, before making a stronger support claim, or when a host smoke reports regression. Chat Harness semver versions its own software/contracts, not vendor releases.

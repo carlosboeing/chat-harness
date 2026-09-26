@@ -1,12 +1,12 @@
 # Workspace Map
 
+## Authoritative domain sources
+- household contacts → `Household/contacts.md`
+- school correspondence → `School/Correspondence/`
+- restricted example records → `Restricted/`
+
 ## Harness state
-- Current obligations/cases → `.chat-harness/workstreams/`
-
-## Domain sources
-- routine household records → `Household/`
-- confidential correspondence → `School/Correspondence/`
-- synthetic restricted records → `Restricted/`
-- dates → connected family calendar; retrieve current event data rather than copying calendar canon
-
-The Source Policy in this Workspace governs cross-context handling of the user-owned corpus.
+- Workspace instructions → `.chat-harness/WORKSPACE.md`
+- resumable objectives → `.chat-harness/workstreams/`
+- durable working artifacts → `.chat-harness/workbench/`
+- Procedures → `.chat-harness/procedures/`

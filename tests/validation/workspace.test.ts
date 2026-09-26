@@ -18,7 +18,7 @@ async function workspace(): Promise<string> {
 }
 
 describe("workspace validation", () => {
-  test("minimal setup with no workstreams is valid", async () => {
+  test("v0.2 setup with no workstreams is valid", async () => {
     const root = await workspace();
     await runSetup(root, { dryRun: false });
     expect(await validateWorkspace(root)).toEqual([]);
@@ -30,7 +30,7 @@ describe("workspace validation", () => {
 
     await writeFile(
       path.join(root, ".chat-harness", "workstreams", "broken.md"),
-      ["---", "status: active", "created: 2026-09-24", "---", "# Broken", "", "## Objective", "", "Goal", "", "## Current state", "", ""].join("\n"),
+      ["---", "status: active", "created: 2026-09-24", "---", "# Broken", "", "## Objective", "", "Goal", "", "## Current direction", "", ""].join("\n"),
     );
     await writeFile(
       path.join(root, ".chat-harness", "source-policy.yaml"),
@@ -47,6 +47,6 @@ describe("workspace validation", () => {
   test("missing scaffolding is reported, not repaired", async () => {
     const root = await workspace();
     const findings = await validateWorkspace(root);
-    expect(findings.filter((finding) => finding.code === "workspace.required_missing").length).toBe(4);
+    expect(findings.filter((finding) => finding.code === "workspace.required_missing").length).toBe(15);
   });
 });

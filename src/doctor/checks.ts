@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 
 import type { Finding } from "../cli/result.js";
 import { inspectWorkspace } from "../workspace/inspect.js";
+import { expectedManagedKind } from "../workspace/paths.js";
 
 export type InstallationMode = "standalone" | "npm" | "development";
 
@@ -132,22 +133,16 @@ export async function scaffoldFindings(
   workspace: string,
 ): Promise<Finding[]> {
   const inspection = await inspectWorkspace(workspace);
-  const expected = new Map([
-    ["AGENTS.md", "file"],
-    [".chat-harness", "directory"],
-    [".chat-harness/README.md", "file"],
-    [".chat-harness/workstreams", "directory"],
-  ]);
   const findings: Finding[] = [];
 
   for (const observation of inspection.observations) {
-    const expectedKind = expected.get(observation.path);
+    const expectedKind = expectedManagedKind(observation.path);
     if (observation.kind === "missing") {
       findings.push({
         code: "doctor.scaffold_missing",
         severity: "warning",
         message:
-          `Expected ${expectedKind} is missing; setup can establish minimal harness state.`,
+          `Expected ${expectedKind} is missing; setup can establish the v0.2 harness scaffold.`,
         location: observation.path,
         remediation: "Run chat-harness setup.",
       });

@@ -1,53 +1,31 @@
 # ChatGPT host binding
 
-ChatGPT is the first-class v0.1 host, but `AGENTS.md` remains the portable instruction source. ChatGPT Project Instructions are a **binding**, not a second canon.
+ChatGPT Projects cannot be updated by the local Chat Harness CLI. The binding is therefore an explicit manual action.
 
-## Current documented host primitives
+## Setup
 
-As checked against OpenAI documentation on 2026-09-24:
+1. Run `chat-harness setup` for the Workspace.
+2. Make the Workspace and its relevant sources retrievable from the ChatGPT Project.
+3. Open the generated root `AGENTS.md`.
+4. Copy the **entire current file** into ChatGPT Project Instructions.
+5. Do not extract a managed subsection, manually merge it with specialist instructions, or maintain a separate minimal binding.
+6. Keep Workspace/domain-specific behavior in `.chat-harness/WORKSPACE.md`.
 
-- Project Instructions apply inside the Project and override global custom instructions.
-- Google Drive files and folders can be added as Project sources.
-- Connected apps can be used from Project chats.
-- A Google Drive connection in a Project can search/access relevant files, but content is not necessarily pre-synced; personal/individual Drive access is live/on-demand.
-- Availability and actions vary by plan, workspace configuration, region, connected-account permissions, and surface.
+A future `chat-harness setup` may replace a recognizably Chat Harness-managed `AGENTS.md` wholesale. When that happens, recopy the complete current file into Project Instructions.
 
-See [Compatibility](../compatibility.md) for evidence status and authoritative vendor links.
+## Runtime retrieval
 
-## Reference binding
-
-1. Create or choose the ChatGPT Project for the Workspace.
-2. Make the Workspace retrievable from that Project. For a Google Drive-backed Workspace, add the relevant Drive folder/file as a Project source or connect Google Drive with permission to access it.
-3. In Project settings, add the minimal binding below as Project Instructions.
-4. Keep the actual operating protocol in the Workspace's `AGENTS.md`; update that file rather than maintaining two independent instruction sets.
-5. Run the host smoke before calling the path verified.
-
-Suggested binding:
-
-```text
-This Project uses Chat Harness. At the start of substantial work, retrieve and follow the canonical AGENTS.md from the Project's configured Workspace before acting. Use .chat-harness/README.md as the Workspace Map and resume the relevant .chat-harness/workstreams/ file when durable continuation exists.
-
-AGENTS.md is the project-level instruction source of truth. These Project Instructions are only the ChatGPT host binding. If AGENTS.md cannot be retrieved or applied, say so rather than silently substituting a guessed instruction set.
-```
-
-## Context retrieval
-
-After applying the binding, retrieve `AGENTS.md`, the Workspace Map, and the relevant active Workstream, then retrieve the minimum known authoritative context and progressively broaden to other authorized sources when material.
-
-Google Drive project sources are not assumed to be a complete synchronized corpus. The assistant may need to search/access files on demand.
+For substantial work, the Project Instructions direct the host to:
+1. retrieve WORKSPACE + Workspace Map;
+2. inspect relevant active/parked Workstreams before reconstructing from chat/memory;
+3. resume matching state from Next action or create a qualifying Workstream;
+4. load only relevant Procedures and canonical sources;
+5. checkpoint material changes and reconcile durable state before closeout.
 
 ## Source Policy caveat
 
-ChatGPT-native file/app retrieval is a host-native path. Portable instructions require the assistant to respect Source Policy, but Chat Harness cannot claim hard pre-read enforcement where it cannot intercept the host's retrieval operation.
+ChatGPT-native file/app retrieval is host-native. Chat Harness instructions require Source Policy-aware behavior, but hard pre-read enforcement cannot be claimed where Chat Harness does not intercept the access path.
 
-For `restricted` non-obvious cross-context use, the binding expects explicit approval before use. For `confidential`, it expects a proportional notice. These are behavioural requirements to exercise in host evals.
+## Verification
 
-## Authority
-
-Normal research/retrieval may proceed when safe and authorized. Before meaningful external mutations, apply Action Transparency. Consequential actions require explicit user approval at the action boundary.
-
-## Verification status
-
-This binding is **documented but unverified** until release qualification records that `AGENTS.md` materially affected behaviour, Workspace Map/Workstream recovery worked, a new-session continuation resumed from `Next action`, cross-context retrieval respected policy/transparency, and durable closeout state was persisted.
-
-Do not promote this entry to `verified` based only on vendor documentation.
+Host compatibility should be demonstrated with real continuation/recovery scenarios rather than inferred from documentation alone.

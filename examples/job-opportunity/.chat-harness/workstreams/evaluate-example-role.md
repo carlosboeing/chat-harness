@@ -8,7 +8,7 @@ created: 2026-09-24
 ## Objective
 Assess a synthetic Principal Engineer opportunity using canonical career evidence, current role evidence, and relevant technical-project context.
 
-## Current state
+## Current direction
 The brownfield Career corpus predates Chat Harness and remains unchanged. The role source was recorded, but a previous native retrieval returned ambiguous search results. Exact LinkedIn lookup is a fallback only for the public numeric job identifier.
 
 ## Decisions

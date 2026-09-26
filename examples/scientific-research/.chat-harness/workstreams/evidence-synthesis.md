@@ -8,7 +8,7 @@ created: 2026-09-24
 ## Objective
 Synthesize the synthetic evidence on whether intervention X changes outcome Y while keeping conflicting results and provenance explicit.
 
-## Current state
+## Current direction
 Two fixture studies disagree. Study A reports a positive effect; Study B reports no detectable effect and uses a larger sample. `Analysis/effect-summary.csv` contains a reproducible derived summary, but neither the CSV nor this Workstream replaces the underlying study records.
 
 ## Next action

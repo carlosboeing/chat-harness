@@ -8,7 +8,7 @@ created: 2026-09-24
 ## Objective
 Produce a workable Tokyo–Kyoto family itinerary around confirmed flight and hotel dates while keeping live transport and venue information current.
 
-## Current state
+## Current direction
 Flights and the first Tokyo hotel are confirmed in `Bookings/`. The itinerary has a three-night Kyoto gap and one unresolved day-trip decision. A previous session stopped after finding that the original museum day conflicts with current closure information.
 
 ## Decisions

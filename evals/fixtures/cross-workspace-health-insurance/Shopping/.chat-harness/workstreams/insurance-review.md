@@ -8,7 +8,7 @@ created: 2026-09-24
 ## Objective
 Compare a synthetic family policy including the income-dependent rebate calculation.
 
-## Current state
+## Current direction
 The policy comparison is ready except for the one household income figure owned by Tax & Finance.
 
 ## Next action

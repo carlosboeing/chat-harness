@@ -1,26 +1,26 @@
 # Workspace Map
 
-This file is user-owned after setup. It describes where authoritative information lives and how the assistant should orient and route retrieval. It is not a machine manifest and it does not make this Workspace an information silo.
+This file is Workspace/user-owned after setup. It is a compact routing/index artifact, **not another instruction file**.
 
-## Harness state
+## Harness entry points
+- Workspace instructions: `.chat-harness/WORKSPACE.md`
+- Current resumable objectives: `.chat-harness/workstreams/`
+- Durable working artifacts: `.chat-harness/workbench/`
+- Reusable task Procedures: `.chat-harness/procedures/`
+- Source-handling policy: `.chat-harness/source-policy.yaml`
+- Human/automation intake: `_inbox/`
 
-- Portable project instructions: `AGENTS.md`
-- Current resumable work: `.chat-harness/workstreams/`
-- Optional Source Policy: `.chat-harness/source-policy.yaml`
+## Authoritative domain sources
+List the files, folders, repositories, connected apps, other Workspaces, or external authorities that own important domain truth. Point to canonical sources rather than duplicating them here.
 
-## Domain sources
+## Important domain locations
+Add only high-value navigation that helps a new session retrieve the minimum relevant context.
 
-Describe the existing files, folders, repositories, connected apps, other Workspaces, and external authorities that own domain truth.
+## Procedures
+List important reusable Procedures when they are added.
 
-Example:
-
-- customer agreements → `Contracts/`
-- implementation and engineering docs → GitHub repository
-- current vendor behaviour → authoritative live vendor documentation
-- related household finances → Tax & Finance Workspace; retrieve only what the task needs and preserve ownership there
-
-Do not reorganize the Workspace merely to fit Chat Harness. When information already has an authoritative home elsewhere, retrieve or reference it rather than creating competing canon.
+## Workstreams
+Authoritative current state for ongoing objectives lives under `.chat-harness/workstreams/`. Keep this section as lightweight routing only; do not duplicate changing Workstream state.
 
 ## Operating notes
-
-Add only stable routing, currentness, authority, or persistence rules that belong to this Workspace. Changing Workstream state belongs in `.chat-harness/workstreams/`, not here.
+Add stable routing or ownership notes that improve retrieval. Workspace-specific role, judgement, evidence, currentness, invariants, boundaries, and approval rules belong in `WORKSPACE.md`, not here.

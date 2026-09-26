@@ -1,10 +1,12 @@
 # Workspace Map
 
-## Harness state
-- Current research questions → `.chat-harness/workstreams/`
-- supporting design/review history → `.chat-harness/lifecycle/`
+## Authoritative domain sources
+- source literature → `Literature/`
+- domain analysis data → `Analysis/`
+- current external evidence → primary/authoritative sources where practical
 
-## Domain sources
-- literature notes and citation metadata → `Literature/`
-- quantitative derived analysis → `Analysis/`
-- claims about newly published work → current authoritative publication/index sources; reverify before relying on freshness
+## Harness state
+- Workspace instructions → `.chat-harness/WORKSPACE.md`
+- resumable objectives → `.chat-harness/workstreams/`
+- durable working artifacts → `.chat-harness/workbench/`
+- Procedures → `.chat-harness/procedures/`

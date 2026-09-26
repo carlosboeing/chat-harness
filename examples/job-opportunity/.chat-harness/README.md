@@ -1,13 +1,12 @@
 # Workspace Map
 
-This example represents brownfield adoption: the pre-existing `Career/` corpus keeps its organization.
+## Authoritative domain sources
+- factual career profile → `Career/Profile.md`
+- opportunity records → `Career/Opportunities/`
+- technical evidence → retrieve from its owning repository/technical Workspace when material
 
 ## Harness state
-- Current opportunity state → `.chat-harness/workstreams/`
-
-## Domain sources
-- canonical career history → `Career/Profile.md`
-- opportunity notes → `Career/Opportunities/`
-- technical project evidence → owning engineering repository / technical Workspace; retrieve instead of duplicating canon
-- current role posting → live authoritative posting
-- exact LinkedIn identity fallback → bounded `linkedin.job.lookup` only when native retrieval is insufficient
+- Workspace instructions → `.chat-harness/WORKSPACE.md`
+- resumable objectives → `.chat-harness/workstreams/`
+- durable working artifacts → `.chat-harness/workbench/`
+- Procedures → `.chat-harness/procedures/`
