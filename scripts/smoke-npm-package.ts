@@ -107,22 +107,38 @@ export async function smokeInstalledNpmPackage(
       if (!help.includes(command)) {
         throw new Error(`installed CLI help is missing command: ${command}`);
       }
+      const commandHelp = run(bin, [command, "--help"], root).stdout;
+      if (!commandHelp.includes("current directory")) {
+        throw new Error(`installed ${command} help does not explain the default Workspace path`);
+      }
+    }
+
+    const setupHelp = run(bin, ["setup", "--help"], root).stdout;
+    if (!setupHelp.includes("--specialist <id>") || !setupHelp.includes("travel")) {
+      throw new Error("installed setup help is missing specialist guidance");
     }
 
     const workspace = path.join(root, "workspace");
     await mkdir(workspace);
     const setup = JSON.parse(
-      run(bin, ["setup", workspace, "--json"], root).stdout,
-    ) as { success?: boolean };
-    if (setup.success !== true) {
-      throw new Error("installed CLI setup smoke did not succeed");
+      run(bin, ["setup", "--specialist", "tech", "--json"], workspace).stdout,
+    ) as { success?: boolean; result?: { specialist?: string } };
+    if (setup.success !== true || setup.result?.specialist !== "tech") {
+      throw new Error("installed cwd setup with --specialist tech did not succeed");
     }
 
     const validate = JSON.parse(
-      run(bin, ["validate", workspace, "--json"], root).stdout,
+      run(bin, ["validate", "--json"], workspace).stdout,
     ) as { success?: boolean };
     if (validate.success !== true) {
-      throw new Error("installed CLI validate smoke did not succeed");
+      throw new Error("installed cwd validate smoke did not succeed");
+    }
+
+    const doctor = JSON.parse(
+      run(bin, ["doctor", "--json"], workspace).stdout,
+    ) as { success?: boolean };
+    if (doctor.success !== true) {
+      throw new Error("installed cwd doctor smoke did not succeed");
     }
 
     process.stdout.write(
