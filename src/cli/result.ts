@@ -8,7 +8,8 @@ export interface Finding {
   remediation?: string;
 }
 
-export type CommandName = "setup" | "validate" | "doctor";
+export type CommandName = "setup" | "validate" | "doctor" | "update" | "uninstall";
+export type WorkspaceCommandName = Extract<CommandName, "setup" | "validate" | "doctor">;
 
 export interface CommandResultPayload {
   state: string;
@@ -20,7 +21,7 @@ export interface CommandEnvelope<
 > {
   version: 1;
   command: CommandName;
-  workspace: string;
+  workspace?: string;
   success: boolean;
   result: TResult;
   findings: Finding[];
@@ -34,7 +35,7 @@ export function commandEnvelope<
   TResult extends CommandResultPayload = CommandResultPayload,
 >(input: {
   command: CommandName;
-  workspace: string;
+  workspace?: string;
   result: TResult;
   findings?: Finding[];
   success?: boolean;
@@ -43,7 +44,7 @@ export function commandEnvelope<
   return {
     version: 1,
     command: input.command,
-    workspace: input.workspace,
+    ...(input.workspace ? { workspace: input.workspace } : {}),
     success: input.success ?? !hasErrorFinding(findings),
     result: input.result,
     findings,
