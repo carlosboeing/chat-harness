@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: Workstream title
 status: active
 created: YYYY-MM-DD
+updated: YYYY-MM-DD
 ---
 
 # Workstream title
@@ -12,13 +15,13 @@ State the independent ongoing objective.
 State the current approach or direction concisely.
 
 ## Durable state
-Capture only material progress, decisions/rationale, accepted or rejected options worth preserving, and other state needed to resume safely.
+Capture only progress, decisions/rationale, accepted/rejected options, and state needed to resume safely.
 
 ## Blockers / open questions
-List current blockers, dependencies, or unresolved questions. Use “None” when there are none.
+List blockers, dependencies, or unresolved questions. Use “None” when there are none.
 
 ## Relevant artifacts / sources
-List only high-signal artifact/source locations needed to orient future work. This is not an allowlist and does not replace canonical ownership.
+List high-signal artifact/source locations needed to orient future work.
 
 ## Next action
 State the next executable action.

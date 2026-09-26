@@ -30,7 +30,7 @@ describe("workspace validation", () => {
 
     await writeFile(
       path.join(root, ".chat-harness", "workstreams", "broken.md"),
-      ["---", "status: active", "created: 2026-09-24", "---", "# Broken", "", "## Objective", "", "Goal", "", "## Current direction", "", ""].join("\n"),
+      ["---", "type: workstream", "title: Broken", "status: active", "created: 2026-09-24", "updated: 2026-09-24", "---", "# Broken", "", "## Objective", "", "Goal", "", "## Current direction", "", ""].join("\n"),
     );
     await writeFile(
       path.join(root, ".chat-harness", "source-policy.yaml"),
@@ -42,6 +42,27 @@ describe("workspace validation", () => {
     expect(second).toEqual(first);
     expect(first.map((finding) => finding.code)).toContain("workstream.next_action_missing");
     expect(first.map((finding) => finding.code)).toContain("source_policy.invalid");
+  });
+
+  test("rejects non-Markdown durable artifacts", async () => {
+    const root = await workspace();
+    await runSetup(root, { dryRun: false });
+    await writeFile(
+      path.join(root, ".chat-harness", "workbench", "0-ideas", "native-doc.txt"),
+      "not markdown\n",
+    );
+    await writeFile(
+      path.join(root, ".chat-harness", "workstreams", "tracker.txt"),
+      "not markdown\n",
+    );
+
+    const findings = await validateWorkspace(root);
+    expect(findings.map((finding) => finding.code)).toContain(
+      "workbench.file_extension_invalid",
+    );
+    expect(findings.map((finding) => finding.code)).toContain(
+      "workstream.file_extension_invalid",
+    );
   });
 
   test("missing scaffolding is reported, not repaired", async () => {

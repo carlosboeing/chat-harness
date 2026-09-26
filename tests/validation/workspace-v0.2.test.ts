@@ -56,8 +56,11 @@ describe("v0.2 workspace validation", () => {
       path.join(root, ".chat-harness", "workstreams", "broken.md"),
       [
         "---",
+        "type: workstream",
+        "title: Broken",
         "status: active",
         "created: 2026-09-26",
+        "updated: 2026-09-26",
         "---",
         "# Broken",
         "",

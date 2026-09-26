@@ -58,7 +58,7 @@ describe("v0.2 workspace setup", () => {
       ".chat-harness/workbench",
       ".chat-harness/workbench/0-ideas",
       ".chat-harness/workbench/1-research",
-      ".chat-harness/workbench/2-analysis",
+      ".chat-harness/workbench/2-decisions",
       ".chat-harness/workbench/3-plans",
       ".chat-harness/workbench/4-reviews",
       ".chat-harness/procedures",
@@ -80,8 +80,10 @@ describe("v0.2 workspace setup", () => {
     expect(agents).toContain("<!-- chat-harness-managed: agents -->");
     expect(agents).toContain(".chat-harness/WORKSPACE.md");
     expect(agents).toContain("active/parked Workstreams");
-    expect(agents).toContain("independent objective + independent next action + likely future continuation");
-    expect(agents).toContain("copy this entire file");
+    expect(agents).toContain("Classify each request as **Answer-only** or **Work**.");
+    expect(agents).toContain("2-decisions/");
+    expect(agents).toContain("text/markdown");
+    expect(agents.length).toBeLessThanOrEqual(7500);
 
     const specialist = await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8");
     expect(specialist).toContain("Principal/Staff+");

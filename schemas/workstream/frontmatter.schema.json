@@ -2,73 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chat-harness.dev/schemas/workstream/frontmatter.schema.json",
   "type": "object",
-  "required": [
-    "status",
-    "created"
-  ],
+  "required": ["type", "title", "status", "created", "updated"],
   "properties": {
-    "status": {
-      "enum": [
-        "active",
-        "parked",
-        "resolved",
-        "superseded"
-      ]
-    },
-    "created": {
-      "type": "string",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-    },
-    "superseded_by": {
-      "type": "string",
-      "minLength": 1
-    }
+    "type": { "const": "workstream" },
+    "title": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["active", "parked", "completed"] },
+    "created": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "updated": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "status": {
-            "const": "superseded"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "then": {
-        "required": [
-          "superseded_by"
-        ],
-        "properties": {
-          "superseded_by": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "status": {
-            "not": {
-              "const": "superseded"
-            }
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "then": {
-        "not": {
-          "required": [
-            "superseded_by"
-          ]
-        }
-      }
-    }
-  ],
   "additionalProperties": false
 }

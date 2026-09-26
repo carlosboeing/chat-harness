@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: Evidence synthesis
 status: active
 created: 2026-09-24
+updated: 2026-09-24
 ---
 
 # Evidence synthesis

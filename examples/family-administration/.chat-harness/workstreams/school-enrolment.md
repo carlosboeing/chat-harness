@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: School enrolment follow-up
 status: active
 created: 2026-09-24
+updated: 2026-09-24
 ---
 
 # School enrolment follow-up
