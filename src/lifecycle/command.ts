@@ -257,12 +257,21 @@ export async function runUpdate(
   }
 
   const mismatch = pathMismatch(installation, dependencies);
-  if (mismatch) {
+  if (mismatch && !options.check) {
     return {
       result: { state: "path_mismatch", ...base },
       findings: [mismatch],
     };
   }
+  const checkFinding = mismatch
+    ? {
+        ...mismatch,
+        severity: "warning" as const,
+        message:
+          "The running executable differs from the chat-harness command on PATH. " +
+          "The read-only update check will continue, but mutation remains blocked until PATH ambiguity is fixed.",
+      }
+    : undefined;
 
   try {
     if (installation.channel === "npm") {
@@ -279,10 +288,14 @@ export async function runUpdate(
             ...base,
             latest,
           },
+          ...(checkFinding ? { findings: [checkFinding] } : {}),
         };
       }
       if (options.check) {
-        return { result: { state: "update_available", ...base, latest } };
+        return {
+          result: { state: "update_available", ...base, latest },
+          ...(checkFinding ? { findings: [checkFinding] } : {}),
+        };
       }
 
       const mutation = dependencies.npm(
@@ -352,6 +365,7 @@ export async function runUpdate(
           ...base,
           latest: release.version,
         },
+        ...(checkFinding ? { findings: [checkFinding] } : {}),
       };
     }
     if (options.check) {
@@ -361,6 +375,7 @@ export async function runUpdate(
           ...base,
           latest: release.version,
         },
+        ...(checkFinding ? { findings: [checkFinding] } : {}),
       };
     }
 

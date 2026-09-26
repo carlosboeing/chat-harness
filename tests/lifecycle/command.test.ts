@@ -189,6 +189,19 @@ describe("lifecycle commands", () => {
     expect(fixture.calls.replaced).toEqual([]);
   });
 
+  test("update --check reports through PATH ambiguity without mutation", async () => {
+    const fixture = dependencies(installation(), {
+      activeExecutable: () => "/other/bin/chat-harness",
+    });
+    const result = await runUpdate("0.3.0", { check: true, json: true }, fixture.deps);
+
+    expect(result.result.state).toBe("update_available");
+    expect(result.findings?.[0]?.severity).toBe("warning");
+    expect(result.findings?.[0]?.code).toBe("lifecycle.path_mismatch");
+    expect(fixture.calls.metadata).toEqual([]);
+    expect(fixture.calls.replaced).toEqual([]);
+  });
+
   test("npm update delegates to the global npm owner and verifies the installed version", async () => {
     const npmInstall = installation({
       channel: "npm",

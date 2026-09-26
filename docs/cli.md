@@ -65,6 +65,19 @@ Without interactive prompts:
 
 Setup does not reorganize existing domain content. Optional domain folders are additive only. Wrong-type collisions and symlinks at managed paths require user action. A recognized Chat Harness-managed `AGENTS.md` may be refreshed; unmanaged files are never silently adopted.
 
+### Optional specialist folders
+
+| Specialist | Folders |
+|---|---|
+| `general` | none |
+| `research` | `Research/` |
+| `tech` | `Projects/` |
+| `tax` | `Tax/` |
+| `finance` | `Finance/` |
+| `career` | `Profile/`, `Opportunities/` |
+| `shopping` | `Research/`, `Purchases/` |
+| `travel` | `Trips/` |
+
 ## validate
 
 ```bash
