@@ -8,7 +8,7 @@ import { buildBinary } from "./build-binary.js";
 
 type ExecFn = typeof execFileSync;
 
-export function getTargetName(platform = process.platform, arch = process.arch): string {
+export function getTargetName(platform: string = process.platform, arch: string = process.arch): string {
   if (platform !== "darwin" && platform !== "linux") {
     throw new Error(`Unsupported platform: ${platform}. Local installs currently support macOS and Linux.`);
   }
