@@ -71,7 +71,7 @@ describe("setup reconciliation", () => {
       ".chat-harness/workbench",
       ".chat-harness/workbench/0-ideas",
       ".chat-harness/workbench/1-research",
-      ".chat-harness/workbench/2-analysis",
+      ".chat-harness/workbench/2-decisions",
       ".chat-harness/workbench/3-plans",
       ".chat-harness/workbench/4-reviews",
       ".chat-harness/procedures",
