@@ -72,7 +72,7 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
       {
         applyOptions: {
           beforeApply: async (plan) => {
-            if (!runtime.isTTY || context.options.json) return;
+            if (!runtime.isTTY || !runtime.nativeTerminal || context.options.json) return;
 
             const create = plan.operations.filter((operation) => operation.action !== "replace_file");
             const replace = plan.operations.filter((operation) => operation.action === "replace_file");
