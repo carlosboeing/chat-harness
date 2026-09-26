@@ -41,6 +41,8 @@ function setupStructure(envelope: CommandEnvelope): SetupStructureEntry[] {
 }
 
 function renderSetupInteractive(envelope: CommandEnvelope): void {
+  if (!envelope.workspace) throw new Error("setup result is missing its Workspace path");
+  const workspace = envelope.workspace;
   const structure = setupStructure(envelope);
   const state = envelope.result.state;
 
@@ -55,7 +57,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
 
     if (structure.length > 0) {
       note(
-        renderSetupTree(envelope.workspace, structure),
+        renderSetupTree(workspace, structure),
         "Workspace ready",
       );
 
@@ -75,7 +77,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.info(`Workspace: ${envelope.workspace}`);
     if (structure.length > 0) {
       note(
-        renderSetupTree(envelope.workspace, structure),
+        renderSetupTree(workspace, structure),
         "Workspace structure",
       );
     }
@@ -85,7 +87,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.info(`Workspace: ${envelope.workspace}`);
     if (structure.length > 0) {
       note(
-        renderSetupTree(envelope.workspace, structure),
+        renderSetupTree(workspace, structure),
         "Workspace preview",
       );
     }
