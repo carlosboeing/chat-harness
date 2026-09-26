@@ -82,7 +82,7 @@ describe("CLI surface", () => {
     expect(output).toContain("Create, validate, diagnose, update, and uninstall Chat Harness");
     expect(output).toContain("chat-harness setup --specialist travel");
     expect(output).toContain("current directory");
-    expect(output).toContain("do not search parent directories");
+    expect(output.replace(/\s+/g, " ")).toContain("do not search parent directories");
     expect(output).toContain("Exit codes:");
     expect(output).toContain("setup");
     expect(output).toContain("validate");
