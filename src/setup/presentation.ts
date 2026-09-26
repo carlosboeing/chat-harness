@@ -155,18 +155,28 @@ export function renderSetupTree(
     { tree: `${path.basename(workspace) || workspace}/`, status: "" },
   ];
 
-  function walk(node: TreeNode, prefix: string): void {
+  function walk(
+    node: TreeNode,
+    prefix: string,
+    inheritedStatus?: SetupStructureStatus,
+  ): void {
     const children = [...node.children.values()].sort(compareSetupTreeNames);
     children.forEach((child, index) => {
       const last = index === children.length - 1;
       const connector = last ? "└── " : "├── ";
       const suffix = child.kind === "directory" ? "/" : "";
+      const repeatedStatus =
+        child.status !== undefined && child.status === inheritedStatus;
       lines.push({
         tree: `${prefix}${connector}${child.name}${suffix}`,
-        status: statusLabel(child.status),
+        status: repeatedStatus ? "" : statusLabel(child.status),
       });
       if (child.children.size > 0) {
-        walk(child, `${prefix}${last ? "    " : "│   "}`);
+        walk(
+          child,
+          `${prefix}${last ? "    " : "│   "}`,
+          child.status ?? inheritedStatus,
+        );
       }
     });
   }
