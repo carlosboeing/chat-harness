@@ -39,7 +39,8 @@ describe("setup v0.2 CLI", () => {
 
     const envelope = JSON.parse(io.stdout());
     expect(envelope.result.specialist).toBe("career");
-    expect(envelope.result.host_action).toContain("complete current AGENTS.md");
+    expect(envelope.result.host_action).toContain("Google Drive");
+    expect(envelope.result.host_action).toContain("Project Instructions");
     expect(await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8")).toContain("evidence-grounded");
     expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain("chat-harness-managed: agents");
     expect((await lstat(path.join(root, "Profile"))).isDirectory()).toBe(true);
