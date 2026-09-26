@@ -71,13 +71,15 @@ Verify the CLI you are actually running:
 chat-harness --version
 ```
 
-To upgrade an npm installation later:
+After installation, lifecycle commands are channel-aware:
 
 ```bash
-npm install -g chat-harness@latest
+chat-harness update --check
+chat-harness update
+chat-harness uninstall
 ```
 
-For a standalone installation, rerun the installer; it downloads the current release unless `CHAT_HARNESS_VERSION` is pinned.
+`update` uses GitHub Releases + SHA-256 verification for standalone binaries and delegates global npm updates to npm. `uninstall` removes the CLI only; Workspace/project data is never removed. See the [CLI reference](docs/cli.md) for provenance, Windows self-replacement, non-interactive confirmation, and safety details.
 
 ## Quick start
 
@@ -194,13 +196,15 @@ See [Security](docs/security.md).
 
 ## Usage
 
-All commands accept an optional `[path]`. When it is omitted, Chat Harness uses the current directory.
+Workspace commands (`setup`, `validate`, and `doctor`) accept an optional `[path]`; when omitted, they use the current directory. Lifecycle commands operate on the detected CLI installation and never take a Workspace path.
 
 | Command | What it does | Typical use |
 |---|---|---|
 | `chat-harness setup` | Create or safely reconcile the Workspace scaffold. | First-time setup or refreshing managed files. |
 | `chat-harness validate` | Check the scaffold, Workstreams, and Source Policy without changing files. | Confirm the Workspace still satisfies Chat Harness contracts. |
 | `chat-harness doctor` | Check Workspace health and local prerequisites without changing files. | Diagnose environment or installation problems. |
+| `chat-harness update` | Check/update the installed CLI through its detected standalone or npm channel. | Keep Chat Harness software current without remembering channel-specific commands. |
+| `chat-harness uninstall` | Remove the installed CLI only. | Uninstall Chat Harness without touching Workspace/project data. |
 
 Interactive `setup` explains choices before asking for consent, shows the complete resulting Workspace tree with human-readable status labels, and asks for approval before writing.
 
@@ -225,6 +229,9 @@ chat-harness setup --specialist tech --scaffold-domain
 chat-harness setup --dry-run
 chat-harness validate --json
 chat-harness doctor
+chat-harness update --check
+chat-harness update
+chat-harness uninstall
 ```
 
 Run `chat-harness --help` or `chat-harness <command> --help` for terminal help. See the complete [CLI reference](docs/cli.md) for behavior, safety rules, automation, and exit codes.
