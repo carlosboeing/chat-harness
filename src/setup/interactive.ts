@@ -1,10 +1,11 @@
 import { confirm, isCancel, select } from "@clack/prompts";
 
 import { inspectWorkspace } from "../workspace/inspect.js";
-import { isManagedAgentsSource, workspaceTemplate } from "./templates.js";
+import { AGENTS_TEMPLATE, isManagedAgentsSource, workspaceTemplate } from "./templates.js";
 import {
   SPECIALIST_IDS,
   specialistDomainPaths,
+  specialistSummary,
   type SpecialistId,
 } from "./specialists.js";
 
@@ -30,7 +31,7 @@ async function chooseSpecialist(): Promise<SpecialistId | null> {
     message: "Choose a Workspace specialist",
     options: SPECIALIST_IDS.map((id) => ({
       value: id,
-      label: id,
+      label: `${id} — ${specialistSummary(id)}`,
     })),
     initialValue: "general",
   });
@@ -53,17 +54,25 @@ export async function resolveInteractiveSetup(
     !isManagedAgentsSource(agents.content ?? "") &&
     !replaceAgents
   ) {
-    const action = await select({
-      message:
-        "Existing AGENTS.md is not Chat Harness-managed. Setup will not adopt it silently.",
-      options: [
-        { value: "cancel", label: "Cancel (safe default)" },
-        { value: "replace", label: "Replace and let Chat Harness own AGENTS.md" },
-      ],
-      initialValue: "cancel",
-    });
-    if (isCancel(action) || action === "cancel") return { cancelled: true };
-    replaceAgents = true;
+    while (true) {
+      const action = await select({
+        message:
+          "Existing AGENTS.md is not Chat Harness-managed. Setup will not overwrite it without your approval.",
+        options: [
+          { value: "cancel", label: "Cancel (safe default)" },
+          { value: "preview", label: "Preview the Chat Harness AGENTS.md replacement" },
+          { value: "replace", label: "Replace it and let Chat Harness manage AGENTS.md" },
+        ],
+        initialValue: "cancel",
+      });
+      if (isCancel(action) || action === "cancel") return { cancelled: true };
+      if (action === "preview") {
+        write(`\n--- Chat Harness AGENTS.md preview ---\n${AGENTS_TEMPLATE}--- end preview ---\n\n`);
+        continue;
+      }
+      replaceAgents = true;
+      break;
+    }
   }
 
   const workspaceFile = inspection.observations.find(
@@ -93,10 +102,19 @@ export async function resolveInteractiveSetup(
   }
 
   let scaffoldDomain = request.scaffoldDomain;
-  if (!scaffoldDomain && specialistDomainPaths(specialist).length > 0) {
+  const domainPaths = specialistDomainPaths(specialist);
+  if (!scaffoldDomain && domainPaths.length > 0) {
+    write(
+      [
+        "",
+        `Optional ${specialist} folders:`,
+        ...domainPaths.map((path) => `  - ${path}/`),
+        "Only missing folders are created. Existing files and folders are left unchanged.",
+        "",
+      ].join("\n"),
+    );
     const answer = await confirm({
-      message:
-        `Create the suggested ${specialist} domain folder structure? Only missing exact paths are created.`,
+      message: "Create these optional folders?",
       initialValue: false,
     });
     if (isCancel(answer)) return { cancelled: true };
