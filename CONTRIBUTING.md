@@ -27,6 +27,25 @@ bunx playwright install --with-deps --only-shell chromium
 bun run smoke:browser
 ```
 
+### Installing unreleased builds locally
+
+To test the current checkout through the same standalone-binary path used by the primary distribution:
+
+```bash
+bun run install:local
+```
+
+This builds only the current macOS/Linux platform target, installs it atomically to `~/.local/bin/chat-harness`, verifies the installed `--version`, and checks whether that binary is the active `chat-harness` on `PATH`.
+
+Local builds identify themselves as:
+
+```text
+0.2.0-<short-git-sha>
+0.2.0-<short-git-sha>-dirty
+```
+
+Set `CHAT_HARNESS_BIN_DIR` to override the destination. If another installation appears earlier on `PATH`, the installer leaves it untouched and prints the active and newly installed paths so you can fix the precedence explicitly.
+
 ## Design rules
 
 Prefer:

@@ -71,6 +71,14 @@ jobs:
       - name: Compare standalone and Node JSON behaviour
         run: bun scripts/smoke-distributions.ts dist/bin/chat-harness-linux-x64 dist/npm/chat-harness.js
 
+      - name: Smoke unreleased local install workflow
+        env:
+          CHAT_HARNESS_BIN_DIR: /tmp/chat-harness-local-bin
+        run: bun run install:local
+
+      - name: Verify local development binary executes
+        run: /tmp/chat-harness-local-bin/chat-harness --version
+
       - name: Inspect npm package contents
         run: |
           npm pack --dry-run --json > dist/npm-pack.json

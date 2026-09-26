@@ -13,7 +13,7 @@ const supported = new Set([
   "bun-windows-x64",
 ]);
 
-export async function buildBinary(target: string, outfile: string): Promise<void> {
+export async function buildBinary(target: string, outfile: string, entrypoint = "src/cli/main.ts"): Promise<void> {
   if (!supported.has(target)) throw new Error(`Unsupported release target: ${target}`);
   const absolute = path.resolve(root, outfile);
   if (!absolute.startsWith(root + path.sep)) throw new Error("Output must remain inside repository.");
@@ -28,7 +28,7 @@ export async function buildBinary(target: string, outfile: string): Promise<void
       "--minify",
       "--no-compile-autoload-dotenv",
       "--no-compile-autoload-bunfig",
-      "src/cli/main.ts",
+      entrypoint,
       `--outfile=${absolute}`,
     ],
     { cwd: root, encoding: "utf8", stdio: "inherit" },
@@ -40,10 +40,11 @@ export async function buildBinary(target: string, outfile: string): Promise<void
 async function main(): Promise<void> {
   const target = process.argv[2];
   const outfile = process.argv[3];
+  const entrypoint = process.argv[4] ?? "src/cli/main.ts";
   if (!target || !outfile) {
-    throw new Error("Usage: bun scripts/build-binary.ts <bun-target> <outfile>");
+    throw new Error("Usage: bun scripts/build-binary.ts <bun-target> <outfile> [entrypoint]");
   }
-  await buildBinary(target, outfile);
+  await buildBinary(target, outfile, entrypoint);
 }
 
 const isEntrypoint =
