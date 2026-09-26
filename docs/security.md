@@ -10,7 +10,7 @@ Local execution can improve data sovereignty, but locality alone does not solve 
 
 ## Source Policy
 
-The optional Source Policy classifies user-owned Workspace sources:
+Source Policy classifies user-owned Workspace sources:
 
 | Privacy | Default cross-context handling |
 |---|---|
@@ -63,7 +63,7 @@ Do not expose generic shell/RCE, unrestricted HTTP, arbitrary browser targets, c
 
 The GitHub extension uses Issue bodies and comments. Those are persistent repository content and therefore a confidentiality/retention boundary.
 
-V0.1 machine-enforces that this transport can invoke only capabilities that are read-only, public-data, credential-free, and explicitly persistent-transport-safe.
+The current transport machine-enforces that it can invoke only capabilities that are read-only, public-data, credential-free, and explicitly persistent-transport-safe.
 
 Do not place secrets, authentication material, payment data, private health/financial content, or unnecessary personal data in capability requests/results.
 
@@ -81,4 +81,4 @@ Prefer structured findings, result states, sanitized provenance, action receipts
 
 ## Reporting issues
 
-The public reporting process is defined in repository-root `SECURITY.md` once release engineering is complete.
+The public reporting process is defined in repository-root [`SECURITY.md`](../SECURITY.md).

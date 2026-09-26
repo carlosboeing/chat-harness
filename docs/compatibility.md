@@ -9,7 +9,7 @@ Status meanings:
 
 ## ChatGPT Projects
 
-ChatGPT is the reference hosted binding for v0.2.
+ChatGPT is the reference hosted binding.
 
 The binding contract is intentionally simple: copy the **entire current `AGENTS.md`** into ChatGPT Project Instructions, and make the Workspace retrievable by the Project. Do not maintain a second hand-written “minimal binding” or merge specialist text into Project Instructions; Workspace-specific behavior remains in `.chat-harness/WORKSPACE.md`.
 
@@ -23,4 +23,4 @@ The architecture is portable, but support remains evidence-based. A host that ca
 
 ## Reverification
 
-Reverify after material host behavior changes, before making a stronger support claim, or when a host smoke reports regression. Chat Harness semver versions its own software/contracts, not vendor releases.
+Reverify after material host behavior changes, before making a stronger support claim, or when a host smoke reports regression. Chat Harness versions its own software/contracts, not vendor releases.
