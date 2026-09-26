@@ -42,6 +42,7 @@ export interface CliRuntime {
   stderr: (text: string) => void;
   handlers: Partial<Record<CommandName, CommandHandler>>;
   nativeTerminal: boolean;
+  version: string;
 }
 
 function defaultRuntime(): CliRuntime {
@@ -53,6 +54,7 @@ function defaultRuntime(): CliRuntime {
     stderr: (text) => process.stderr.write(text),
     handlers: {},
     nativeTerminal: true,
+    version: packageMetadata.version,
   };
 }
 
@@ -139,7 +141,7 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
   program
     .name("chat-harness")
     .description("Create, validate, and diagnose Chat Harness Workspaces for AI assistants.")
-    .version(packageMetadata.version)
+    .version(runtime.version)
     .showHelpAfterError("(run with --help for usage)")
     .addHelpText(
       "after",
