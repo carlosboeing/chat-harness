@@ -1,16 +1,31 @@
 export const SPECIALIST_IDS = ["general", "research", "tech", "tax", "finance", "career", "shopping", "travel"] as const;
 export type SpecialistId = (typeof SPECIALIST_IDS)[number];
 
+export const SPECIALIST_LABELS: Readonly<Record<SpecialistId, string>> = {
+  general: "General",
+  research: "Research",
+  tech: "Technology",
+  tax: "Tax",
+  finance: "Finance",
+  career: "Career",
+  shopping: "Shopping",
+  travel: "Travel",
+};
+
 export const SPECIALIST_SUMMARIES: Readonly<Record<SpecialistId, string>> = {
   general: "Everyday projects and mixed topics",
-  research: "Evidence-heavy research and investigation",
-  tech: "Software engineering and technical research",
+  research: "In-depth research where sources and evidence matter",
+  tech: "Software engineering and technical projects",
   tax: "Tax research, records, and planning",
   finance: "Financial analysis, investments, and planning",
-  career: "Career positioning, job searches, and opportunities",
+  career: "CVs, job searches, and career planning",
   shopping: "Product research and purchase decisions",
   travel: "Trips, itineraries, bookings, and travel research",
 };
+
+export function specialistLabel(id: SpecialistId): string {
+  return SPECIALIST_LABELS[id];
+}
 
 export function specialistSummary(id: SpecialistId): string {
   return SPECIALIST_SUMMARIES[id];
@@ -134,9 +149,38 @@ export const SPECIALIST_DOMAIN_PATHS: Readonly<Record<SpecialistId, readonly str
   tech: ["Projects"],
   tax: ["Tax"],
   finance: ["Finance"],
-  career: ["Profile", "Opportunities"],
-  shopping: ["Research", "Purchases"],
+  career: ["Opportunities", "Profile"],
+  shopping: ["Purchases", "Research"],
   travel: ["Trips"],
+};
+
+export const SPECIALIST_DOMAIN_DESCRIPTIONS: Readonly<
+  Record<SpecialistId, Readonly<Record<string, string>>>
+> = {
+  general: {},
+  research: {
+    Research: "Research notes, evidence, and substantial investigations",
+  },
+  tech: {
+    Projects: "Software and technical projects",
+  },
+  tax: {
+    Tax: "Tax records, research, and planning material",
+  },
+  finance: {
+    Finance: "Financial analysis, records, and planning material",
+  },
+  career: {
+    Profile: "Reusable career history, achievements, and positioning material",
+    Opportunities: "Roles, companies, and applications you are investigating",
+  },
+  shopping: {
+    Research: "Product comparisons and purchase research",
+    Purchases: "Records and follow-up for things you decide to buy",
+  },
+  travel: {
+    Trips: "Individual trips, itineraries, bookings, and travel research",
+  },
 };
 
 export function specialistTemplate(id: SpecialistId): string {

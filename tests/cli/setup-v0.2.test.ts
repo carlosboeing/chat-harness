@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { lstat, mkdtemp, readFile, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -39,11 +39,39 @@ describe("setup v0.2 CLI", () => {
 
     const envelope = JSON.parse(io.stdout());
     expect(envelope.result.specialist).toBe("career");
-    expect(envelope.result.host_action).toContain("complete current AGENTS.md");
+    expect(envelope.result.host_action).toContain("Google Drive");
+    expect(envelope.result.host_action).toContain("Project Instructions");
     expect(await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8")).toContain("evidence-grounded");
     expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain("chat-harness-managed: agents");
     expect((await lstat(path.join(root, "Profile"))).isDirectory()).toBe(true);
     expect((await lstat(path.join(root, "Opportunities"))).isDirectory()).toBe(true);
+  });
+
+  test("JSON structure keeps an existing optional folder visible", async () => {
+    const root = await workspace();
+    await mkdir(path.join(root, "Trips"));
+    const io = capture(root);
+
+    expect(
+      await runCli(
+        [
+          "setup",
+          root,
+          "--specialist",
+          "travel",
+          "--scaffold-domain",
+          "--json",
+        ],
+        io.runtime,
+      ),
+    ).toBe(0);
+
+    const envelope = JSON.parse(io.stdout());
+    expect(envelope.result.structure).toContainEqual({
+      path: "Trips",
+      kind: "directory",
+      status: "already_there",
+    });
   });
 
   test("omitted specialist is deterministically general in non-interactive mode", async () => {

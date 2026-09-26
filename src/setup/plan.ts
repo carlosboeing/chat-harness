@@ -19,6 +19,8 @@ export interface SetupPlan {
   operations: ReadonlyArray<SetupOperation>;
   findings: ReadonlyArray<Finding>;
   snapshot: WorkspaceInspection;
+  options: Readonly<SetupPlanOptions>;
+  domain: ReadonlyArray<DomainPathObservation>;
 }
 export interface SetupPlanOptions {
   specialist: SpecialistId;
@@ -118,5 +120,12 @@ export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlan
     }
   }
 
-  return Object.freeze({ workspace: snapshot.workspace, operations: Object.freeze(operations), findings: Object.freeze(findings), snapshot });
+  return Object.freeze({
+    workspace: snapshot.workspace,
+    operations: Object.freeze(operations),
+    findings: Object.freeze(findings),
+    snapshot,
+    options: Object.freeze({ ...options }),
+    domain: Object.freeze([...domain]),
+  });
 }

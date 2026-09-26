@@ -2,12 +2,14 @@ import type { Finding } from "../cli/result.js";
 import { inspectWorkspace } from "../workspace/inspect.js";
 import { applySetupPlan, SetupCancelledError, SetupStalePlanError, SetupVerificationError, type ApplySetupOptions } from "./apply.js";
 import { buildSetupPlan, inspectDomainScaffold, type SetupOperation } from "./plan.js";
+import { buildSetupStructure, type SetupStructureEntry } from "./presentation.js";
 import type { SpecialistId } from "./specialists.js";
 
 const HOST_ACTION = [
-  "To connect this Workspace to ChatGPT Projects:",
-  "1. Add the Workspace's Google Drive folder as a Project source.",
-  "2. Copy the complete current AGENTS.md into Project Instructions.",
+  "Your Workspace files are ready. To use this Workspace with ChatGPT:",
+  "1. Make sure this folder is stored in Google Drive so ChatGPT can access the same up-to-date files.",
+  "2. In your ChatGPT Project, add the Google Drive folder under Sources.",
+  "3. Open AGENTS.md, copy the complete file, and paste it into Project settings → Project Instructions.",
   "Guide: https://github.com/carlosboeing/chat-harness/blob/main/docs/hosts/chatgpt.md",
 ].join("\n");
 
@@ -24,6 +26,7 @@ export interface SetupCommandOutput {
     state: "no_changes" | "changes_planned" | "changes_applied" | "cancelled" | "user_action_required" | "execution_failure";
     operations: ReadonlyArray<SetupOperation>;
     specialist: SpecialistId;
+    structure?: ReadonlyArray<SetupStructureEntry>;
     host_action?: string;
   };
   findings: Finding[];
@@ -43,6 +46,11 @@ export async function runSetup(workspace: string, options: SetupCommandOptions, 
     state,
     operations,
     specialist,
+    ...(state === "changes_planned"
+      ? { structure: buildSetupStructure(plan, "planned") }
+      : state === "changes_applied" || state === "no_changes"
+        ? { structure: buildSetupStructure(plan, "applied") }
+        : {}),
     ...(state === "changes_applied" || state === "no_changes"
       ? { host_action: HOST_ACTION }
       : {}),

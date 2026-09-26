@@ -2,9 +2,9 @@
 
 This guide is for people who want the benefits of Chat Harness without needing to understand its internal architecture first.
 
-A **Workspace** is simply the folder you want your AI assistant to work with over time. Chat Harness adds a small set of instruction and state files inside that folder so work is easier to resume, verify, and maintain.
+A **Workspace** is the folder your AI assistant uses for ongoing work. Chat Harness adds a small set of instruction and state files so work is easier to resume, verify, and maintain.
 
-This guide uses **ChatGPT Projects + Google Drive** because that is the current reference setup.
+This guide uses **ChatGPT Projects + Google Drive**, the current reference setup. For ChatGPT, keep the Workspace in Google Drive so the Project can use the same up-to-date folder as a source. Uploading a local folder or file creates a point-in-time copy instead of this live folder relationship.
 
 ## What you will do
 
@@ -57,11 +57,9 @@ npm install -g chat-harness@latest
 
 ## 2. Open your Workspace folder in Terminal
 
-Choose the folder you want ChatGPT to use for this project.
+Choose or create the Google Drive folder you want ChatGPT to use for this Project, and make that folder available on your computer through Google Drive for Desktop.
 
-If you are using Google Drive, put the folder somewhere in Google Drive so ChatGPT can later access the same files.
-
-Then open that folder in your terminal.
+Then open the locally mirrored folder in your terminal.
 
 ### macOS tip
 
@@ -91,9 +89,9 @@ You can also choose directly:
 chat-harness setup --specialist travel
 ```
 
-Before Chat Harness creates optional folders or replaces an existing managed file, it shows what the choice means. Before writing the final plan, it shows the exact files and folders it will create or replace.
+The guided setup first explains what Chat Harness will do, then asks what the Workspace is mainly for. Optional organizational folders are explained before you choose them.
 
-Existing content not listed in the plan is left unchanged.
+Before writing anything, setup shows the complete Chat Harness folder/file tree with labels such as `new`, `updated`, or `already there`, then asks for approval. Existing unrelated content is left unchanged.
 
 ## 4. Understand what was created
 
@@ -101,16 +99,21 @@ A normal Workspace contains:
 
 ```text
 Your folder/
-├── AGENTS.md
 ├── _inbox/
-└── .chat-harness/
-    ├── WORKSPACE.md
-    ├── README.md
-    ├── source-policy.yaml
-    ├── workstreams/
-    ├── workbench/
-    ├── procedures/
-    └── temp/
+├── .chat-harness/
+│   ├── procedures/
+│   ├── temp/
+│   ├── workbench/
+│   │   ├── 0-ideas/
+│   │   ├── 1-research/
+│   │   ├── 2-analysis/
+│   │   ├── 3-plans/
+│   │   └── 4-reviews/
+│   ├── workstreams/
+│   ├── README.md
+│   ├── source-policy.yaml
+│   └── WORKSPACE.md
+└── AGENTS.md
 ```
 
 The two files most useful to understand at first are:
