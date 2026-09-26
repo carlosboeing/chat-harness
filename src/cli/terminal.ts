@@ -1,4 +1,4 @@
-import { intro, log, outro } from "@clack/prompts";
+import { intro, log, note, outro } from "@clack/prompts";
 
 import type { CommandEnvelope } from "./result.js";
 import {
@@ -41,8 +41,6 @@ function setupStructure(envelope: CommandEnvelope): SetupStructureEntry[] {
 }
 
 function renderSetupInteractive(envelope: CommandEnvelope): void {
-  intro("Chat Harness setup", { withGuide: false });
-
   const structure = setupStructure(envelope);
   const state = envelope.result.state;
 
@@ -56,8 +54,9 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.info(`Workspace: ${envelope.workspace}`);
 
     if (structure.length > 0) {
-      log.info(
-        `Chat Harness structure:\n\n${renderSetupTree(envelope.workspace, structure)}`,
+      note(
+        renderSetupTree(envelope.workspace, structure),
+        "Workspace ready",
       );
 
       const created = structure.filter((entry) => entry.status === "created").length;
@@ -75,8 +74,9 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.success("Everything is already up to date.");
     log.info(`Workspace: ${envelope.workspace}`);
     if (structure.length > 0) {
-      log.info(
-        `Chat Harness structure:\n\n${renderSetupTree(envelope.workspace, structure)}`,
+      note(
+        renderSetupTree(envelope.workspace, structure),
+        "Workspace structure",
       );
     }
     log.info("No files needed to be added or changed.");
@@ -84,8 +84,9 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
     log.info("Dry run only — nothing was changed.");
     log.info(`Workspace: ${envelope.workspace}`);
     if (structure.length > 0) {
-      log.info(
-        `The Workspace would look like this:\n\n${renderSetupTree(envelope.workspace, structure)}`,
+      note(
+        renderSetupTree(envelope.workspace, structure),
+        "Workspace preview",
       );
     }
   }
@@ -107,7 +108,7 @@ function renderSetupInteractive(envelope: CommandEnvelope): void {
 
   const hostAction = envelope.result.host_action;
   if (typeof hostAction === "string" && hostAction.length > 0) {
-    log.info(`Next: connect this Workspace to ChatGPT\n\n${hostAction}`);
+    note(hostAction, "Next: connect this Workspace to ChatGPT");
   }
 
   outro(

@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command, CommanderError, Option } from "commander";
-import { confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel, note } from "@clack/prompts";
 
 import packageMetadata from "../../package.json" with { type: "json" };
 
@@ -77,11 +77,8 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
           beforeApply: async (plan) => {
             if (!runtime.isTTY || !runtime.nativeTerminal || context.options.json) return;
 
-            runtime.stdout(
+            note(
               [
-                "",
-                "Review your Workspace",
-                "",
                 "Here's how the Chat Harness part of this Workspace will look after setup:",
                 "",
                 renderSetupTree(
@@ -90,8 +87,8 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
                 ),
                 "",
                 "Anything else already in this folder will be left exactly as it is.",
-                "",
               ].join("\n"),
+              "Review your Workspace",
             );
 
             const answer = await confirm({
@@ -284,7 +281,6 @@ Examples:
             replaceAgents: Boolean(options.replaceAgents),
             replaceWorkspace: Boolean(options.replaceWorkspace),
           },
-          runtime.stdout,
         );
         if (interactive.cancelled) {
           const envelope = commandEnvelope({

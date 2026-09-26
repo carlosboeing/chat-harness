@@ -69,6 +69,16 @@ describe("setup presentation", () => {
     expect(workstreams).toBeLessThan(readme);
     expect(readme).toBeLessThan(sourcePolicy);
     expect(sourcePolicy).toBeLessThan(workspaceFile);
+
+    const chatHarnessLine = lines.find((line) => line.includes(".chat-harness/"));
+    const proceduresLine = lines.find((line) => line.includes("procedures/"));
+    const inboxLine = lines.find((line) => line.includes("_inbox/"));
+    const tripsLine = lines.find((line) => line.includes("Trips/"));
+
+    expect(chatHarnessLine).toContain("new");
+    expect(inboxLine).toContain("new");
+    expect(proceduresLine).not.toContain("new");
+    expect(tripsLine).toContain("already there");
   });
 
   test("keeps an existing specialist folder visible as already there", async () => {
