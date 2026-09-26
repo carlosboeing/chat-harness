@@ -113,6 +113,29 @@ describe("lifecycle commands", () => {
     expect(fixture.calls.metadata).toEqual([]);
   });
 
+  test("download failure leaves the installed standalone binary untouched", async () => {
+    const fixture = dependencies(installation(), {
+      download: async () => { throw new Error("connection reset"); },
+    });
+    const result = await runUpdate("0.3.0", { check: false, json: true }, fixture.deps);
+
+    expect(result.result.state).toBe("update_failed");
+    expect(result.findings?.[0]?.message).toContain("connection reset");
+    expect(fixture.calls.metadata).toEqual([]);
+    expect(fixture.calls.replaced).toEqual([]);
+  });
+
+  test("unwritable standalone replacement fails without a fallback mutation path", async () => {
+    const fixture = dependencies(installation(), {
+      replacePosix: () => { throw new Error("EACCES: install directory is not writable"); },
+    });
+    const result = await runUpdate("0.3.0", { check: false, json: true }, fixture.deps);
+
+    expect(result.result.state).toBe("update_failed");
+    expect(result.findings?.[0]?.message).toContain("EACCES");
+    expect(fixture.calls.replaced).toEqual([]);
+  });
+
   test("standalone update records provenance then replaces the exact running binary", async () => {
     const fixture = dependencies(installation());
     const result = await runUpdate("0.3.0", { check: false, json: true }, fixture.deps);
@@ -182,6 +205,22 @@ describe("lifecycle commands", () => {
       ["view", "chat-harness@latest", "version", "--json"],
       ["install", "-g", "chat-harness@latest"],
     ]);
+  });
+
+  test("npm-managed update fails safely when npm cannot be started", async () => {
+    const npmInstall = installation({
+      channel: "npm",
+      packageRoot: "/prefix/lib/node_modules/chat-harness",
+      provenance: "npm-global",
+    });
+    const fixture = dependencies(npmInstall, {
+      npm: () => { throw new Error("npm could not be started: ENOENT"); },
+    });
+    const result = await runUpdate("0.3.0", { check: false, json: true }, fixture.deps);
+
+    expect(result.result.state).toBe("update_failed");
+    expect(result.findings?.[0]?.message).toContain("npm could not be started");
+    expect(fixture.calls.replaced).toEqual([]);
   });
 
   test("npm failures remain explicit and do not fall back to standalone mutation", async () => {
