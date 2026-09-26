@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command, CommanderError, Option } from "commander";
+import { confirm, isCancel } from "@clack/prompts";
 
 import packageMetadata from "../../package.json" with { type: "json" };
 
@@ -71,14 +72,31 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
       {
         applyOptions: {
           beforeApply: async (plan) => {
-            if (!runtime.isTTY || context.options.json) return;
+            if (!runtime.isTTY || !runtime.nativeTerminal || context.options.json) return;
+
+            const create = plan.operations.filter((operation) => operation.action !== "replace_file");
+            const replace = plan.operations.filter((operation) => operation.action === "replace_file");
             runtime.stdout(
               [
-                "Chat Harness setup plan:",
-                ...plan.operations.map((operation) => `- ${operation.action}: ${operation.path}`),
+                "",
+                "Ready to set up Chat Harness.",
+                "",
+                ...(create.length > 0
+                  ? ["Will create:", ...create.map((operation) => `  - ${operation.path}`), ""]
+                  : []),
+                ...(replace.length > 0
+                  ? ["Will replace:", ...replace.map((operation) => `  - ${operation.path}`), ""]
+                  : []),
+                "Everything else in the Workspace will be left unchanged.",
                 "",
               ].join("\n"),
             );
+
+            const answer = await confirm({
+              message: "Apply these changes?",
+              initialValue: true,
+            });
+            return !isCancel(answer) && answer;
           },
         },
       },
@@ -120,8 +138,31 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
   const program = new Command();
   program
     .name("chat-harness")
-    .description("Harness engineering for AI assistants.")
+    .description("Create, validate, and diagnose Chat Harness Workspaces for AI assistants.")
     .version(packageMetadata.version)
+    .showHelpAfterError("(run with --help for usage)")
+    .addHelpText(
+      "after",
+      `
+Examples:
+  chat-harness setup
+  chat-harness setup --specialist travel
+  chat-harness validate
+  chat-harness doctor
+
+Commands default to the current directory and do not search parent directories
+for a Workspace. Pass [path] only when targeting another existing directory.
+
+Exit codes:
+  0  Success
+  1  A setup, validation, or health finding requires attention
+  2  Invalid command-line usage
+  3  Unexpected internal failure
+
+Documentation:
+  https://github.com/carlosboeing/chat-harness#usage
+`,
+    )
     .exitOverride()
     .configureOutput({
       writeOut: (output) => runtime.stdout(output),
@@ -132,7 +173,7 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
     const command = program
       .command(name)
       .description(description)
-      .argument("[path]", "Workspace root; defaults to the current directory")
+      .argument("[path]", "Existing Workspace root directory; defaults to the current directory")
       .option("--json", "Emit the stable machine-readable JSON envelope")
       .option("--no-color", "Disable ANSI terminal decoration");
 
@@ -144,8 +185,66 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
             .choices([...SPECIALIST_IDS]),
         )
         .option("--scaffold-domain", "Create the selected specialist's additive domain starter folders")
-        .option("--replace-agents", "Explicitly replace an existing unmanaged AGENTS.md")
-        .option("--replace-workspace", "Explicitly replace WORKSPACE.md with the selected specialist seed");
+        .option("--replace-agents", "Overwrite an existing unmanaged AGENTS.md and let Chat Harness manage it")
+        .option("--replace-workspace", "Overwrite WORKSPACE.md with the selected specialist seed")
+        .addHelpText(
+          "after",
+          `
+Behaviour:
+  Interactive setup explains choices before asking for consent and shows the
+  exact create/replace plan before writing. Existing content not in that plan
+  is left unchanged.
+
+  If --specialist is omitted, interactive setup asks what the Workspace is
+  mainly for; non-interactive setup uses general.
+
+  --json disables interactive prompts. --scaffold-domain creates only the
+  selected specialist's optional starter folders.
+
+Examples:
+  chat-harness setup
+  chat-harness setup --specialist travel
+  chat-harness setup --specialist tech --scaffold-domain
+  chat-harness setup --dry-run
+  chat-harness setup ~/Projects/research --specialist research
+  chat-harness setup --json
+
+ChatGPT setup guide:
+  https://github.com/carlosboeing/chat-harness/blob/main/docs/hosts/chatgpt.md
+`,
+        );
+    } else if (name === "validate") {
+      command.addHelpText(
+        "after",
+        `
+Checks:
+  Required scaffold paths, managed AGENTS.md, Workstream contracts,
+  supersession references, and Source Policy validity. No files are modified.
+
+Examples:
+  chat-harness validate
+  chat-harness validate ~/Projects/research
+  chat-harness validate --json
+`,
+      );
+    } else {
+      command.addHelpText(
+        "after",
+        `
+Checks:
+  Workspace readability/writability, scaffold health, local runtime
+  compatibility, capability registry integrity when present, and Git when the
+  GitHub extension development path is present. No files are modified.
+
+  Hosted assistant entitlements and conversation-level permissions cannot be
+  diagnosed locally.
+
+Examples:
+  chat-harness doctor
+  chat-harness doctor ~/Projects/research
+  chat-harness doctor --json
+`,
+      );
     }
 
     command.action(async (
@@ -218,9 +317,9 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
     });
   };
 
-  addCommand("setup", "Create or reconcile the Chat Harness v0.2 Workspace scaffold");
-  addCommand("validate", "Validate deterministic Chat Harness workspace contracts");
-  addCommand("doctor", "Diagnose local Chat Harness environment prerequisites");
+  addCommand("setup", "Create or reconcile a Chat Harness Workspace");
+  addCommand("validate", "Validate Workspace scaffold, Workstreams, and Source Policy");
+  addCommand("doctor", "Diagnose Workspace health and local prerequisites");
 
   try {
     await program.parseAsync(["node", "chat-harness", ...argv]);

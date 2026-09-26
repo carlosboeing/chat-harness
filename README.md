@@ -65,15 +65,38 @@ The secondary npm channel requires Node 22.12+:
 npm install -g chat-harness
 ```
 
-## Quick start
+Verify the CLI you are actually running:
 
 ```bash
-chat-harness setup /path/to/project --specialist tech
-chat-harness validate /path/to/project
-chat-harness doctor /path/to/project
+chat-harness --version
 ```
 
-Or run the commands from the target directory.
+To upgrade an npm installation later:
+
+```bash
+npm install -g chat-harness@latest
+```
+
+For a standalone installation, rerun the installer; it downloads the current release unless `CHAT_HARNESS_VERSION` is pinned.
+
+## Quick start
+
+The normal workflow is to run Chat Harness **from inside the folder you want to use as a Workspace**:
+
+```bash
+cd /path/to/your/project
+chat-harness setup --specialist tech
+chat-harness validate
+chat-harness doctor
+```
+
+The path is optional. You can target another existing directory explicitly when needed:
+
+```bash
+chat-harness setup /path/to/your/project --specialist tech
+```
+
+Chat Harness does not search parent directories for a Workspace.
 
 `setup` creates the Chat Harness working scaffold without reorganizing your domain content:
 
@@ -98,7 +121,12 @@ Or run the commands from the target directory.
 
 It is intentionally brownfield-safe: existing user-owned Workspace and domain content is preserved, a recognizably Chat Harness-managed `AGENTS.md` can be refreshed, and unknown same-name content is never silently adopted.
 
-For ChatGPT Projects, copy the **entire current `AGENTS.md`** into Project Instructions. The CLI cannot update hosted Project Instructions directly. See [ChatGPT host setup](docs/hosts/chatgpt.md).
+Creating the files is only the local half of setup. To use the Workspace with **ChatGPT Projects**:
+
+1. add the Workspace's Google Drive folder to the ChatGPT Project as a source;
+2. copy the **entire current `AGENTS.md`** into ChatGPT Project Instructions.
+
+The CLI cannot perform those hosted UI steps for you. Follow the beginner-friendly [Getting Started guide](docs/getting-started.md) or the illustrated [ChatGPT setup guide](docs/hosts/chatgpt.md).
 
 ## How a Workspace works
 
@@ -175,15 +203,42 @@ Chat Harness treats source ownership as part of reliability. Search results, ass
 
 See [Security](docs/security.md).
 
-## CLI
+## Usage
 
-| Command | Purpose |
+All commands accept an optional `[path]`. When it is omitted, Chat Harness uses the current directory.
+
+| Command | What it does | Typical use |
+|---|---|---|
+| `chat-harness setup` | Create or safely reconcile the Workspace scaffold. | First-time setup or refreshing managed files. |
+| `chat-harness validate` | Check the scaffold, Workstreams, and Source Policy without changing files. | Confirm the Workspace still satisfies Chat Harness contracts. |
+| `chat-harness doctor` | Check Workspace health and local prerequisites without changing files. | Diagnose environment or installation problems. |
+
+Interactive `setup` explains choices before asking for consent and shows the exact create/replace plan before writing.
+
+Common setup options:
+
+| Option | What it means |
 |---|---|
-| `setup` | Reconcile the Chat Harness scaffold and optionally seed specialist/domain guidance. |
-| `validate` | Check deterministic Workspace, Workstream, Source Policy, and capability invariants. |
-| `doctor` | Diagnose local operational prerequisites without mutating the Workspace. |
+| `--specialist <id>` | Start `WORKSPACE.md` with guidance for `general`, `research`, `tech`, `tax`, `finance`, `career`, `shopping`, or `travel`. |
+| `--scaffold-domain` | Also create the selected specialist's optional starter folders. |
+| `--dry-run` | Show what setup would change without writing anything. |
+| `--replace-agents` | Explicitly overwrite an unmanaged existing `AGENTS.md`. |
+| `--replace-workspace` | Explicitly overwrite `WORKSPACE.md` with the selected specialist seed. |
+| `--json` | Emit stable machine-readable output; for setup, this also disables interactive prompts. |
+| `--no-color` | Disable ANSI terminal decoration. |
 
-`validate` and `doctor` support machine-readable JSON output.
+Examples:
+
+```bash
+chat-harness setup
+chat-harness setup --specialist travel
+chat-harness setup --specialist tech --scaffold-domain
+chat-harness setup --dry-run
+chat-harness validate --json
+chat-harness doctor
+```
+
+Run `chat-harness --help` or `chat-harness <command> --help` for terminal help. See the complete [CLI reference](docs/cli.md) for behavior, safety rules, automation, and exit codes.
 
 ## Bounded capability extension
 
@@ -211,8 +266,9 @@ These are not missing abstractions waiting to be filled by default. They require
 
 ## Documentation
 
-Start with the [documentation guide](docs/README.md).
+Start with the [Getting Started guide](docs/getting-started.md) or the [documentation guide](docs/README.md).
 
+- [CLI reference](docs/cli.md)
 - [Architecture](docs/architecture.md)
 - [Concepts](docs/concepts.md)
 - [Specialists](docs/specialists.md)

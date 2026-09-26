@@ -117,9 +117,21 @@ describe("doctor", () => {
     expect(
       runtimeFindings("npm", {
         execPath: "/usr/bin/node",
-        nodeVersion: "18.20.0",
+        nodeVersion: "22.11.0",
       })[0]?.code,
     ).toBe("doctor.node_unsupported");
+    expect(
+      runtimeFindings("npm", {
+        execPath: "/usr/bin/node",
+        nodeVersion: "22.12.0",
+      }),
+    ).toEqual([]);
+    expect(
+      runtimeFindings("npm", {
+        execPath: "/usr/bin/node",
+        nodeVersion: "24.0.0",
+      }),
+    ).toEqual([]);
     expect(
       runtimeFindings("development", {
         execPath: "/usr/local/bin/bun",

@@ -70,12 +70,49 @@ describe("CLI surface", () => {
     expect(code).toBe(0);
 
     const output = io.stdout();
+    expect(output).toContain("Create, validate, and diagnose Chat Harness Workspaces");
+    expect(output).toContain("chat-harness setup --specialist travel");
+    expect(output).toContain("current directory");
+    expect(output).toContain("do not search parent directories");
+    expect(output).toContain("Exit codes:");
     expect(output).toContain("setup");
     expect(output).toContain("validate");
     expect(output).toContain("doctor");
     expect(output).not.toContain("init");
     expect(output).not.toContain("migrate");
     expect(output).not.toContain("upgrade");
+  });
+
+  test("setup --help explains specialists, safety, and cwd-first usage", async () => {
+    const root = await workspace();
+    const io = capture(root);
+
+    expect(await runCli(["setup", "--help"], io.runtime)).toBe(0);
+    const output = io.stdout();
+
+    expect(output).toContain("--specialist <id>");
+    expect(output).toContain("general");
+    expect(output).toContain("travel");
+    expect(output).toContain("is left unchanged");
+    expect(output).toContain("--json disables interactive prompts");
+    expect(output).toContain("chat-harness setup --specialist travel");
+    expect(output).toContain("ChatGPT setup guide:");
+    expect(output).not.toContain("v0.2 Workspace scaffold");
+  });
+
+  test("validate and doctor help explain their distinct checks", async () => {
+    const root = await workspace();
+
+    const validateIo = capture(root);
+    expect(await runCli(["validate", "--help"], validateIo.runtime)).toBe(0);
+    expect(validateIo.stdout()).toContain("Workstream contracts");
+    expect(validateIo.stdout()).toContain("No files are modified");
+
+    const doctorIo = capture(root);
+    expect(await runCli(["doctor", "--help"], doctorIo.runtime)).toBe(0);
+    expect(doctorIo.stdout()).toContain("readability/writability");
+    expect(doctorIo.stdout()).toContain("Hosted assistant entitlements");
+    expect(doctorIo.stdout()).toContain("No files are modified");
   });
 
   test.each(["setup", "validate", "doctor"] as const)(
@@ -126,6 +163,7 @@ describe("CLI surface", () => {
     const code = await runCli(["validate", root, "unexpected"], io.runtime);
     expect(code).toBe(2);
     expect(io.stderr()).toContain("too many arguments");
+    expect(io.stderr()).toContain("--help");
   });
 
   test("internal command errors exit 3 and stay valid JSON", async () => {

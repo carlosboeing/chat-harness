@@ -11,8 +11,11 @@ export class SetupStalePlanError extends Error {
 export class SetupVerificationError extends Error {
   constructor(message: string) { super(message); this.name = "SetupVerificationError"; }
 }
+export class SetupCancelledError extends Error {
+  constructor() { super("Setup cancelled before applying changes."); this.name = "SetupCancelledError"; }
+}
 export interface ApplySetupOptions {
-  beforeApply?: (plan: SetupPlan) => Promise<void> | void;
+  beforeApply?: (plan: SetupPlan) => Promise<boolean | void> | boolean | void;
   inspect?: typeof inspectWorkspace;
 }
 
@@ -70,7 +73,8 @@ async function domainVerification(plan: SetupPlan): Promise<Finding[]> {
 }
 
 export async function applySetupPlan(plan: SetupPlan, options: ApplySetupOptions = {}): Promise<void> {
-  await options.beforeApply?.(plan);
+  const proceed = await options.beforeApply?.(plan);
+  if (proceed === false) throw new SetupCancelledError();
   for (const operation of plan.operations) await applyOperation(plan.workspace, operation);
   const inspect = options.inspect ?? inspectWorkspace;
   const findings = [...coreVerification(await inspect(plan.workspace)), ...(await domainVerification(plan))];

@@ -1,6 +1,21 @@
 export const SPECIALIST_IDS = ["general", "research", "tech", "tax", "finance", "career", "shopping", "travel"] as const;
 export type SpecialistId = (typeof SPECIALIST_IDS)[number];
 
+export const SPECIALIST_SUMMARIES: Readonly<Record<SpecialistId, string>> = {
+  general: "Everyday projects and mixed topics",
+  research: "Evidence-heavy research and investigation",
+  tech: "Software engineering and technical research",
+  tax: "Tax research, records, and planning",
+  finance: "Financial analysis, investments, and planning",
+  career: "Career positioning, job searches, and opportunities",
+  shopping: "Product research and purchase decisions",
+  travel: "Trips, itineraries, bookings, and travel research",
+};
+
+export function specialistSummary(id: SpecialistId): string {
+  return SPECIALIST_SUMMARIES[id];
+}
+
 export function isSpecialistId(value: string): value is SpecialistId {
   return (SPECIALIST_IDS as readonly string[]).includes(value);
 }

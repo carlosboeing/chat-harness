@@ -6,13 +6,27 @@ A specialist is a **setup-time seed for `.chat-harness/WORKSPACE.md`**. It defin
 
 After setup, `WORKSPACE.md` is user-owned. There is no runtime specialist inheritance, composition, or template synchronization.
 
-## Choose a specialist
+## Choose what the Workspace is mainly for
+
+For most people, run setup from inside the Workspace and let the guided flow explain the choices:
+
+```bash
+chat-harness setup
+```
+
+Or choose directly:
+
+```bash
+chat-harness setup --specialist tech
+```
+
+The optional `[path]` argument is only needed when targeting another existing directory:
 
 ```bash
 chat-harness setup /path/to/project --specialist tech
 ```
 
-If `--specialist` is omitted, interactive setup asks and defaults to `general`; non-interactive setup uses `general`.
+If `--specialist` is omitted, interactive setup asks what the Workspace is mainly for and defaults to `general`; non-interactive setup uses `general`.
 
 | Specialist | Best fit | Emphasis |
 |---|---|---|
@@ -48,7 +62,18 @@ Setup does not silently overwrite an existing `WORKSPACE.md`; replacement requir
 
 ## Optional domain folders
 
-Specialists can also suggest a small domain folder layout, but those folders are not core architecture. Interactive setup defaults to no domain scaffolding; non-interactive setup requires `--scaffold-domain`.
+Specialists can also suggest a small domain folder layout, but those folders are not core architecture. Interactive setup **shows the exact suggested folders before asking** whether to create them. Non-interactive setup requires `--scaffold-domain`.
+
+| Specialist | Optional starter folders |
+|---|---|
+| `general` | none |
+| `research` | `Research/` |
+| `tech` | `Projects/` |
+| `tax` | `Tax/` |
+| `finance` | `Finance/` |
+| `career` | `Profile/`, `Opportunities/` |
+| `shopping` | `Research/`, `Purchases/` |
+| `travel` | `Trips/` |
 
 Domain scaffolding is additive only. Chat Harness does not rename, move, merge, fuzzy-match, or reorganize an existing corpus.
 
