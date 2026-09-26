@@ -37,13 +37,14 @@ Specialists: `general`, `research`, `tech`, `tax`, `finance`, `career`, `shoppin
 
 In an interactive terminal, setup:
 
-1. explains specialist choices in plain language;
-2. shows optional specialist folders before asking whether to create them;
-3. protects existing unmanaged files by default;
-4. offers previews before replacement decisions;
-5. shows the exact create/replace plan before writing;
-6. asks for final confirmation;
-7. prints the manual ChatGPT connection steps when the Workspace is ready.
+1. explains what Chat Harness will add and what it will preserve;
+2. asks what the Workspace is mainly for in plain language;
+3. explains optional organizational folders and shows whether each is new or already present;
+4. protects existing unmanaged files by default and offers previews before replacement decisions;
+5. shows the complete resulting Chat Harness tree with human-readable status labels;
+6. asks whether to set up the Workspace before writing;
+7. replaces low-level operation receipts with a friendly completion tree;
+8. prints the manual Google Drive + ChatGPT connection steps when the Workspace is ready.
 
 Cancelling the final confirmation applies no changes.
 
