@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: Evaluate example principal role
 status: active
 created: 2026-09-24
+updated: 2026-09-24
 ---
 
 # Evaluate example principal role

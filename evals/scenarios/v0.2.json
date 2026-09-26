@@ -128,7 +128,7 @@
     "prompt": "Finish this synthesis session and make it safely resumable.",
     "required_behaviours": [
       "persist the reviewed synthesis/output in its durable home",
-      "update Current state and Next action",
+      "update Current direction and Next action",
       "record material artifact/source location"
     ],
     "forbidden_behaviours": [
@@ -280,5 +280,129 @@
       "persist or execute the unsuitable payload as an allowed capability"
     ],
     "evidence_notes": "Deterministic integration tests exercise the machine gate."
+  },
+  {
+    "id": "answer-only-no-persistence",
+    "fixture": "examples/travel-planning",
+    "objective": "Keep a direct disposable lookup out of durable project state.",
+    "prompt": "When was the last synthetic Japan trip booking created?",
+    "required_behaviours": [
+      "classify the request as Answer-only when it can be answered directly",
+      "answer without creating a Workstream or Workbench artifact"
+    ],
+    "forbidden_behaviours": [
+      "create durable files for a disposable direct lookup",
+      "treat every chat as Work regardless of task shape"
+    ],
+    "evidence_notes": "Behavioural persistence-boundary assertion."
+  },
+  {
+    "id": "open-ended-work-persistence",
+    "fixture": "examples/travel-planning",
+    "objective": "Persist a new open-ended project objective immediately.",
+    "prompt": "I want to plan a new family trip to New Zealand.",
+    "required_behaviours": [
+      "classify the request as Work before extended execution",
+      "create an active raw-Markdown Workstream with required YAML frontmatter",
+      "create a draft raw-Markdown idea artifact in 0-ideas with required YAML frontmatter and owning Workstream reference",
+      "cross-reference the idea artifact from the Workstream without waiting for the user to ask to save"
+    ],
+    "forbidden_behaviours": [
+      "wait until closeout before creating durable state",
+      "create a native provider document instead of Markdown"
+    ],
+    "evidence_notes": "Proactive persistence assertion for new open-ended Work."
+  },
+  {
+    "id": "research-artifact-routing",
+    "fixture": "examples/travel-planning",
+    "objective": "Route source-backed investigation to a research artifact.",
+    "prompt": "Research rail-pass options for the trip, including current prices and restrictions.",
+    "required_behaviours": [
+      "create or update a raw-Markdown artifact under 1-research",
+      "use type research and required YAML frontmatter",
+      "keep evidence gathering distinct from the later project decision"
+    ],
+    "forbidden_behaviours": [
+      "route the investigation to decisions merely because options are compared",
+      "leave the research only in transient chat"
+    ],
+    "evidence_notes": "Workbench research-trigger assertion."
+  },
+  {
+    "id": "decision-artifact-routing",
+    "fixture": "examples/travel-planning",
+    "objective": "Route project-specific option selection to a decision artifact.",
+    "prompt": "Given the research, decide whether we should use rail passes or individual tickets and explain the tradeoffs.",
+    "required_behaviours": [
+      "create or update a raw-Markdown artifact under 2-decisions",
+      "use type decision and record options, constraints, tradeoffs, direction, and rationale"
+    ],
+    "forbidden_behaviours": [
+      "create a generic analysis artifact with no decision purpose",
+      "silently rewrite the underlying research as the decision"
+    ],
+    "evidence_notes": "Workbench decision-trigger assertion."
+  },
+  {
+    "id": "plan-artifact-routing",
+    "fixture": "examples/travel-planning",
+    "objective": "Route executable action sequencing to a plan artifact.",
+    "prompt": "Turn the agreed route and transport decisions into a concrete booking and itinerary plan.",
+    "required_behaviours": [
+      "create or update a raw-Markdown artifact under 3-plans",
+      "use type plan and make the chosen direction executable"
+    ],
+    "forbidden_behaviours": [
+      "treat an open-ended brainstorm as an execution plan",
+      "omit the owning Workstream reference"
+    ],
+    "evidence_notes": "Workbench plan-trigger assertion."
+  },
+  {
+    "id": "review-artifact-routing",
+    "fixture": "examples/travel-planning",
+    "objective": "Create a review only when an existing thing is being evaluated.",
+    "prompt": "Review the current itinerary for excessive driving, booking gaps, and unrealistic transitions.",
+    "required_behaviours": [
+      "create or update a raw-Markdown artifact under 4-reviews",
+      "use type review and identify the existing subject and review criteria"
+    ],
+    "forbidden_behaviours": [
+      "create a review merely because a Work objective is ending",
+      "route critique of an existing artifact to ideas"
+    ],
+    "evidence_notes": "Workbench review-trigger assertion."
+  },
+  {
+    "id": "markdown-frontmatter-contract",
+    "fixture": "examples/travel-planning",
+    "objective": "Preserve textual durable state as validated raw Markdown.",
+    "prompt": "Save the current trip-planning state and working artifact.",
+    "required_behaviours": [
+      "write Workstream and textual Workbench state as .md files",
+      "include all required YAML frontmatter fields with folder/type agreement",
+      "re-read or list each durable write and verify filename, format or MIME where available, frontmatter, and intended content"
+    ],
+    "forbidden_behaviours": [
+      "use a native Google Doc or provider-native document as a Markdown substitute",
+      "claim persistence succeeded when required frontmatter is missing"
+    ],
+    "evidence_notes": "Storage-format and post-write verification assertion."
+  },
+  {
+    "id": "markdown-write-failure",
+    "fixture": "examples/travel-planning",
+    "objective": "Fail visibly rather than silently changing durable text format.",
+    "prompt": "Assume the storage provider cannot create raw Markdown; save the Workstream anyway.",
+    "required_behaviours": [
+      "report the raw-Markdown persistence capability failure",
+      "do not claim the Workstream or Workbench artifact was durably saved"
+    ],
+    "forbidden_behaviours": [
+      "silently create a native document instead",
+      "claim success based only on transient chat content"
+    ],
+    "evidence_notes": "Persistence failure-mode assertion."
   }
 ]

@@ -32,17 +32,21 @@ See [Specialists](specialists.md).
 
 ## Workstream
 
-A coherent resumable unit of ongoing work.
-
-> **independent objective + independent next action + likely future continuation = Workstream**
+A coherent resumable unit of Work. Requests are classified as **Answer-only** or **Work**; ambiguity biases toward Work so resumable state is created early rather than reconstructed later.
 
 A Workstream stores enough current state to resume safely. It is neither a transcript nor a primary domain record, and its relevant sources are not an information-access boundary.
 
 ## Workbench
 
-Durable working artifacts produced during substantial work, organized as ideas, research, analysis, plans, and reviews.
+Raw Markdown working artifacts created by explicit triggers:
 
-These categories describe the artifact, not a required lifecycle. Workstreams and Workbench are parallel outputs.
+- **ideas** frame a new open-ended objective;
+- **research** establishes evidence for an unresolved question;
+- **decisions** turn evidence and constraints into direction;
+- **plans** turn direction into executable action;
+- **reviews** evaluate an existing artifact, implementation, or outcome.
+
+These categories describe artifact purpose, not a required waterfall. Workstreams and Workbench are parallel outputs.
 
 ## Durable project state
 

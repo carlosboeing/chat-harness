@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: Plan Japan trip
 status: active
 created: 2026-09-24
+updated: 2026-09-24
 ---
 
 # Plan Japan trip

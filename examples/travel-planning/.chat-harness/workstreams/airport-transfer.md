@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: Airport transfer
 status: parked
 created: 2026-09-24
+updated: 2026-09-24
 ---
 
 # Airport transfer

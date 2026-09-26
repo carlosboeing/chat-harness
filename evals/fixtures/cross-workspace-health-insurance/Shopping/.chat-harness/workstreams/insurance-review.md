@@ -1,6 +1,9 @@
 ---
+type: workstream
+title: Insurance review
 status: active
 created: 2026-09-24
+updated: 2026-09-24
 ---
 
 # Insurance review
