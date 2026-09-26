@@ -293,4 +293,16 @@ bun run validate:evals
 bun run test
 ```
 
+To test unreleased changes through the real standalone `chat-harness` command without cutting a release:
+
+```bash
+git pull
+bun run install:local
+chat-harness --version
+```
+
+The local installer builds the current checkout for your platform and installs it to `~/.local/bin/chat-harness` by default. Development builds report `<package-version>-<short-git-sha>` (plus `-dirty` when the checkout has uncommitted changes), so they are easy to distinguish from published releases. Override the destination with `CHAT_HARNESS_BIN_DIR`.
+
+The installer also checks which `chat-harness` executable wins on `PATH` and warns if the new local build is not the active command.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and release guidance.
