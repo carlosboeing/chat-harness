@@ -81,7 +81,7 @@ function dependencies(
     removeFile: (target) => { calls.removed.push(target); },
     npm: (args): NpmRunResult => {
       calls.npm.push(args);
-      return { status: 0, stdout: '"0.3.1"\n', stderr: "" };
+      return { status: 0, stdout: "0.3.1\n", stderr: "" };
     },
     packageVersion: () => "0.3.1",
     pathExists: () => false,
@@ -202,6 +202,30 @@ describe("lifecycle commands", () => {
     expect(fixture.calls.replaced).toEqual([]);
   });
 
+  test("npm update check uses scalar view output compatible with npm 12", async () => {
+    const npmInstall = installation({
+      channel: "npm",
+      executablePath: "/prefix/lib/node_modules/chat-harness/dist/npm/chat-harness.js",
+      packageRoot: "/prefix/lib/node_modules/chat-harness",
+      metadataPath: undefined,
+      provenance: "npm-global",
+    });
+    const fixture = dependencies(npmInstall, {
+      npm: (args) => {
+        fixture.calls.npm.push(args);
+        return { status: 0, stdout: "0.3.1\n", stderr: "" };
+      },
+    });
+
+    const result = await runUpdate("0.3.1", { check: true, json: true }, fixture.deps);
+
+    expect(result.result.state).toBe("current");
+    expect(result.result.latest).toBe("0.3.1");
+    expect(fixture.calls.npm).toEqual([
+      ["view", "chat-harness@latest", "version"],
+    ]);
+  });
+
   test("npm update delegates to the global npm owner and verifies the installed version", async () => {
     const npmInstall = installation({
       channel: "npm",
@@ -215,7 +239,7 @@ describe("lifecycle commands", () => {
 
     expect(result.result.state).toBe("updated");
     expect(fixture.calls.npm).toEqual([
-      ["view", "chat-harness@latest", "version", "--json"],
+      ["view", "chat-harness@latest", "version"],
       ["install", "-g", "chat-harness@latest"],
     ]);
   });
@@ -248,7 +272,7 @@ describe("lifecycle commands", () => {
         call += 1;
         fixture.calls.npm.push(args);
         return call === 1
-          ? { status: 0, stdout: '"0.3.1"\n', stderr: "" }
+          ? { status: 0, stdout: "0.3.1\n", stderr: "" }
           : { status: 7, stdout: "", stderr: "permission denied" };
       },
     });
