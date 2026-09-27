@@ -181,8 +181,11 @@ function pathMismatch(
 }
 
 function npmLatest(dependencies: LifecycleDependencies): string {
+  // npm 12 changed `npm view --json` so even a single scalar field is
+  // returned as an array. Querying one field without --json has a stable,
+  // unquoted scalar form across supported npm generations.
   const result = dependencies.npm(
-    ["view", "chat-harness@latest", "version", "--json"],
+    ["view", "chat-harness@latest", "version"],
     false,
   );
   if (result.status !== 0) {
@@ -192,18 +195,14 @@ function npmLatest(dependencies: LifecycleDependencies): string {
     );
   }
 
-  try {
-    const value = JSON.parse(result.stdout) as unknown;
-    if (typeof value !== "string" || !/^\d+\.\d+\.\d+$/.test(value)) {
-      throw new Error("invalid version response");
-    }
-    return value;
-  } catch {
+  const value = result.stdout.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(value)) {
     throw new Error(
       "npm returned an invalid latest version: " +
-      (result.stdout.trim() || "(empty output)"),
+      (value || "(empty output)"),
     );
   }
+  return value;
 }
 
 export function inspectCurrentInstallation(
