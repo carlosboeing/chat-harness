@@ -65,7 +65,6 @@ describe("setup reconciliation", () => {
       "_inbox",
       ".chat-harness",
       ".chat-harness/WORKSPACE.md",
-      ".chat-harness/README.md",
       ".chat-harness/source-policy.yaml",
       ".chat-harness/workstreams",
       ".chat-harness/workbench",
@@ -81,7 +80,6 @@ describe("setup reconciliation", () => {
     const tree = await snapshotTree(root);
     expect(tree["AGENTS.md"]).toContain("Chat Harness Project Instructions");
     expect(tree[".chat-harness"]).toBe("directory");
-    expect(tree[".chat-harness/README.md"]).toContain("# Workspace Map");
     expect(tree[".chat-harness/workstreams"]).toBe("directory");
     expect(tree[".chat-harness/source-policy.yaml"]).toContain("version: 1");
     expect(tree["Knowledge"]).toBeUndefined();
@@ -120,7 +118,11 @@ describe("setup reconciliation", () => {
     await mkdir(path.join(root, ".chat-harness"));
     await writeFile(
       path.join(root, ".chat-harness", "README.md"),
-      "custom workspace map\n",
+      "unmanaged legacy map\n",
+    );
+    await writeFile(
+      path.join(root, "PROJECT_INSTRUCTIONS.md"),
+      "legacy domain instructions\n",
     );
     const beforeDomain = await readFile(
       path.join(root, "Domain", "record.txt"),
@@ -135,7 +137,17 @@ describe("setup reconciliation", () => {
     );
     expect(
       await readFile(path.join(root, ".chat-harness", "README.md"), "utf8"),
-    ).toBe("custom workspace map\n");
+    ).toBe("unmanaged legacy map\n");
+    expect(
+      await readFile(path.join(root, "PROJECT_INSTRUCTIONS.md"), "utf8"),
+    ).toBe("legacy domain instructions\n");
+    expect(output.result.activation).toBe("migration_required");
+    expect(output.findings).toContainEqual(
+      expect.objectContaining({
+        code: "setup.legacy_instructions_migration_required",
+        severity: "warning",
+      }),
+    );
     expect(
       await readFile(path.join(root, "Domain", "record.txt"), "utf8"),
     ).toBe(beforeDomain);
@@ -144,7 +156,7 @@ describe("setup reconciliation", () => {
   test.each([
     "AGENTS.md",
     ".chat-harness",
-    ".chat-harness/README.md",
+    ".chat-harness/WORKSPACE.md",
     ".chat-harness/workstreams",
   ])("wrong-type collision at %s requires user action", async (managedPath) => {
     const root = await workspace();
@@ -155,7 +167,7 @@ describe("setup reconciliation", () => {
     } else if (managedPath.endsWith("workstreams")) {
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(target, "wrong type");
-    } else if (managedPath.endsWith("README.md")) {
+    } else if (managedPath.endsWith("WORKSPACE.md")) {
       await mkdir(path.dirname(target), { recursive: true });
       await mkdir(target);
     } else {
@@ -170,7 +182,7 @@ describe("setup reconciliation", () => {
   test.each([
     "AGENTS.md",
     ".chat-harness",
-    ".chat-harness/README.md",
+    ".chat-harness/WORKSPACE.md",
     ".chat-harness/workstreams",
   ])("symlink at managed path %s is never followed", async (managedPath) => {
     const root = await workspace();
