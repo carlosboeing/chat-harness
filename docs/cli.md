@@ -245,6 +245,6 @@ chat-harness uninstall --help
 
 The CLI configures the local Workspace; it cannot configure hosted AI-assistant Projects directly.
 
-For ChatGPT Projects, follow the [ChatGPT setup guide](hosts/chatgpt.md) to add the Workspace's Google Drive folder as a Project source and copy the complete `AGENTS.md` into Project Instructions.
+For ChatGPT Projects, follow the [ChatGPT setup guide](hosts/chatgpt.md). If setup reports `migration_required`, review and migrate the still-needed Workspace-specific behavior from the existing root project instructions before activating the host binding; otherwise add the Workspace folder as a Project source and copy the complete `AGENTS.md` into Project Instructions.
 
 See [Getting started](getting-started.md) for the complete beginner flow.
