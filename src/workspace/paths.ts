@@ -5,7 +5,6 @@ export const MANAGED_PATHS = [
   "_inbox",
   ".chat-harness",
   ".chat-harness/WORKSPACE.md",
-  ".chat-harness/README.md",
   ".chat-harness/source-policy.yaml",
   ".chat-harness/workstreams",
   ".chat-harness/workbench",
