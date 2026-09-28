@@ -72,6 +72,8 @@ A useful distinction is: **specialist = how this Workspace generally works; Proc
 
 A material durable update that makes interruption and recovery safe. An updated Workstream plus references to material artifacts normally supplies the checkpoint; there is no separate checkpoint database object.
 
+A checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact is not authoritative resume state.
+
 Checkpoint material changes rather than chat noise, and never persist private chain-of-thought.
 
 ## Artifact
