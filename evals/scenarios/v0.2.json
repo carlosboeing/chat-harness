@@ -382,6 +382,7 @@
     "required_behaviours": [
       "write Workstream and textual Workbench state as .md files",
       "include all required YAML frontmatter fields with folder/type agreement",
+      "include exactly one H1 matching the frontmatter title in each Workstream and Workbench artifact",
       "re-read or list each durable write and verify filename, format or MIME where available, frontmatter, and intended content"
     ],
     "forbidden_behaviours": [
@@ -404,5 +405,23 @@
       "claim success based only on transient chat content"
     ],
     "evidence_notes": "Persistence failure-mode assertion."
+  },
+  {
+    "id": "multi-turn-plan-reconciliation",
+    "fixture": "examples/travel-planning",
+    "objective": "Refine an existing executable plan across turns without fragmenting durable state.",
+    "prompt": "New evidence changes which transport option and booking sequence we should use. Update the existing plan and continue from the new direction.",
+    "required_behaviours": [
+      "update the existing same-purpose plan rather than create a parallel plan-like artifact",
+      "classify an experiment or benchmark protocol as a plan while keeping resulting evidence in research",
+      "reconcile the owning canonical Workstream in the same turn after the material plan change",
+      "re-read the canonical Workstream before handoff and ensure Current direction, relevant artifacts, blockers, and Next action match the latest durable state"
+    ],
+    "forbidden_behaviours": [
+      "treat a replacement Workstream in chat or temp as a completed checkpoint",
+      "leave the canonical Workstream pointing at an already-completed or stale Next action",
+      "create a duplicate research artifact whose primary durable purpose is the existing execution plan"
+    ],
+    "evidence_notes": "Regression scenario derived from the 2026-09-27 Research Workspace local-AI real-host test."
   }
 ]
