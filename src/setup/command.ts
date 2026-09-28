@@ -55,7 +55,7 @@ export async function runSetup(workspace: string, options: SetupCommandOptions, 
     state,
     operations,
     specialist,
-    activation: plan.legacyInstructions === "missing" ? "ready" : "migration_required",
+    activation: plan.legacyInstructions === "missing" ? "ready" as const : "migration_required" as const,
     ...(state === "changes_planned"
       ? { structure: buildSetupStructure(plan, "planned") }
       : state === "changes_applied" || state === "no_changes"
