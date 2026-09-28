@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AGENTS_TEMPLATE, WORKSTREAM_TEMPLATE } from "../../src/setup/templates.js";
+import { SPECIALIST_IDS, specialistTemplate } from "../../src/setup/specialists.js";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../..");
 describe("canonical templates",()=>{
@@ -10,6 +11,16 @@ describe("canonical templates",()=>{
     const source=await readFile(path.join(root,"templates","AGENTS.md"),"utf8");
     expect(source).toBe(AGENTS_TEMPLATE);
     expect(source.length).toBeLessThanOrEqual(7000);
+    const classify = source.indexOf("Classify each request as **Answer-only** or **Work**.");
+    const workspace = source.indexOf("After classification, read `.chat-harness/WORKSPACE.md`");
+    expect(classify).toBeGreaterThanOrEqual(0);
+    expect(workspace).toBeGreaterThan(classify);
+    expect(source).not.toContain(".chat-harness/README.md");
+  });
+  test("specialist seeds stay compact",()=>{
+    for(const id of SPECIALIST_IDS){
+      expect(specialistTemplate(id).length).toBeLessThanOrEqual(3500);
+    }
   });
   test("Workstream stays synchronized",async()=>{
     expect(await readFile(path.join(root,"templates","workstream.md"),"utf8")).toBe(WORKSTREAM_TEMPLATE);
