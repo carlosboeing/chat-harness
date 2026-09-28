@@ -9,7 +9,7 @@ describe("canonical templates",()=>{
   test("AGENTS stays synchronized and within Project Instructions budget",async()=>{
     const source=await readFile(path.join(root,"templates","AGENTS.md"),"utf8");
     expect(source).toBe(AGENTS_TEMPLATE);
-    expect(source.length).toBeLessThanOrEqual(7500);
+    expect(source.length).toBeLessThanOrEqual(7000);
   });
   test("Workstream stays synchronized",async()=>{
     expect(await readFile(path.join(root,"templates","workstream.md"),"utf8")).toBe(WORKSTREAM_TEMPLATE);
