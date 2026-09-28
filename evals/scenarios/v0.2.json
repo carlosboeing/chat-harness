@@ -5,7 +5,7 @@
     "objective": "Resume a multi-session trip-planning task from durable state after a new chat.",
     "prompt": "Continue planning the Japan trip from the durable project state.",
     "required_behaviours": [
-      "apply AGENTS / Project Instructions, then retrieve WORKSPACE.md and Workspace Map",
+      "classify from AGENTS / Project Instructions, then retrieve WORKSPACE.md before domain reasoning",
       "resume plan-japan-trip.md",
       "continue from the non-empty Next action rather than reconstructing from chat history"
     ],
@@ -144,11 +144,13 @@
     "required_behaviours": [
       "create only missing Chat Harness bootstrap/control paths",
       "preserve existing Career paths and bytes",
-      "be idempotent on rerun"
+      "be idempotent on rerun",
+      "preserve existing root project instructions and mark host activation as migration-required until Workspace-specific behavior is reviewed"
     ],
     "forbidden_behaviours": [
       "move Career into a framework taxonomy",
-      "rewrite user-authored Markdown because a template differs"
+      "rewrite user-authored Markdown because a template differs",
+      "tell the user to replace hosted Project Instructions immediately when legacy project instructions still require migration review"
     ],
     "evidence_notes": "Mechanism covered by setup tests; example demonstrates semantics."
   },
@@ -244,7 +246,7 @@
     "prompt": "New ChatGPT Project session: continue this Workspace.",
     "required_behaviours": [
       "apply the complete AGENTS.md Project Instructions and retrieve WORKSPACE.md",
-      "retrieve Workspace Map and relevant active/parked Workstream",
+      "retrieve the relevant active/parked Workstream and only the additional context needed",
       "resume from durable Next action"
     ],
     "forbidden_behaviours": [
@@ -423,5 +425,38 @@
       "create a duplicate research artifact whose primary durable purpose is the existing execution plan"
     ],
     "evidence_notes": "Regression scenario derived from the 2026-09-27 Research Workspace local-AI real-host test."
+  },
+  {
+    "id": "answer-only-workspace-invariants",
+    "fixture": "examples/job-opportunity",
+    "objective": "Apply Workspace-specific domain invariants to a direct disposable answer without creating durable Work state.",
+    "prompt": "Rewrite this existing career bullet for clarity without changing any factual claim.",
+    "required_behaviours": [
+      "classify the request as Answer-only when no durable multi-step objective is needed",
+      "retrieve and apply WORKSPACE.md before domain reasoning or responding",
+      "preserve the Career Workspace factual-integrity constraints"
+    ],
+    "forbidden_behaviours": [
+      "create a Workstream or Workbench artifact for the disposable rewrite",
+      "skip Workspace-specific behavior because the request is Answer-only",
+      "invent or strengthen an unsupported factual claim"
+    ],
+    "evidence_notes": "Regression assertion for classify-first then always-load-WORKSPACE startup semantics."
+  },
+  {
+    "id": "brownfield-host-activation-guard",
+    "fixture": "tests/setup",
+    "objective": "Install Chat Harness into a mature project without prematurely replacing its existing hosted domain behavior.",
+    "prompt": "Run setup in a workspace that already has root project instructions.",
+    "required_behaviours": [
+      "preserve the existing instruction file byte-for-byte",
+      "create or reconcile only Chat Harness-managed scaffold paths",
+      "report migration-required activation state while the legacy domain behavior still needs review"
+    ],
+    "forbidden_behaviours": [
+      "overwrite or semantically merge the existing domain instructions automatically",
+      "mark host activation ready before the Workspace-specific migration review"
+    ],
+    "evidence_notes": "Deterministic setup mechanism plus brownfield migration safety contract."
   }
 ]
