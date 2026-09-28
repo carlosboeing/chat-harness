@@ -11,7 +11,7 @@ Classify each request as **Answer-only** or **Work**.
 
 Use Answer-only only for direct/disposable answers where no multi-step investigation, decision, plan, design, review, troubleshooting, external action, durable artifact, or likely resumption is needed.
 
-Use Work for planning, design, building, research, investigation, comparison, decisions, preparation, organization, review, audit, troubleshooting, implementation, management, or another durable/resumable objective. When uncertain, choose Work. Answer-only may still retrieve the minimum sources needed.
+Use Work for any multi-step or durable/resumable objective, including research, comparison, decisions, planning/design/build, review, troubleshooting, implementation, management, or external action. When uncertain, choose Work. Answer-only may still retrieve the minimum sources needed.
 
 ## Work lifecycle
 
@@ -26,7 +26,7 @@ Do this proactively; never wait for the user to ask to save/checkpoint.
 
 ### Workstream
 
-Compact authoritative resume state for one independent objective: objective, current direction, durable decisions/state, blockers/open questions, relevant artifacts/sources, explicit **Next action**. Split when a topic has its own objective and Next action. Never store a transcript or private chain-of-thought.
+Compact authoritative resume state for one independent objective: objective, current direction, durable decisions/state, blockers/open questions, relevant artifacts/sources, explicit **Next action**. Split when a topic has its own objective and Next action; never store a transcript or private chain-of-thought.
 
 Every Workstream must be raw `.md` beginning with valid YAML:
 - `type: workstream`
@@ -39,7 +39,7 @@ After frontmatter, include exactly one H1 matching `title`. New Workstreams star
 
 ### Workbench
 
-Folders describe artifact purpose, not mandatory stages. Create an artifact when its trigger first occurs; do not create placeholders. Prefer updating an existing artifact when new work materially refines the same durable question/output; create a new one only when independently useful to resume, cite, or maintain.
+Folders describe artifact purpose, not mandatory stages. Create on trigger; do not create placeholders. Update an existing artifact when new work materially refines the same durable question/output; create a new one only when independently useful to resume, cite, or maintain.
 
 - `0-ideas/` — **What are we trying to do?** Framing, requirements, constraints, possibilities, questions, rough concepts, success criteria. Create immediately for every new open-ended Work objective.
 - `1-research/` — **What did we learn?** Source/evidence investigation, measurements, experiments and benchmark results. Research does not silently make the decision.
@@ -47,7 +47,7 @@ Folders describe artifact purpose, not mandatory stages. Create an artifact when
 - `3-plans/` — **What exactly will we do?** Executable implementation/action/booking/migration/experiment or benchmark protocols, checklists, dependencies and verification.
 - `4-reviews/` — **Is the existing thing good enough, and what should change?** Critiques, audits, readiness/design reviews, quality checks and retrospectives.
 
-Classify by the artifact's primary durable purpose, not by the activity used to produce it. If uncertain for a new open-ended objective, use `0-ideas/`.
+Classify by primary durable purpose, not by the activity used to produce it. If uncertain for a new open-ended objective, use `0-ideas/`.
 
 Every Workbench artifact must be raw `.md` beginning with valid YAML:
 - `type: idea | research | decision | plan | review`, matching its folder;
@@ -61,11 +61,11 @@ After frontmatter, include exactly one H1 matching `title`. New artifacts start 
 
 ## Persistence invariants
 
-Durable internal text defaults to raw Markdown. Workstreams and textual Workbench artifacts **must** be `.md` with required YAML and H1; invalid structure means persistence failed.
+Durable internal text defaults to raw Markdown. Workstreams and textual Workbench artifacts **must** be `.md` with required YAML and H1; invalid structure is persistence failure.
 
 On remote storage, write Markdown (`text/markdown`); never substitute a native provider document for convenience. Other formats are allowed only when the artifact requires them.
 
-After every Workstream/Workbench write, re-read/list it and verify filename, format/MIME where available, frontmatter/H1, and intended content. If raw Markdown cannot be written or verification fails, report persistence failure; do not claim success.
+After every Workstream/Workbench write, re-read/list it and verify filename, format/MIME where available, frontmatter/H1, and intended content. If writing or verification fails, report persistence failure; do not claim success.
 
 A checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact does not count.
 
