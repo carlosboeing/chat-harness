@@ -29,8 +29,7 @@ flowchart LR
     U["User"] --> H["AI assistant host<br/>models + conversations + native tools"]
     H --> A["AGENTS.md<br/>generic harness behavior"]
     A --> W["WORKSPACE.md<br/>Workspace-specific behavior"]
-    W --> M["Workspace Map<br/>durable state + source routing"]
-    M --> S["Workstreams / Procedures<br/>authoritative sources"]
+    W --> S["Workstreams / Procedures<br/>selective durable context"]
     S --> C["Domain corpus / external canon<br/>user-owned"]
     H --> N["Native capabilities<br/>web / files / apps / MCP"]
     N --> X{"Material gap?"}
@@ -115,18 +114,18 @@ Chat Harness does not search parent directories for a Workspace.
 │   │   ├── 3-plans/
 │   │   └── 4-reviews/
 │   ├── workstreams/
-│   ├── README.md
 │   ├── source-policy.yaml
 │   └── WORKSPACE.md
 └── AGENTS.md
 ```
 
-It is intentionally brownfield-safe: existing user-owned Workspace and domain content is preserved, a recognizably Chat Harness-managed `AGENTS.md` can be refreshed, and unknown same-name content is never silently adopted.
+It is intentionally brownfield-safe: existing user-owned Workspace and domain content is preserved, a recognizably Chat Harness-managed `AGENTS.md` can be refreshed, and unknown same-name content is never silently adopted. If setup detects an existing root project-instructions file from an earlier harness, it preserves it and marks host activation as migration-required until its still-needed Workspace-specific behavior has been reviewed.
 
 Creating the files is only the local half of setup. To use the Workspace with **ChatGPT Projects**:
 
 1. add the Workspace's Google Drive folder to the ChatGPT Project as a source;
-2. copy the **entire current `AGENTS.md`** into ChatGPT Project Instructions.
+2. if setup reported `migration_required`, first review/migrate the legacy Workspace-specific behavior into `.chat-harness/WORKSPACE.md`;
+3. copy the **entire current `AGENTS.md`** into ChatGPT Project Instructions.
 
 The CLI cannot perform those hosted UI steps for you. Follow the beginner-friendly [Getting Started guide](docs/getting-started.md) or the illustrated [ChatGPT setup guide](docs/hosts/chatgpt.md).
 
@@ -136,7 +135,6 @@ The scaffold separates generic harness behavior from Workspace-specific knowledg
 
 - **`AGENTS.md`** — generic Chat Harness operating behavior.
 - **`WORKSPACE.md`** — Workspace-specific role, judgement, evidence standards, boundaries, and approvals.
-- **Workspace Map** (`.chat-harness/README.md`) — human-readable routing to authoritative sources, important locations, Procedures, and Workstreams.
 - **Workstreams** — compact current resume state for continuing objectives.
 - **Workbench** — durable Markdown working artifacts: ideas, research, decisions, plans, and reviews.
 - **Procedures** — reusable methodology for recurring tasks.
@@ -149,9 +147,9 @@ AGENTS / Project Instructions
         ↓
 WORKSPACE.md
         ↓
-Workspace Map
+matching Workstream
         ↓
-matching Workstream / Procedure / authoritative sources
+relevant Procedure / authoritative sources
 ```
 
 The goal is not to load everything. It is to recover the right state and the minimum authoritative context needed for the task.
