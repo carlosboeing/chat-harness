@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Finding } from "../cli/result.js";
 import { expectedManagedKind, type ManagedPath } from "../workspace/paths.js";
 import type { ManagedPathObservation, PathKind, WorkspaceInspection } from "../workspace/inspect.js";
-import { AGENTS_TEMPLATE, isManagedAgentsSource, SOURCE_POLICY_TEMPLATE, WORKSPACE_MAP_TEMPLATE, workspaceTemplate } from "./templates.js";
+import { AGENTS_TEMPLATE, isManagedAgentsSource, SOURCE_POLICY_TEMPLATE, workspaceTemplate } from "./templates.js";
 import { specialistDomainPaths, type SpecialistId } from "./specialists.js";
 
 export type SetupOperationAction = "create_directory" | "create_file" | "replace_file";
@@ -32,7 +32,6 @@ export interface DomainPathObservation { path: string; kind: PathKind; }
 
 const FILE_TEMPLATES: Partial<Record<ManagedPath, string>> = {
   "AGENTS.md": AGENTS_TEMPLATE,
-  ".chat-harness/README.md": WORKSPACE_MAP_TEMPLATE,
   ".chat-harness/source-policy.yaml": SOURCE_POLICY_TEMPLATE,
 };
 
@@ -81,7 +80,6 @@ export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlan
         path: observation.path,
         reason: observation.path === "AGENTS.md" ? "Create canonical generic Chat Harness Project Instructions."
           : observation.path === ".chat-harness/WORKSPACE.md" ? `Seed Workspace instructions from the ${options.specialist} specialist.`
-          : observation.path === ".chat-harness/README.md" ? "Create the user-owned Workspace Map."
           : observation.path === ".chat-harness/source-policy.yaml" ? "Create the normal Source Policy scaffold."
           : "Create the v0.2 Chat Harness core scaffold.",
         ...(content !== undefined ? { content } : {}),
