@@ -122,11 +122,16 @@ export async function validateWorkbenchFile(
   }
 
   const structure = parseMarkdownStructure(parsed.body);
-  if (structure.h1.length !== 1) {
+  const title = parsed.frontmatter.title;
+  if (
+    structure.h1.length !== 1 ||
+    typeof title !== "string" ||
+    structure.h1[0] !== title
+  ) {
     findings.push(
       finding(
         "workbench.heading_invalid",
-        "Workbench artifact must contain exactly one H1 heading.",
+        "Workbench artifact must contain exactly one H1 heading matching frontmatter title.",
         file,
       ),
     );

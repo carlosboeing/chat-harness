@@ -48,4 +48,9 @@ describe("Workbench validation", () => {
     expect(findings.map((f)=>f.code)).toContain("workbench.frontmatter_invalid");
     expect(findings.map((f)=>f.message)).toContain("updated must not be earlier than created.");
   });
+  test("requires exactly one H1 matching the frontmatter title",async()=>{
+    const state=await fixture();
+    const file=await artifact(state,"1-research",document("research").replace("# Artifact","# Different"));
+    expect((await validateWorkbenchFile(file,{...state,expectedType:"research"})).map((f)=>f.code)).toContain("workbench.heading_invalid");
+  });
 });
