@@ -31,7 +31,7 @@ export interface SetupPlanOptions {
 }
 export interface DomainPathObservation { path: string; kind: PathKind; }
 
-const LEGACY_INSTRUCTIONS = ["PROJECT", "INSTRUCTIONS.md"].join("_");
+const LEGACY_INSTRUCTIONS = "PROJECT_INSTRUCTIONS.md";
 
 export async function inspectLegacyInstructions(workspace: string): Promise<PathKind> {
   const target = path.join(workspace, LEGACY_INSTRUCTIONS);
