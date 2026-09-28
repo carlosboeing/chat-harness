@@ -85,7 +85,7 @@ describe("doctor", () => {
 
     expect(output.result.state).toBe("healthy");
     expect(output.findings.filter((finding) => finding.code === "doctor.scaffold_missing").length)
-      .toBe(15);
+      .toBe(14);
   });
 
   test("detects standalone, npm, and development runtime modes", () => {
