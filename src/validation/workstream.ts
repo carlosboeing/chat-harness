@@ -79,11 +79,16 @@ export async function validateWorkstreamFile(
   }
 
   const structure = parseMarkdownStructure(parsed.body);
-  if (structure.h1.length !== 1) {
+  const title = parsed.frontmatter.title;
+  if (
+    structure.h1.length !== 1 ||
+    typeof title !== "string" ||
+    structure.h1[0] !== title
+  ) {
     findings.push(
       finding(
         "workstream.heading_invalid",
-        "Workstream must contain exactly one H1 heading.",
+        "Workstream must contain exactly one H1 heading matching frontmatter title.",
         file,
       ),
     );
