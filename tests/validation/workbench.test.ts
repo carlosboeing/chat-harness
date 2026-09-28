@@ -8,8 +8,9 @@ const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root)=>rm(root,{recursive:true,force:true}))); });
 async function fixture() {
   const root=await mkdtemp(path.join(os.tmpdir(),"chat-harness-wb-")); roots.push(root);
-  const workbenchRoot=path.join(root,"workbench"); const workstreamsRoot=path.join(root,"workstreams");
-  await mkdir(workbenchRoot); await mkdir(workstreamsRoot);
+  const harnessRoot=path.join(root,".chat-harness");
+  const workbenchRoot=path.join(harnessRoot,"workbench"); const workstreamsRoot=path.join(harnessRoot,"workstreams");
+  await mkdir(workbenchRoot,{recursive:true}); await mkdir(workstreamsRoot,{recursive:true});
   await writeFile(path.join(workstreamsRoot,"owner.md"),["---","type: workstream","title: Owner","status: active","created: 2026-09-24","updated: 2026-09-24","---","# Owner","","## Objective","","Own artifact.","","## Current direction","","Continue.","","## Next action","","Validate.",""].join("\n"));
   return {workbenchRoot,workstreamsRoot};
 }
