@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Finding } from "../cli/result.js";
 import { expectedManagedKind, type ManagedPath } from "../workspace/paths.js";
 import type { ManagedPathObservation, PathKind, WorkspaceInspection } from "../workspace/inspect.js";
-import { AGENTS_TEMPLATE, isManagedAgentsSource, SOURCE_POLICY_TEMPLATE, WORKSPACE_MAP_TEMPLATE, workspaceTemplate } from "./templates.js";
+import { AGENTS_TEMPLATE, isManagedAgentsSource, SOURCE_POLICY_TEMPLATE, workspaceTemplate } from "./templates.js";
 import { specialistDomainPaths, type SpecialistId } from "./specialists.js";
 
 export type SetupOperationAction = "create_directory" | "create_file" | "replace_file";
@@ -21,6 +21,7 @@ export interface SetupPlan {
   snapshot: WorkspaceInspection;
   options: Readonly<SetupPlanOptions>;
   domain: ReadonlyArray<DomainPathObservation>;
+  legacyInstructions: PathKind;
 }
 export interface SetupPlanOptions {
   specialist: SpecialistId;
@@ -30,9 +31,21 @@ export interface SetupPlanOptions {
 }
 export interface DomainPathObservation { path: string; kind: PathKind; }
 
+const LEGACY_INSTRUCTIONS = "PROJECT_INSTRUCTIONS.md";
+
+export async function inspectLegacyInstructions(workspace: string): Promise<PathKind> {
+  const target = path.join(workspace, LEGACY_INSTRUCTIONS);
+  try {
+    const info = await lstat(target);
+    return info.isSymbolicLink() ? "symlink" : info.isDirectory() ? "directory" : info.isFile() ? "file" : "other";
+  } catch (error) {
+    if (error instanceof Error && "code" in error && ["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return "missing";
+    throw error;
+  }
+}
+
 const FILE_TEMPLATES: Partial<Record<ManagedPath, string>> = {
   "AGENTS.md": AGENTS_TEMPLATE,
-  ".chat-harness/README.md": WORKSPACE_MAP_TEMPLATE,
   ".chat-harness/source-policy.yaml": SOURCE_POLICY_TEMPLATE,
 };
 
@@ -68,9 +81,24 @@ export async function inspectDomainScaffold(workspace: string, specialist: Speci
   return observations;
 }
 
-export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlanOptions, domain: readonly DomainPathObservation[] = []): SetupPlan {
+export function buildSetupPlan(
+  snapshot: WorkspaceInspection,
+  options: SetupPlanOptions,
+  domain: readonly DomainPathObservation[] = [],
+  legacyInstructions: PathKind = "missing",
+): SetupPlan {
   const findings: Finding[] = [];
   const operations: SetupOperation[] = [];
+
+  if (legacyInstructions !== "missing") {
+    findings.push({
+      code: "setup.legacy_instructions_migration_required",
+      severity: "warning",
+      message: "Existing root project instructions were detected and preserved; host activation should wait for migration review.",
+      location: LEGACY_INSTRUCTIONS,
+      remediation: "Review and migrate required domain behavior into .chat-harness/WORKSPACE.md before host activation.",
+    });
+  }
 
   for (const observation of snapshot.observations) {
     const expected = expectedManagedKind(observation.path);
@@ -81,7 +109,6 @@ export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlan
         path: observation.path,
         reason: observation.path === "AGENTS.md" ? "Create canonical generic Chat Harness Project Instructions."
           : observation.path === ".chat-harness/WORKSPACE.md" ? `Seed Workspace instructions from the ${options.specialist} specialist.`
-          : observation.path === ".chat-harness/README.md" ? "Create the user-owned Workspace Map."
           : observation.path === ".chat-harness/source-policy.yaml" ? "Create the normal Source Policy scaffold."
           : "Create the v0.2 Chat Harness core scaffold.",
         ...(content !== undefined ? { content } : {}),
@@ -127,5 +154,6 @@ export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlan
     snapshot,
     options: Object.freeze({ ...options }),
     domain: Object.freeze([...domain]),
+    legacyInstructions,
   });
 }

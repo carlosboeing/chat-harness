@@ -22,7 +22,7 @@ describe("v0.2 workspace validation", () => {
   test("requires the complete v0.2 scaffold", async () => {
     const root = await workspace();
     const findings = await validateWorkspace(root);
-    expect(findings.filter((finding) => finding.code === "workspace.required_missing").length).toBe(15);
+    expect(findings.filter((finding) => finding.code === "workspace.required_missing").length).toBe(14);
   });
 
   test("ignores obsolete v0.1 lifecycle content", async () => {

@@ -68,6 +68,6 @@ describe("workspace validation", () => {
   test("missing scaffolding is reported, not repaired", async () => {
     const root = await workspace();
     const findings = await validateWorkspace(root);
-    expect(findings.filter((finding) => finding.code === "workspace.required_missing").length).toBe(15);
+    expect(findings.filter((finding) => finding.code === "workspace.required_missing").length).toBe(14);
   });
 });

@@ -4,7 +4,7 @@ Specialists give a new Workspace useful domain-specific guidance without turning
 
 A specialist is a **setup-time seed for `.chat-harness/WORKSPACE.md`**. It defines the kind of judgement the assistant should apply, the strongest evidence for the domain, important failure modes and boundaries, and what good output should look like.
 
-After setup, `WORKSPACE.md` is user-owned. There is no runtime specialist inheritance, composition, or template synchronization.
+After setup, `WORKSPACE.md` is user-owned. Keep it compact: high-leverage domain role, invariants, evidence/currentness rules, approval boundaries, and a few routing pointers. Detailed recurring methodology belongs in Procedures/Guides and should be retrieved when triggered. There is no runtime specialist inheritance, composition, or template synchronization.
 
 ## Choose what the Workspace is mainly for
 
@@ -56,7 +56,7 @@ Selecting a specialist does not install Procedures or create a separate agent.
 
 The generated `WORKSPACE.md` is meant to evolve. Add the domain invariants, preferred evidence sources, approval boundaries, output conventions, and judgement rules that are specific to the real Workspace.
 
-Keep generic Chat Harness behavior in `AGENTS.md`. For ChatGPT, copy the complete `AGENTS.md` into Project Instructions and leave specialist/domain guidance in `WORKSPACE.md`.
+Keep generic Chat Harness behavior in `AGENTS.md`. For ChatGPT, copy the complete `AGENTS.md` into Project Instructions and leave specialist/domain guidance in `WORKSPACE.md`. Avoid duplicating the same behavioral rule across both files.
 
 Setup does not silently overwrite an existing `WORKSPACE.md`; replacement requires an explicit choice.
 

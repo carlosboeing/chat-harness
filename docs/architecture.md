@@ -36,7 +36,6 @@ A Workspace is an ownership and durable-state boundary:
 ├── _inbox/
 └── .chat-harness/
     ├── WORKSPACE.md
-    ├── README.md
     ├── source-policy.yaml
     ├── workstreams/
     ├── workbench/
@@ -69,8 +68,8 @@ Classify each request as **Answer-only** or **Work**. Answer-only is reserved fo
 
 For every Work objective:
 
-1. apply `AGENTS.md` and load `WORKSPACE.md` plus the Workspace Map;
-2. inspect relevant active or parked Workstreams before reconstructing state from chat history or model memory;
+1. classify the request from `AGENTS.md`, then load `WORKSPACE.md` before domain reasoning;
+2. for Work, inspect relevant active or parked Workstreams before reconstructing state from chat history or model memory;
 3. resume matching state from its Next action, or create the Workstream immediately;
 4. create or update each Workbench artifact whose trigger applies, preferring the existing artifact when it owns the same durable question/output;
 5. retrieve the minimum relevant Procedures and authoritative context, broadening when material;
@@ -82,7 +81,7 @@ A Workstream is a context entry point, not an information boundary.
 
 ## Source ownership
 
-`.chat-harness/README.md` is the human-readable **Workspace Map**. It records routing and ownership, not machine configuration.
+`WORKSPACE.md` carries only compact, high-value routing pointers needed across the domain. A matching Workstream should point directly to the sources/artifacts needed to resume its objective; broader domain maps remain user-owned and are retrieved only when useful.
 
 A Workstream is the durable resume point for one continuing objective. Domain facts remain authoritative in the record that owns them. Search indexes, assistant memory, summaries, and derived reports do not become canon merely because they are convenient.
 

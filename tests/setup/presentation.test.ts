@@ -33,7 +33,6 @@ describe("setup presentation", () => {
       { path: ".chat-harness", kind: "directory", status: "new" },
       { path: "_inbox", kind: "directory", status: "new" },
       { path: ".chat-harness/WORKSPACE.md", kind: "file", status: "new" },
-      { path: ".chat-harness/README.md", kind: "file", status: "new" },
       { path: ".chat-harness/workstreams", kind: "directory", status: "new" },
       { path: ".chat-harness/temp", kind: "directory", status: "new" },
       { path: ".chat-harness/procedures", kind: "directory", status: "new" },
@@ -59,15 +58,13 @@ describe("setup presentation", () => {
     const temp = lines.findIndex((line) => line.includes("temp/"));
     const workbench = lines.findIndex((line) => line.includes("workbench/"));
     const workstreams = lines.findIndex((line) => line.includes("workstreams/"));
-    const readme = lines.findIndex((line) => line.includes("README.md"));
     const sourcePolicy = lines.findIndex((line) => line.includes("source-policy.yaml"));
     const workspaceFile = lines.findIndex((line) => line.includes("WORKSPACE.md"));
 
     expect(procedures).toBeLessThan(temp);
     expect(temp).toBeLessThan(workbench);
     expect(workbench).toBeLessThan(workstreams);
-    expect(workstreams).toBeLessThan(readme);
-    expect(readme).toBeLessThan(sourcePolicy);
+    expect(workstreams).toBeLessThan(sourcePolicy);
     expect(sourcePolicy).toBeLessThan(workspaceFile);
 
     const chatHarnessLine = lines.find((line) => line.includes(".chat-harness/"));

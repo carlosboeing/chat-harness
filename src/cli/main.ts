@@ -87,6 +87,16 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
           beforeApply: async (plan) => {
             if (!runtime.isTTY || !runtime.nativeTerminal || context.options.json) return;
 
+            if (plan.legacyInstructions !== "missing") {
+              note(
+                [
+                  "Existing root project instructions were detected and will not be changed.",
+                  "Chat Harness can install safely, but wait to activate the host binding until the Workspace-specific behavior has been reviewed and migrated into .chat-harness/WORKSPACE.md.",
+                ].join("\n"),
+                "Brownfield Workspace",
+              );
+            }
+
             note(
               [
                 "Here's how the Chat Harness part of this Workspace will look after setup:",
@@ -232,7 +242,9 @@ Behaviour:
   mainly for; non-interactive setup uses general.
 
   --json disables interactive prompts. --scaffold-domain creates only the
-  selected specialist's optional starter folders.
+  selected specialist's optional starter folders. Existing root project
+  instructions are preserved and pause host activation until their
+  Workspace-specific behavior has been reviewed/migrated.
 
 Examples:
   chat-harness setup

@@ -102,7 +102,7 @@ chat-harness setup --specialist travel
 
 The guided setup first explains what Chat Harness will do, then asks what the Workspace is mainly for. Optional organizational folders are explained before you choose them.
 
-Before writing anything, setup shows the complete Chat Harness folder/file tree with labels such as `new`, `updated`, or `already there`, then asks for approval. Existing unrelated content is left unchanged.
+Before writing anything, setup shows the complete Chat Harness folder/file tree with labels such as `new`, `updated`, or `already there`, then asks for approval. Existing unrelated content is left unchanged. If an existing root project-instructions file is detected, setup preserves it and marks host activation as migration-required so you can review/migrate its still-needed Workspace-specific behavior before changing the hosted Project Instructions.
 
 ## 4. Understand what was created
 
@@ -121,7 +121,6 @@ Your folder/
 │   │   ├── 3-plans/
 │   │   └── 4-reviews/
 │   ├── workstreams/
-│   ├── README.md
 │   ├── source-policy.yaml
 │   └── WORKSPACE.md
 └── AGENTS.md
@@ -141,10 +140,11 @@ Creating the files does not automatically configure ChatGPT. There are two manua
 ### Step A — add the Google Drive folder as a Project source
 
 1. Open ChatGPT and create or open the Project you want to use.
-2. Find the Project's **Sources** area.
-3. Choose **Add source** or the equivalent option.
-4. Paste the link to the Google Drive folder containing this Workspace.
-5. If ChatGPT asks you to connect Google Drive, sign in to the Google account that can access the folder and approve the requested access.
+2. If setup reported `migration_required`, finish the Workspace-specific instruction migration first.
+3. Find the Project's **Sources** area.
+4. Choose **Add source** or the equivalent option.
+5. Paste the link to the Google Drive folder containing this Workspace.
+6. If ChatGPT asks you to connect Google Drive, sign in to the Google account that can access the folder and approve the requested access.
 
 OpenAI currently documents Google Drive **files and folders** as supported Project source links. Availability can still depend on your plan, region, workspace settings, and Google permissions.
 

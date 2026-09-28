@@ -18,17 +18,13 @@ The canonical portable source of generic Chat Harness behavior. A host that can 
 
 The single Workspace-specific instruction extension. It captures domain role, judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
 
-It is seeded during setup and then user-owned.
+It is seeded during setup and then user-owned. Keep it compact: domain role, high-value invariants, approvals, and only the routing pointers that are useful across the Workspace.
 
 ## Specialist
 
 A setup-time seed for `WORKSPACE.md`. A specialist captures durable domain judgement and evidence standards; it is not a separate agent, runtime mode, inheritance hierarchy, or Procedure package.
 
 See [Specialists](specialists.md).
-
-## Workspace Map
-
-`.chat-harness/README.md`, a human-readable orientation and source-routing document. It says where authoritative information lives and points to important Workstreams and Procedures. It is not a Workspace manifest or machine routing registry.
 
 ## Workstream
 
