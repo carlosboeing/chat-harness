@@ -4,7 +4,7 @@ title: Review title
 status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-workstream: ../../workstreams/YYYY-MM-DD-topic.md
+workstream: .chat-harness/workstreams/YYYY-MM-DD-topic.md
 ---
 
 # Review title
