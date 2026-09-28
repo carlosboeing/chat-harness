@@ -22,7 +22,7 @@ describe("canonical templates",()=>{
       expect(source).toContain("status: draft");
       expect(source).toContain("created: YYYY-MM-DD");
       expect(source).toContain("updated: YYYY-MM-DD");
-      expect(source).toContain("workstream: ../../workstreams/");
+      expect(source).toContain("workstream: .chat-harness/workstreams/");
     }
   });
 });
