@@ -21,6 +21,7 @@ export interface SetupPlan {
   snapshot: WorkspaceInspection;
   options: Readonly<SetupPlanOptions>;
   domain: ReadonlyArray<DomainPathObservation>;
+  legacyInstructions: PathKind;
 }
 export interface SetupPlanOptions {
   specialist: SpecialistId;
@@ -29,6 +30,19 @@ export interface SetupPlanOptions {
   replaceWorkspace: boolean;
 }
 export interface DomainPathObservation { path: string; kind: PathKind; }
+
+const LEGACY_INSTRUCTIONS = ["PROJECT", "INSTRUCTIONS.md"].join("_");
+
+export async function inspectLegacyInstructions(workspace: string): Promise<PathKind> {
+  const target = path.join(workspace, LEGACY_INSTRUCTIONS);
+  try {
+    const info = await lstat(target);
+    return info.isSymbolicLink() ? "symlink" : info.isDirectory() ? "directory" : info.isFile() ? "file" : "other";
+  } catch (error) {
+    if (error instanceof Error && "code" in error && ["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return "missing";
+    throw error;
+  }
+}
 
 const FILE_TEMPLATES: Partial<Record<ManagedPath, string>> = {
   "AGENTS.md": AGENTS_TEMPLATE,
@@ -67,9 +81,24 @@ export async function inspectDomainScaffold(workspace: string, specialist: Speci
   return observations;
 }
 
-export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlanOptions, domain: readonly DomainPathObservation[] = []): SetupPlan {
+export function buildSetupPlan(
+  snapshot: WorkspaceInspection,
+  options: SetupPlanOptions,
+  domain: readonly DomainPathObservation[] = [],
+  legacyInstructions: PathKind = "missing",
+): SetupPlan {
   const findings: Finding[] = [];
   const operations: SetupOperation[] = [];
+
+  if (legacyInstructions !== "missing") {
+    findings.push({
+      code: "setup.legacy_instructions_migration_required",
+      severity: "warning",
+      message: "Existing root project instructions were detected and preserved; host activation should wait for migration review.",
+      location: LEGACY_INSTRUCTIONS,
+      remediation: "Review and migrate required domain behavior into .chat-harness/WORKSPACE.md before host activation.",
+    });
+  }
 
   for (const observation of snapshot.observations) {
     const expected = expectedManagedKind(observation.path);
@@ -125,5 +154,6 @@ export function buildSetupPlan(snapshot: WorkspaceInspection, options: SetupPlan
     snapshot,
     options: Object.freeze({ ...options }),
     domain: Object.freeze([...domain]),
+    legacyInstructions,
   });
 }
