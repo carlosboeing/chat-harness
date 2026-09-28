@@ -46,6 +46,18 @@ describe("Workbench validation", () => {
     );
     expect(await validateWorkbenchFile(workspaceRelative,{...state,expectedType:"research"})).toEqual([]);
   });
+  test("rejects Workspace-relative Workstream references outside workstreams",async()=>{
+    const state=await fixture();
+    const file=await artifact(
+      state,
+      "1-research",
+      document("research").replace(
+        "../../workstreams/owner.md",
+        ".chat-harness/workstreams/../outside.md",
+      ),
+    );
+    expect((await validateWorkbenchFile(file,{...state,expectedType:"research"})).map((f)=>f.code)).toContain("workbench.workstream_invalid");
+  });
   test("enforces folder/type and owning Workstream",async()=>{
     const state=await fixture(); const file=await artifact(state,"1-research",document("decision").replace("owner.md","missing.md"));
     const findings=await validateWorkbenchFile(file,{...state,expectedType:"research"});
