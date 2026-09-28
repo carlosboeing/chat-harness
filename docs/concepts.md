@@ -48,6 +48,8 @@ Raw Markdown working artifacts created by explicit triggers:
 
 These categories describe artifact purpose, not a required waterfall. Workstreams and Workbench are parallel outputs.
 
+Workbench `workstream:` backlinks canonically use Workspace-relative paths such as `.chat-harness/workstreams/YYYY-MM-DD-topic.md`. The validator also accepts the earlier artifact-relative `../../workstreams/...` form for backward compatibility.
+
 ## Durable project state
 
 Explicit inspectable state outside transient conversation history: objective, current direction, material decisions, dependencies, source/artifact references, blockers, and next action. This is more precise than calling the system “memory.”
