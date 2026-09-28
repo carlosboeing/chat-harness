@@ -28,7 +28,10 @@ function finding(code: string, message: string, location: string): Finding {
 }
 
 function referencedPath(root: string, file: string, raw: string): string | null {
-  const resolved = path.resolve(path.dirname(file), raw);
+  const workspaceRoot = path.dirname(path.dirname(root));
+  const resolved = raw.startsWith(".chat-harness/")
+    ? path.resolve(workspaceRoot, raw)
+    : path.resolve(path.dirname(file), raw);
   const relative = path.relative(root, resolved);
   if (
     relative === "" ||
