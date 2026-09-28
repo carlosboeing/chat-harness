@@ -70,7 +70,6 @@ describe("v0.2 workspace setup", () => {
     for (const relative of [
       "AGENTS.md",
       ".chat-harness/WORKSPACE.md",
-      ".chat-harness/README.md",
       ".chat-harness/source-policy.yaml",
     ]) {
       expect(await kind(path.join(root, relative))).toBe("file");
@@ -91,12 +90,8 @@ describe("v0.2 workspace setup", () => {
     expect(specialist).toContain("operability");
     expect(specialist).toContain("security");
     expect(specialist).toContain("debuggability");
-
-    const map = await readFile(path.join(root, ".chat-harness", "README.md"), "utf8");
-    expect(map).toContain("Workspace Map");
-    expect(map).toContain("WORKSPACE.md");
-    expect(map).toContain("workbench/");
-    expect(map).toContain("procedures/");
+    expect(specialist).toContain("harness/scaffold");
+    expect(specialist).toContain("do not attribute harness gains automatically");
 
     expect(await kind(path.join(root, "Knowledge"))).toBe("missing");
     expect(await kind(path.join(root, "Research"))).toBe("missing");
