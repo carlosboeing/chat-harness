@@ -142,9 +142,9 @@ Creating the files does not automatically configure ChatGPT. There are two manua
 1. Open ChatGPT and create or open the Project you want to use.
 2. If setup reported `migration_required`, finish the Workspace-specific instruction migration first.
 3. Find the Project's **Sources** area.
-3. Choose **Add source** or the equivalent option.
-4. Paste the link to the Google Drive folder containing this Workspace.
-5. If ChatGPT asks you to connect Google Drive, sign in to the Google account that can access the folder and approve the requested access.
+4. Choose **Add source** or the equivalent option.
+5. Paste the link to the Google Drive folder containing this Workspace.
+6. If ChatGPT asks you to connect Google Drive, sign in to the Google account that can access the folder and approve the requested access.
 
 OpenAI currently documents Google Drive **files and folders** as supported Project source links. Availability can still depend on your plan, region, workspace settings, and Google permissions.
 
