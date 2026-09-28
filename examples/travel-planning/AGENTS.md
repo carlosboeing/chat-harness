@@ -5,13 +5,13 @@ Canonical generic Project Instructions. Copy this file whole into ChatGPT Projec
 
 ## Startup and classification
 
-Before Work, read `.chat-harness/WORKSPACE.md`, then `.chat-harness/README.md`.
-
 Classify each request as **Answer-only** or **Work**.
 
 Use Answer-only only for direct/disposable answers where no multi-step investigation, decision, plan, design, review, troubleshooting, external action, durable artifact, or likely resumption is needed.
 
-Use Work for any multi-step or durable/resumable objective, including research, comparison, decisions, planning/design/build, review, troubleshooting, implementation, management, or external action. When uncertain, choose Work. Answer-only may still retrieve the minimum sources needed.
+Use Work for any multi-step or durable/resumable objective, including research, comparison, decisions, planning/design/build, review, troubleshooting, implementation, management, or external action. When uncertain, choose Work.
+
+After classification, read `.chat-harness/WORKSPACE.md` before domain reasoning or responding. Answer-only may retrieve only the minimum sources needed. For Work, follow the Work lifecycle below and retrieve additional Procedures and authoritative context progressively as needed.
 
 ## Work lifecycle
 
