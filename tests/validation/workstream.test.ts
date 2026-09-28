@@ -40,8 +40,14 @@ describe("Workstream validation", () => {
     const backwards=path.join(dir,"backwards.md"); await writeFile(backwards,document("active").replace("updated: 2026-09-24","updated: 2026-09-23"));
     expect((await validateWorkstreamFile(backwards,{workstreamsRoot:dir})).map((f)=>f.message)).toContain("updated must not be earlier than created.");
   });
-  test("requires exactly one real H1", async () => {
-    const dir=await root(); const file=path.join(dir,"item.md"); await writeFile(file,document("active")+"\n# Second\n");
-    expect((await validateWorkstreamFile(file,{workstreamsRoot:dir})).map((f)=>f.code)).toContain("workstream.heading_invalid");
+  test("requires exactly one H1 matching the frontmatter title", async () => {
+    const dir=await root();
+    const extra=path.join(dir,"extra.md");
+    await writeFile(extra,document("active")+"\n# Second\n");
+    expect((await validateWorkstreamFile(extra,{workstreamsRoot:dir})).map((f)=>f.code)).toContain("workstream.heading_invalid");
+
+    const mismatch=path.join(dir,"mismatch.md");
+    await writeFile(mismatch,document("active").replace("# Workstream","# Different"));
+    expect((await validateWorkstreamFile(mismatch,{workstreamsRoot:dir})).map((f)=>f.code)).toContain("workstream.heading_invalid");
   });
 });
