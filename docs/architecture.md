@@ -72,11 +72,11 @@ For every Work objective:
 1. apply `AGENTS.md` and load `WORKSPACE.md` plus the Workspace Map;
 2. inspect relevant active or parked Workstreams before reconstructing state from chat history or model memory;
 3. resume matching state from its Next action, or create the Workstream immediately;
-4. create/resume each Workbench artifact whose trigger applies;
+4. create or update each Workbench artifact whose trigger applies, preferring the existing artifact when it owns the same durable question/output;
 5. retrieve the minimum relevant Procedures and authoritative context, broadening when material;
 6. reverify volatile facts and use the simplest sufficient authorized capability;
 7. verify results and every durable write;
-8. checkpoint material changes and reconcile durable state before handoff.
+8. after material artifact/state changes, reconcile and re-read the canonical Workstream before handoff.
 
 A Workstream is a context entry point, not an information boundary.
 
