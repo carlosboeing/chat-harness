@@ -105,7 +105,7 @@ For example:
 
 > Help me plan our family trip to Japan. Check whether this continues any existing Workspace work before starting a new plan.
 
-For substantial work, the Project Instructions direct ChatGPT to retrieve `WORKSPACE.md`, the Workspace Map, relevant Workstreams, Procedures, and authoritative sources selectively.
+After classification, the Project Instructions direct ChatGPT to retrieve `WORKSPACE.md`; for Work, it then resumes the relevant Workstream and retrieves Procedures and authoritative sources selectively.
 
 ## When Chat Harness updates AGENTS.md
 
@@ -141,7 +141,7 @@ Normal research and retrieval may proceed when safe and authorized. Consequentia
 The ChatGPT binding remains **documented but unverified** until a real host scenario demonstrates that:
 
 - the complete `AGENTS.md` binding materially affects behavior;
-- Workspace Map and Workstream recovery work;
+- WORKSPACE and Workstream recovery work;
 - a fresh-session continuation resumes from the current Next action;
 - Source Policy/transparency behavior matches the documented contract;
 - durable closeout state is persisted.
