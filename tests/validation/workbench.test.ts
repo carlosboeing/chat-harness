@@ -29,6 +29,22 @@ describe("Workbench validation", () => {
     const state=await fixture(); const file=await artifact(state,"1-research",document("research",status));
     expect(await validateWorkbenchFile(file,{...state,expectedType:"research"})).toEqual([]);
   });
+  test("accepts artifact-relative and workspace-relative Workstream references",async()=>{
+    const state=await fixture();
+    const artifactRelative=await artifact(state,"1-research",document("research"),"artifact-relative.md");
+    expect(await validateWorkbenchFile(artifactRelative,{...state,expectedType:"research"})).toEqual([]);
+
+    const workspaceRelative=await artifact(
+      state,
+      "1-research",
+      document("research").replace(
+        "../../workstreams/owner.md",
+        ".chat-harness/workstreams/owner.md",
+      ),
+      "workspace-relative.md",
+    );
+    expect(await validateWorkbenchFile(workspaceRelative,{...state,expectedType:"research"})).toEqual([]);
+  });
   test("enforces folder/type and owning Workstream",async()=>{
     const state=await fixture(); const file=await artifact(state,"1-research",document("decision").replace("owner.md","missing.md"));
     const findings=await validateWorkbenchFile(file,{...state,expectedType:"research"});
