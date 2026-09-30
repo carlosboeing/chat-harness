@@ -82,7 +82,7 @@ chat-harness uninstall
 
 ## Quick start
 
-The normal workflow is to run Chat Harness **from inside the folder you want to use as a Workspace**. For the current ChatGPT reference setup, use a folder stored in Google Drive so ChatGPT can access the same up-to-date files as a Project source:
+The normal workflow is to run Chat Harness **from inside the folder you want to use as a Workspace**. For the current ChatGPT reference setup, use a folder stored in Google Drive so ChatGPT can access the Workspace through Project sources and connected Drive tooling:
 
 ```bash
 cd /path/to/your/project

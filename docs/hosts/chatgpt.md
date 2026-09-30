@@ -57,6 +57,8 @@ Then in ChatGPT:
 
 OpenAI's current Projects documentation describes this flow for Google Drive file and folder links. It specifically documents adding app links from a private Project.
 
+Project-source freshness is distinct from live connected-app retrieval. In a 2026-09-30 real-host smoke test, the Drive folder attached as a Project source retained stale indexed content until **Sync** was run, while the Google Drive connector could fetch the current file directly. Host behavior can vary, so when current Workspace or control-plane state matters, prefer a live connector read when available or refresh the Project source first.
+
 If you cannot see an Add source option or Google Drive cannot be connected, check your ChatGPT plan/workspace settings and Google permissions before changing the Chat Harness Workspace.
 
 ## 3. Add the Chat Harness instructions
@@ -95,7 +97,8 @@ If ChatGPT cannot retrieve the file:
 - confirm the correct Google Drive folder link was added;
 - confirm the connected Google account can access that folder;
 - confirm Google Drive is available for your ChatGPT plan/workspace;
-- reconnect Google Drive if its permissions have changed.
+- reconnect Google Drive if its permissions have changed;
+- if a file is retrievable but appears stale, refresh the Project source or use the live Google Drive connector/app to read the current file.
 
 ## 5. Start using Chat Harness normally
 
@@ -124,7 +127,7 @@ ChatGPT Project Instructions are a **binding** of the portable `AGENTS.md`, not 
 
 The Workspace remains host-independent. The same Workspace can later be connected to another assistant without changing its core structure.
 
-Google Drive access from an individual ChatGPT account is live, on-demand access rather than a personal synchronized index. Relevant files may therefore need to be retrieved when work requires them.
+ChatGPT can expose the same Drive Workspace through distinct retrieval paths. A connected Drive app/connector can fetch current files on demand. A Drive folder attached as a Project source may use an indexed snapshot that requires manual **Sync** in the observed host configuration. Do not treat those paths as equivalent for freshness: when state may have changed, prefer the live read when available or refresh the Project source.
 
 ## Source Policy caveat
 
@@ -144,6 +147,7 @@ The ChatGPT binding remains **documented but unverified** until a real host scen
 - WORKSPACE and Workstream recovery work;
 - a fresh-session continuation resumes from the current Next action;
 - Source Policy/transparency behavior matches the documented contract;
-- durable closeout state is persisted.
+- durable closeout state is persisted;
+- freshness-sensitive reads prefer current live state over stale Project-source copies.
 
 Vendor documentation establishes available host primitives; it does not by itself prove the complete Chat Harness behavioral binding.
