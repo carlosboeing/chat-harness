@@ -458,5 +458,69 @@
       "mark host activation ready before the Workspace-specific migration review"
     ],
     "evidence_notes": "Deterministic setup mechanism plus brownfield migration safety contract."
+  },
+  {
+    "id": "related-objective-workstream-split",
+    "fixture": "examples/job-opportunity",
+    "objective": "Keep a new independently resumable career objective separate from an existing related Workstream.",
+    "prompt": "Separate from evaluating the current role, I want to validate a paid technical-interview coaching service for senior engineers. Research the market, define the offer, and tell me what to do next.",
+    "required_behaviours": [
+      "classify as Work and inspect existing Workstreams before deep execution",
+      "recognize that the service validation has a distinct objective, success criteria, and resumable Next action from the role evaluation",
+      "create a separate Workstream and point new Workbench artifacts to that owner while linking related context only where useful"
+    ],
+    "forbidden_behaviours": [
+      "reuse evaluate-example-role.md merely because both objectives are career-related",
+      "leave new service artifacts owned by the role-evaluation Workstream"
+    ],
+    "evidence_notes": "Behavioural regression derived from the 2026-09-30 Work & Career real-host smoke test."
+  },
+  {
+    "id": "mid-flight-workstream-split",
+    "fixture": "examples/travel-planning",
+    "objective": "Split a related subtopic when execution turns it into an independently resumable objective.",
+    "prompt": "While planning Japan, build a reusable family travel packing system that we can keep maintaining for future trips. Research the structure and produce a concrete maintenance plan.",
+    "required_behaviours": [
+      "use the Japan-trip context where relevant without assuming the new work has the same owner",
+      "once the reusable packing system has its own success criteria and Next action beyond this trip, create a separate Workstream before handoff",
+      "repoint the packing-system Workbench artifacts to the new owning Workstream"
+    ],
+    "forbidden_behaviours": [
+      "keep the packing system in plan-japan-trip.md solely because it originated during Japan planning",
+      "finish with an independently resumable child objective embedded only in the parent Workstream"
+    ],
+    "evidence_notes": "Checkpoint ownership regression scenario; semantic behavior, not a deterministic validator rule."
+  },
+  {
+    "id": "temp-staging-not-canonical",
+    "fixture": "examples/travel-planning",
+    "objective": "Keep transient staging paths out of canonical handoff references.",
+    "prompt": "Update the Japan trip Workstream using a temporary staging file if the host needs one, verify the canonical write, then tell me where the durable state lives.",
+    "required_behaviours": [
+      "use .chat-harness/temp only as staging if needed",
+      "verify the canonical Workstream after the write",
+      "reference the verified canonical artifact in the final response"
+    ],
+    "forbidden_behaviours": [
+      "cite or link a .chat-harness/temp file as authoritative",
+      "claim the checkpoint succeeded from the staging file alone"
+    ],
+    "evidence_notes": "Regression derived from a real-host response that surfaced a temp .updated.md file after canonical persistence succeeded."
+  },
+  {
+    "id": "live-source-freshness",
+    "fixture": "examples/job-opportunity",
+    "objective": "Prefer current live Workspace state when an indexed Project-source copy is stale.",
+    "prompt": "Assume the Project-source index contains an older copy of the role Workstream but an authorized live connector exposes the current Workspace file. Continue from the current durable state.",
+    "required_behaviours": [
+      "prefer the authorized live read when freshness matters",
+      "treat cached or indexed copies as discovery aids rather than freshness authority",
+      "resume from the current Workstream Next action"
+    ],
+    "forbidden_behaviours": [
+      "choose the older Project-source copy solely because it was retrieved first",
+      "claim the deterministic fixture alone proves hosted freshness behavior"
+    ],
+    "evidence_notes": "Real-host smoke candidate; repository validation preserves the contract but cannot reproduce host indexing freshness."
   }
 ]

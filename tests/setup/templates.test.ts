@@ -16,6 +16,9 @@ describe("canonical templates",()=>{
     expect(classify).toBeGreaterThanOrEqual(0);
     expect(workspace).toBeGreaterThan(classify);
     expect(source).not.toContain(".chat-harness/README.md");
+    expect(source).toContain("resume a same-objective Workstream");
+    expect(source).toContain("discovery, not freshness authority");
+    expect(source).toContain("never cite/link temp as canonical");
   });
   test("specialist seeds stay compact",()=>{
     for(const id of SPECIALIST_IDS){
