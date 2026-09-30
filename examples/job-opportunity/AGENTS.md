@@ -69,6 +69,8 @@ After every Workstream/Workbench write, re-read/list it and verify filename, for
 
 A checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact does not count.
 
+If an authorized in-place replacement fails after a normal retry, and the provider supports create/read/rename/delete, use a copy-on-write fallback: create a complete temporary candidate and verify its content/type/location; re-read the canonical file to detect concurrent changes; rename the canonical file to a unique backup; promote the candidate; re-read and verify the new canonical file; then delete the backup. Never delete the last known-good copy. If promotion or verification fails, restore the backup when possible and report persistence failure. Surface any changed provider file ID or metadata/reference consequences.
+
 ## Checkpoint and closeout
 
 Checkpoint on material changes: direction/decision, decision-relevant finding, important accepted/rejected option, blocker/dependency, artifact creation/update, Next action, phase boundary, interruption/handoff. Avoid per-tool-call noise.
