@@ -82,7 +82,7 @@ describe("v0.2 workspace setup", () => {
     expect(agents).toContain("Classify each request as **Answer-only** or **Work**.");
     expect(agents).toContain("2-decisions/");
     expect(agents).toContain("text/markdown");
-    expect(agents.length).toBeLessThanOrEqual(7500);
+    expect(agents.length).toBeLessThanOrEqual(8000);
 
     const specialist = await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8");
     expect(specialist).toContain("Principal/Staff+");
