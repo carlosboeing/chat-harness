@@ -1,5 +1,7 @@
 # Architecture
 
+> **Architecture authority:** The [approved vNext Design](../.chat-harness/workbench/2-design/2026-09-30-chat-harness-architecture-design.md) defines the implementation target. This overview describes the existing v0.3.x implementation and may differ until that design is implemented.
+
 Chat Harness applies harness engineering around an existing AI assistant. The assistant owns the model, native conversation/tool loop, UI, and built-in capabilities. Chat Harness owns the project-level conventions and deterministic tooling that make long-running work easier to resume, verify, and maintain.
 
 ## Boundary
