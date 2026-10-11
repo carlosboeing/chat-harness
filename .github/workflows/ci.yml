@@ -127,6 +127,10 @@ jobs:
       - name: Run Gate 0 filesystem safety tests
         run: bun test tests/setup/managed-file-safety.test.ts tests/setup/managed-backup-safety.test.ts
 
+      - name: Prove macOS native no-replace move and restore (unwired spike)
+        if: runner.os == 'macOS'
+        run: bash tests/native/macos-gate0-spike.sh
+
   windows-lifecycle:
     runs-on: windows-2025
     timeout-minutes: 8
