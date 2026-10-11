@@ -34,7 +34,7 @@ const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value) &&
   (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 function mapping(value: unknown, location: string): Record<string, unknown> {
-  if (!object(value)) manifestError(location + " must be a mapping");
+  if (!object(value)) throw new ManifestContractError(location + " must be a mapping");
   return value;
 }
 function keys(value: Record<string, unknown>, allowed: readonly string[], where: string): void {
@@ -76,7 +76,7 @@ export function validateManifest(value: unknown): WorkspaceManifest {
   const harness = mapping(root.harness, "harness");
   keys(harness, ["version"], "harness");
   if (typeof harness.version !== "string" || !harness.version.trim() ||
-      harness.version !== harness.version.trim()) manifestError("Invalid harness release version");
+      harness.version !== harness.version.trim()) throw new ManifestContractError("Invalid harness release version");
 
   const core = mapping(root.core, "core");
   keys(core, ["version", "files"], "core");
@@ -92,7 +92,7 @@ export function validateManifest(value: unknown): WorkspaceManifest {
   const out: Record<string, ManifestComponent> = {};
   const owned = new Map<string, string>([[ownershipKey("AGENTS.md"), "core"]]);
   for (const id of Object.keys(specialists).sort()) {
-    if (!isSpecialistId(id)) manifestError("Unknown installed Specialist ID: " + id);
+    if (!isSpecialistId(id)) throw new ManifestContractError("Unknown installed Specialist ID: " + id);
     const record = mapping(specialists[id], "specialists." + id);
     keys(record, ["version", "files"], "specialists." + id);
     const installed = version(record.version, id, SPECIALISTS[id].version);
