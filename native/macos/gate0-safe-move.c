@@ -1,6 +1,7 @@
-// macOS Gate 0 feasibility SPIKE: single-directory, handle-relative, no-replace file moves.
-// Not a released helper, not wired into setup, manifest mutation or recovery.
-// Compile on macOS: cc -std=c11 -Wall -Wextra native/macos/gate0-safe-move.c -o gate0-safe-move
+// macOS Gate 0 bounded native SPIKE, not wired to the setup CLI.
+// Anchor every ancestor from "/" using openat(O_DIRECTORY|O_NOFOLLOW).
+// Exactly one source and target *in the same verified parent directory* per call.
+// Compile/test only on macOS; this does not implement manifest journaling or recovery.
 #define _DARWIN_C_SOURCE 1
 #include <CommonCrypto/CommonDigest.h>
 #include <errno.h>
@@ -11,7 +12,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static int valid_base(const char *name) {
+static int valid_segment(const char *name) {
   if (!name || !*name || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
   for (const unsigned char *p=(const unsigned char *)name; *p; ++p) {
     if (*p == '/' || *p == '\\' || *p == ':' || *p < 32 || *p == 127) return 0;
@@ -26,9 +27,51 @@ static int valid_digest(const char *text) {
   return 1;
 }
 
-// Pinned regular file, no leaf symlink, before/after inode check and exact SHA-256.
-// A simultaneous in-place writer is detected by the post-move verification.
-static int check_file(int dir, const char *name, const char *expected) {
+/** Each component is opened relative to its pinned, non-symlink directory fd. */
+static int descend(int *dir, const char *relative) {
+  if (!relative || !*relative || relative[0] == '/') return -1;
+  const char *start = relative;
+  for (const char *p = relative; ; ++p) {
+    if (*p != '/' && *p != '\0') continue;
+    size_t len = (size_t)(p - start);
+    if (len == 0 || len > 255) return -1;
+    char part[256];
+    memcpy(part, start, len);
+    part[len] = '\0';
+    if (!valid_segment(part)) return -1;
+    int next = openat(*dir, part, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (next < 0) return -1;
+    close(*dir);
+    *dir = next;
+    if (*p == '\0') return 0;
+    start = p + 1;
+  }
+}
+
+/**
+ * Explicit absolute physical Workspace root; symlink anywhere in its ancestor
+ * chain is rejected. Relative parent "." is the Workspace root itself.
+ * The caller still owns semantic managed-path namespace and alias validation.
+ */
+static int open_anchored_parent(const char *root, const char *parent) {
+  if (!root || root[0] != '/' || !root[1] ||
+      !parent || !*parent || (strcmp(parent, ".") && parent[0] == '/')) {
+    errno = EINVAL; return -1;
+  }
+  int dir = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  if (dir < 0) return -1;
+  if (descend(&dir, root + 1) ||
+      (strcmp(parent, ".") && descend(&dir, parent))) {
+    int saved = errno;
+    close(dir);
+    errno = saved == 0 ? EINVAL : saved;
+    return -1;
+  }
+  return dir;
+}
+
+/** Pinned regular file and exact digest; inode compared before/after hashing. */
+static int check_file(int dir, const char *name, const char *expected, struct stat *identity) {
   int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
   if (fd < 0) return -1;
   struct stat before, after, leaf;
@@ -52,57 +95,73 @@ static int check_file(int dir, const char *name, const char *expected) {
   char hex[65];
   for (int i=0;i<32;i++) snprintf(hex+2*i, 3, "%02x", bytes[i]);
   ok = strcmp(hex, expected) == 0;
+  if (ok && identity) *identity = after;
 done:
   close(fd);
-  if (!ok) errno = EBUSY; // mismatch or unproven identity is a conflict
+  if (!ok) errno = EBUSY;
   return ok ? 0 : -1;
 }
 
-static void test_pause(void) {
+static void test_pause(const char *name) {
 #ifdef GATE0_TEST_HOOKS
-  const char *text = getenv("GATE0_TEST_DELAY_US");
+  const char *text = getenv(name);
   if (text && *text) {
     long us = strtol(text, NULL, 10);
     if (us > 0 && us <= 2000000) usleep((useconds_t)us);
   }
+#else
+  (void)name;
 #endif
 }
 
+/** Test-only signal + pause for deterministic SIGKILL after atomic move. */
+static void test_after_move(void) {
+#ifdef GATE0_TEST_HOOKS
+  const char *flag = getenv("GATE0_TEST_AFTER_MOVE_SIGNAL");
+  if (flag && *flag) {
+    int fd = open(flag, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (fd >= 0) { (void)write(fd, "moved\n", 6); close(fd); }
+  }
+#endif
+  test_pause("GATE0_TEST_AFTER_MOVE_DELAY_US");
+}
+
 static int move_no_replace(int dir, const char *from, const char *to) {
-  // RENAME_EXCL refuses an occupied destination; rename() would not.
   return renameatx_np(dir, from, dir, to, RENAME_EXCL);
 }
 
 int main(int argc, char **argv) {
-  if (argc != 6 || (strcmp(argv[1], "move") && strcmp(argv[1], "promote") &&
+  if (argc != 7 || (strcmp(argv[1], "move") && strcmp(argv[1], "promote") &&
                     strcmp(argv[1], "restore"))) {
-    fprintf(stderr, "Usage: gate0-safe-move move|promote|restore PARENT_DIR SOURCE_BASE TARGET_BASE SHA256_HEX\n");
+    fprintf(stderr, "Usage: gate0-safe-move move|promote|restore WORKSPACE_ROOT RELATIVE_PARENT SOURCE_BASE TARGET_BASE SHA256_HEX\n");
     return 64;
   }
-  const char *op=argv[1], *source=argv[3], *target=argv[4], *hash=argv[5];
-  if (!valid_base(source) || !valid_base(target) || !strcmp(source, target) ||
+  const char *op=argv[1], *source=argv[4], *target=argv[5], *hash=argv[6];
+  if (!valid_segment(source) || !valid_segment(target) || !strcmp(source, target) ||
       !valid_digest(hash)) {
     fprintf(stderr, "Invalid leaf name or digest\n"); return 64;
   }
-  // This proof requires caller to pass a trusted, already-inspected parent path.
-  // Opening the directory with O_NOFOLLOW pins it throughout this invocation.
-  int dir = open(argv[2], O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-  if (dir < 0) { perror("open parent directory"); return 2; }
-  if (check_file(dir, source, hash)) {
+  int dir = open_anchored_parent(argv[2], argv[3]);
+  if (dir < 0) { perror("open anchored Workspace parent"); return 2; }
+  struct stat initial, moved;
+  if (check_file(dir, source, hash, &initial)) {
     fprintf(stderr, "Source identity/content does not match expected digest\n");
     close(dir); return 3;
   }
-  test_pause();
+  test_pause("GATE0_TEST_DELAY_US");
   if (move_no_replace(dir, source, target)) {
     perror("destination exists, unsupported filesystem, or rename conflict");
     close(dir); return 4;
   }
-  if (check_file(dir, target, hash)) {
-    // Move-back uses no-replace too. If someone now owns SOURCE, preserve TARGET.
+  test_after_move();
+  if (check_file(dir, target, hash, &moved) ||
+      moved.st_dev != initial.st_dev || moved.st_ino != initial.st_ino) {
+    // A different inode with identical bytes is still an intervening source.
+    // Keep the unexpected bytes. Restore by no-replace if possible.
     if (!move_no_replace(dir, target, source)) {
-      fprintf(stderr, "Post-move digest conflict; changed source restored without overwrite\n");
+      fprintf(stderr, "Post-move conflict; moved bytes restored without overwrite\n");
     } else {
-      fprintf(stderr, "Post-move digest conflict; original filename occupied, backup preserved\n");
+      fprintf(stderr, "Post-move conflict; source occupied, moved bytes preserved at target\n");
     }
     close(dir); return 5;
   }
