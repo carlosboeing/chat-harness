@@ -71,6 +71,17 @@ jobs:
       - name: Compare standalone and Node JSON behaviour
         run: bun scripts/smoke-distributions.ts dist/bin/chat-harness-linux-x64 dist/npm/chat-harness.js
 
+      - name: Prove Specialist registry embeds Markdown in Node and standalone distributions
+        run: |
+          bun scripts/generate-specialist-assets.ts --check
+          mkdir -p dist/specialist-smoke
+          bun build scripts/smoke-specialist-bundle.ts --target=node --format=esm --packages=bundle --minify --outfile=dist/specialist-smoke/node.js
+          bun build --compile --target=bun-linux-x64 scripts/smoke-specialist-bundle.ts --outfile=dist/specialist-smoke/native
+          mv src/specialists/assets dist/specialist-smoke/hidden-assets
+          node dist/specialist-smoke/node.js > dist/specialist-smoke/node.json
+          dist/specialist-smoke/native > dist/specialist-smoke/native.json
+          diff -u dist/specialist-smoke/node.json dist/specialist-smoke/native.json
+
       - name: Smoke unreleased local install workflow
         env:
           CHAT_HARNESS_BIN_DIR: /tmp/chat-harness-local-bin
