@@ -48,7 +48,7 @@ describe("workspace validation", () => {
     const root = await workspace();
     await runSetup(root, { dryRun: false });
     await writeFile(
-      path.join(root, ".chat-harness", "workbench", "0-ideas", "native-doc.txt"),
+      path.join(root, ".chat-harness", "workbench", "0-brainstorms", "native-doc.txt"),
       "not markdown\n",
     );
     await writeFile(
@@ -63,6 +63,19 @@ describe("workspace validation", () => {
     expect(findings.map((finding) => finding.code)).toContain(
       "workstream.file_extension_invalid",
     );
+  });
+
+  test("legacy Workbench folders are diagnosed without migrating files", async () => {
+    const root = await workspace();
+    await runSetup(root, { dryRun: false });
+    const { mkdir, readFile } = await import("node:fs/promises");
+    const legacy = path.join(root, ".chat-harness", "workbench", "0-ideas");
+    await mkdir(legacy);
+    const owned = path.join(legacy, "draft.md");
+    await writeFile(owned, "user-owned bytes\\n");
+    const findings = await validateWorkspace(root);
+    expect(findings.map((f) => f.code)).toContain("workspace.legacy_workbench_layout");
+    expect(await readFile(owned, "utf8")).toBe("user-owned bytes\\n");
   });
 
   test("missing scaffolding is reported, not repaired", async () => {

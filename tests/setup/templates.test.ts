@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { AGENTS_TEMPLATE, WORKSTREAM_TEMPLATE } from "../../src/setup/templates.js";
+import { AGENTS_TEMPLATE, CORE_VERSION, WORKSTREAM_TEMPLATE } from "../../src/setup/templates.js";
 import { SPECIALIST_IDS, specialistTemplate } from "../../src/setup/specialists.js";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../..");
@@ -10,6 +10,8 @@ describe("canonical templates",()=>{
   test("AGENTS stays synchronized and within Project Instructions budget",async()=>{
     const source=await readFile(path.join(root,"templates","AGENTS.md"),"utf8");
     expect(source).toBe(AGENTS_TEMPLATE);
+    expect(CORE_VERSION).toBe(1);
+    expect(source).toContain("explicit scoped approval");
     expect(source.length).toBeLessThanOrEqual(8000);
     const classify = source.indexOf("Classify each request as **Answer-only** or **Work**.");
     const workspace = source.indexOf("After classification, read `.chat-harness/WORKSPACE.md`");
@@ -35,7 +37,7 @@ describe("canonical templates",()=>{
     expect(await readFile(path.join(root,"templates","workstream.md"),"utf8")).toBe(WORKSTREAM_TEMPLATE);
   });
   test("publishes one frontmatter-first template per Workbench class",async()=>{
-    for(const [name,type] of [["idea.md","idea"],["research.md","research"],["decision.md","decision"],["plan.md","plan"],["review.md","review"]] as const){
+    for(const [name,type] of [["brainstorm.md","brainstorm"],["discovery.md","discovery"],["design.md","design"],["plan.md","plan"],["review.md","review"]] as const){
       const source=await readFile(path.join(root,"templates","workbench",name),"utf8");
       expect(source.startsWith("---\n")).toBe(true);
       expect(source).toContain(`type: ${type}`);

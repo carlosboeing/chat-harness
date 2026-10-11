@@ -22,45 +22,45 @@ async function artifact(state: Awaited<ReturnType<typeof fixture>>,dir:string,so
 }
 
 describe("Workbench validation", () => {
-  test.each([["0-ideas","idea"],["1-research","research"],["2-decisions","decision"],["3-plans","plan"],["4-reviews","review"]] as const)("accepts %s with type %s",async(dir,type)=>{
+  test.each([["0-brainstorms","brainstorm"],["1-discovery","discovery"],["2-design","design"],["3-plans","plan"],["4-reviews","review"]] as const)("accepts %s with type %s",async(dir,type)=>{
     const state=await fixture(); const file=await artifact(state,dir,document(type));
     expect(await validateWorkbenchFile(file,{...state,expectedType:type})).toEqual([]);
   });
   test.each(["draft","approved","completed"] as const)("accepts status %s",async(status)=>{
-    const state=await fixture(); const file=await artifact(state,"1-research",document("research",status));
-    expect(await validateWorkbenchFile(file,{...state,expectedType:"research"})).toEqual([]);
+    const state=await fixture(); const file=await artifact(state,"1-discovery",document("discovery",status));
+    expect(await validateWorkbenchFile(file,{...state,expectedType:"discovery"})).toEqual([]);
   });
   test("accepts artifact-relative and workspace-relative Workstream references",async()=>{
     const state=await fixture();
-    const artifactRelative=await artifact(state,"1-research",document("research"),"artifact-relative.md");
-    expect(await validateWorkbenchFile(artifactRelative,{...state,expectedType:"research"})).toEqual([]);
+    const artifactRelative=await artifact(state,"1-discovery",document("discovery"),"artifact-relative.md");
+    expect(await validateWorkbenchFile(artifactRelative,{...state,expectedType:"discovery"})).toEqual([]);
 
     const workspaceRelative=await artifact(
       state,
-      "1-research",
-      document("research").replace(
+      "1-discovery",
+      document("discovery").replace(
         "../../workstreams/owner.md",
         ".chat-harness/workstreams/owner.md",
       ),
       "workspace-relative.md",
     );
-    expect(await validateWorkbenchFile(workspaceRelative,{...state,expectedType:"research"})).toEqual([]);
+    expect(await validateWorkbenchFile(workspaceRelative,{...state,expectedType:"discovery"})).toEqual([]);
   });
   test("rejects Workspace-relative Workstream references outside workstreams",async()=>{
     const state=await fixture();
     const file=await artifact(
       state,
-      "1-research",
-      document("research").replace(
+      "1-discovery",
+      document("discovery").replace(
         "../../workstreams/owner.md",
         ".chat-harness/workstreams/../outside.md",
       ),
     );
-    expect((await validateWorkbenchFile(file,{...state,expectedType:"research"})).map((f)=>f.code)).toContain("workbench.workstream_invalid");
+    expect((await validateWorkbenchFile(file,{...state,expectedType:"discovery"})).map((f)=>f.code)).toContain("workbench.workstream_invalid");
   });
   test("enforces folder/type and owning Workstream",async()=>{
-    const state=await fixture(); const file=await artifact(state,"1-research",document("decision").replace("owner.md","missing.md"));
-    const findings=await validateWorkbenchFile(file,{...state,expectedType:"research"});
+    const state=await fixture(); const file=await artifact(state,"1-discovery",document("design").replace("owner.md","missing.md"));
+    const findings=await validateWorkbenchFile(file,{...state,expectedType:"discovery"});
     expect(findings.map((f)=>f.code)).toContain("workbench.type_mismatch");
     expect(findings.map((f)=>f.code)).toContain("workbench.workstream_invalid");
   });
@@ -79,7 +79,7 @@ describe("Workbench validation", () => {
   });
   test("requires exactly one H1 matching the frontmatter title",async()=>{
     const state=await fixture();
-    const file=await artifact(state,"1-research",document("research").replace("# Artifact","# Different"));
-    expect((await validateWorkbenchFile(file,{...state,expectedType:"research"})).map((f)=>f.code)).toContain("workbench.heading_invalid");
+    const file=await artifact(state,"1-discovery",document("discovery").replace("# Artifact","# Different"));
+    expect((await validateWorkbenchFile(file,{...state,expectedType:"discovery"})).map((f)=>f.code)).toContain("workbench.heading_invalid");
   });
 });
