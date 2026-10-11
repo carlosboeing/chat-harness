@@ -306,7 +306,7 @@
     "required_behaviours": [
       "classify the request as Work before extended execution",
       "create an active raw-Markdown Workstream with required YAML frontmatter",
-      "create a draft raw-Markdown idea artifact in 0-ideas with required YAML frontmatter and owning Workstream reference",
+      "create a draft raw-Markdown idea artifact in 0-brainstorms with required YAML frontmatter and owning Workstream reference",
       "cross-reference the idea artifact from the Workstream without waiting for the user to ask to save"
     ],
     "forbidden_behaviours": [
@@ -321,7 +321,7 @@
     "objective": "Route source-backed investigation to a research artifact.",
     "prompt": "Research rail-pass options for the trip, including current prices and restrictions.",
     "required_behaviours": [
-      "create or update a raw-Markdown artifact under 1-research",
+      "create or update a raw-Markdown artifact under 1-discovery",
       "use type research and required YAML frontmatter",
       "keep evidence gathering distinct from the later project decision"
     ],
@@ -337,7 +337,7 @@
     "objective": "Route project-specific option selection to a decision artifact.",
     "prompt": "Given the research, decide whether we should use rail passes or individual tickets and explain the tradeoffs.",
     "required_behaviours": [
-      "create or update a raw-Markdown artifact under 2-decisions",
+      "create or update a raw-Markdown artifact under 2-design",
       "use type decision and record options, constraints, tradeoffs, direction, and rationale"
     ],
     "forbidden_behaviours": [

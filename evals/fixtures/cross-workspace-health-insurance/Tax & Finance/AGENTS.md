@@ -41,16 +41,16 @@ After frontmatter, include exactly one H1 matching `title`. New Workstreams star
 
 Folders describe artifact purpose, not mandatory stages. Create on trigger; do not create placeholders. Update an existing artifact when new work materially refines the same durable question/output; create a new one only when independently useful to resume, cite, or maintain.
 
-- `0-ideas/` — **What are we trying to do?** Framing, requirements, constraints, possibilities, questions, rough concepts, success criteria. Create immediately for every new open-ended Work objective.
-- `1-research/` — **What did we learn?** Source/evidence investigation, measurements, experiments and benchmark results. Research does not silently make the decision.
-- `2-decisions/` — **What direction should we take, and why?** Alternatives, tradeoffs, feasibility, design/solution, recommendation, direction and rationale.
+- `0-brainstorms/` — **What are we trying to do?** Framing, requirements, constraints, possibilities, questions, rough concepts, success criteria. Create immediately for every new open-ended Work objective.
+- `1-discovery/` — **What did we learn?** Source/evidence investigation, measurements, experiments and benchmark results. Research does not silently make the decision.
+- `2-design/` — **What direction should we take, and why?** Alternatives, tradeoffs, feasibility, design/solution, recommendation, direction and rationale.
 - `3-plans/` — **What exactly will we do?** Executable implementation/action/booking/migration/experiment or benchmark protocols, checklists, dependencies and verification.
 - `4-reviews/` — **Is the existing thing good enough, and what should change?** Critiques, audits, readiness/design reviews, quality checks and retrospectives.
 
-Classify by primary durable purpose, not by the activity used to produce it. If uncertain for a new open-ended objective, use `0-ideas/`.
+Classify by primary durable purpose, not by the activity used to produce it. If uncertain for a new open-ended objective, use `0-brainstorms/`.
 
 Every Workbench artifact must be raw `.md` beginning with valid YAML:
-- `type: idea | research | decision | plan | review`, matching its folder;
+- `type: brainstorm | discovery | design | plan | review`, matching its folder;
 - `title: <non-empty>`;
 - `status: draft | approved | completed | superseded`;
 - `created: YYYY-MM-DD`;
@@ -69,6 +69,8 @@ After every Workstream/Workbench write, re-read/list it and verify filename, for
 
 A checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact does not count.
 
+If an authorized in-place replacement fails after a normal retry, and the provider supports create/read/rename/delete, use a copy-on-write fallback: create a complete temporary candidate and verify its content/type/location; re-read the canonical file to detect concurrent changes; rename the canonical file to a unique backup; promote the candidate; re-read and verify the new canonical file; then delete the backup. Never delete the last known-good copy. If promotion or verification fails, restore the backup when possible and report persistence failure. Surface any changed provider file ID or metadata/reference consequences.
+
 ## Checkpoint and closeout
 
 Checkpoint on material changes: direction/decision, decision-relevant finding, important accepted/rejected option, blocker/dependency, artifact creation/update, Next action, phase boundary, interruption/handoff. Avoid per-tool-call noise.
@@ -82,6 +84,8 @@ Before substantive handoff:
 Ask: **Would a fresh session reading the canonical Workstream and referenced artifacts otherwise have to rediscover something important?** If yes, persist/reconcile it first.
 
 ## Ownership, sources, and actions
+
+Authorized reads may cross Workstreams; writes default to the current Workstream. Before editing **related** Workstream artifacts, name the exact owners/files and changes and obtain explicit scoped approval. Never modify **unrelated** Workstreams or their temp files incidentally. Stop if ownership is ambiguous. These instructions do not enforce host-level ACLs.
 
 The Workspace is an ownership/resume boundary, not an information silo. Use relevant authorized information from other Workspaces, repositories, connected apps, assistant context, and public sources.
 

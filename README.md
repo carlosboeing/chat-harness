@@ -108,9 +108,9 @@ Chat Harness does not search parent directories for a Workspace.
 │   ├── procedures/
 │   ├── temp/
 │   ├── workbench/
-│   │   ├── 0-ideas/
-│   │   ├── 1-research/
-│   │   ├── 2-decisions/
+│   │   ├── 0-brainstorms/
+│   │   ├── 1-discovery/
+│   │   ├── 2-design/
 │   │   ├── 3-plans/
 │   │   └── 4-reviews/
 │   ├── workstreams/
@@ -136,7 +136,7 @@ The scaffold separates generic harness behavior from Workspace-specific knowledg
 - **`AGENTS.md`** — generic Chat Harness operating behavior.
 - **`WORKSPACE.md`** — Workspace-specific role, judgement, evidence standards, boundaries, and approvals.
 - **Workstreams** — compact current resume state for continuing objectives.
-- **Workbench** — durable Markdown working artifacts: ideas, research, decisions, plans, and reviews.
+- **Workbench** — durable Markdown working artifacts: brainstorms, discovery, design, plans, and reviews.
 - **Procedures** — reusable methodology for recurring tasks.
 - **Source Policy** — narrow machine-readable privacy/source-handling rules.
 
@@ -182,7 +182,7 @@ Workstreams and Workbench are parallel outputs from work.
 
 A **Workstream** is compact, continuously maintained resume state: objective, current direction, material rationale, blockers/open questions, relevant sources/artifacts, and an explicit Next action.
 
-The **Workbench** holds raw Markdown artifacts under five purpose-driven categories: ideas (frame an open-ended objective), research (establish evidence), decisions (turn evidence into direction), plans (make direction executable), and reviews (evaluate an existing thing). These are trigger-based artifact classes, not a required waterfall.
+The **Workbench** holds raw Markdown artifacts under five purpose-driven categories: brainstorms (frame an open-ended objective), discovery (establish evidence), design (turn evidence into direction), plans (make direction executable), and reviews (evaluate an existing thing). These are trigger-based artifact classes, not a required waterfall.
 
 ## Source ownership and Source Policy
 
