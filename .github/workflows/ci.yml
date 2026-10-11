@@ -114,7 +114,7 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Run Gate 0 filesystem safety tests
-        run: bun test tests/setup/managed-file-safety.test.ts
+        run: bun test tests/setup/managed-file-safety.test.ts tests/setup/managed-backup-safety.test.ts
 
   windows-lifecycle:
     runs-on: windows-2025
