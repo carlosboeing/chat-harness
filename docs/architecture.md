@@ -39,8 +39,8 @@ A Workspace is an ownership and durable-state boundary:
     ├── source-policy.yaml
     ├── workstreams/
     ├── workbench/
-    │   ├── 0-brainstorms/
-    │   ├── 1-discovery/
+    │   ├── 0-ideas/
+    │   ├── 1-research/
     │   ├── 2-design/
     │   ├── 3-plans/
     │   └── 4-reviews/
@@ -93,7 +93,7 @@ When shared durable state may have changed, refresh and reconcile before overwri
 
 A Workstream stores compact current state for one independent Work objective rather than conversation history.
 
-Workbench holds raw Markdown working artifacts under five trigger-based categories: brainstorms frame open-ended objectives; discovery establishes evidence; design turns evidence into direction; plans make direction executable; reviews evaluate an existing thing. These are artifact purposes, not mandatory lifecycle stages; Workstreams and Workbench are parallel outputs from work.
+Workbench holds raw Markdown working artifacts under five trigger-based categories: ideas frame open-ended objectives; research establishes evidence; design turns evidence into direction; plans make direction executable; reviews evaluate an existing thing. These are artifact purposes, not mandatory lifecycle stages; Workstreams and Workbench are parallel outputs from work.
 
 `_inbox/` is visible user/automation → assistant intake and remains user-owned.
 

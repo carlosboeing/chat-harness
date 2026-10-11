@@ -36,8 +36,8 @@ A Workstream stores enough current state to resume safely. It is neither a trans
 
 Raw Markdown working artifacts created by explicit triggers:
 
-- **brainstorms** frame a new open-ended objective;
-- **discovery** establishes evidence for an unresolved question;
+- **ideas** frame a new open-ended objective;
+- **research** establishes evidence for an unresolved question;
 - **design** turns evidence and constraints into direction;
 - **plans** turn direction into executable action;
 - **reviews** evaluate an existing artifact, implementation, or outcome.

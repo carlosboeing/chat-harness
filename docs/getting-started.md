@@ -115,8 +115,8 @@ Your folder/
 │   ├── procedures/
 │   ├── temp/
 │   ├── workbench/
-│   │   ├── 0-brainstorms/
-│   │   ├── 1-discovery/
+│   │   ├── 0-ideas/
+│   │   ├── 1-research/
 │   │   ├── 2-design/
 │   │   ├── 3-plans/
 │   │   └── 4-reviews/
@@ -187,7 +187,7 @@ Open a new conversation inside the configured ChatGPT Project and work normally.
 
 For direct disposable questions, Chat Harness does not create durable state. For Work such as planning a trip, designing/building something, research, comparison, troubleshooting, implementation, or review, the assistant should proactively create/resume a Workstream and the triggered Workbench artifacts without waiting to be told to save.
 
-Workbench text is raw Markdown with required YAML frontmatter. The five categories are `0-brainstorms/`, `1-discovery/`, `2-design/`, `3-plans/`, and `4-reviews/`; they describe artifact purpose rather than a mandatory waterfall.
+Workbench text is raw Markdown with required YAML frontmatter. The five categories are `0-ideas/`, `1-research/`, `2-design/`, `3-plans/`, and `4-reviews/`; they describe artifact purpose rather than a mandatory waterfall.
 
 For example, in a travel Workspace:
 
