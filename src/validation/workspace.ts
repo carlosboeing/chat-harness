@@ -70,8 +70,8 @@ const WORKBENCH_FOLDERS: ReadonlyArray<{
   directory: string;
   type: WorkbenchArtifactType;
 }> = [
-  { directory: "0-brainstorms", type: "brainstorm" },
-  { directory: "1-discovery", type: "discovery" },
+  { directory: "0-ideas", type: "idea" },
+  { directory: "1-research", type: "research" },
   { directory: "2-design", type: "design" },
   { directory: "3-plans", type: "plan" },
   { directory: "4-reviews", type: "review" },
@@ -146,7 +146,7 @@ export async function validateWorkspace(workspace: string): Promise<Finding[]> {
 
   const workbenchRoot = path.join(workspace, ".chat-harness", "workbench");
   // Legacy Workbench folders contain user-owned records: report, never move.
-  for (const legacy of ["0-ideas", "1-research", "2-decisions"]) {
+  for (const legacy of ["2-decisions"]) {
     try {
       await lstat(path.join(workbenchRoot, legacy));
       findings.push({
