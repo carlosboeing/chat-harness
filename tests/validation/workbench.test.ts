@@ -22,7 +22,7 @@ async function artifact(state: Awaited<ReturnType<typeof fixture>>,dir:string,so
 }
 
 describe("Workbench validation", () => {
-  test.each([["0-ideas","idea"],["1-research","research"],["2-decisions","decision"],["3-plans","plan"],["4-reviews","review"]] as const)("accepts %s with type %s",async(dir,type)=>{
+  test.each([["0-ideas","idea"],["1-research","research"],["2-design","design"],["3-plans","plan"],["4-reviews","review"]] as const)("accepts %s with type %s",async(dir,type)=>{
     const state=await fixture(); const file=await artifact(state,dir,document(type));
     expect(await validateWorkbenchFile(file,{...state,expectedType:type})).toEqual([]);
   });
@@ -59,7 +59,7 @@ describe("Workbench validation", () => {
     expect((await validateWorkbenchFile(file,{...state,expectedType:"research"})).map((f)=>f.code)).toContain("workbench.workstream_invalid");
   });
   test("enforces folder/type and owning Workstream",async()=>{
-    const state=await fixture(); const file=await artifact(state,"1-research",document("decision").replace("owner.md","missing.md"));
+    const state=await fixture(); const file=await artifact(state,"1-research",document("design").replace("owner.md","missing.md"));
     const findings=await validateWorkbenchFile(file,{...state,expectedType:"research"});
     expect(findings.map((f)=>f.code)).toContain("workbench.type_mismatch");
     expect(findings.map((f)=>f.code)).toContain("workbench.workstream_invalid");

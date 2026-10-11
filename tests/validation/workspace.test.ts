@@ -65,6 +65,19 @@ describe("workspace validation", () => {
     );
   });
 
+  test("legacy Workbench folders are diagnosed without migrating files", async () => {
+    const root = await workspace();
+    await runSetup(root, { dryRun: false });
+    const { mkdir, readFile } = await import("node:fs/promises");
+    const legacy = path.join(root, ".chat-harness", "workbench", "2-decisions");
+    await mkdir(legacy);
+    const owned = path.join(legacy, "draft.md");
+    await writeFile(owned, "user-owned bytes\\n");
+    const findings = await validateWorkspace(root);
+    expect(findings.map((f) => f.code)).toContain("workspace.legacy_workbench_layout");
+    expect(await readFile(owned, "utf8")).toBe("user-owned bytes\\n");
+  });
+
   test("missing scaffolding is reported, not repaired", async () => {
     const root = await workspace();
     const findings = await validateWorkspace(root);

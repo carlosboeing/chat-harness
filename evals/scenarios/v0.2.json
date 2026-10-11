@@ -337,7 +337,7 @@
     "objective": "Route project-specific option selection to a decision artifact.",
     "prompt": "Given the research, decide whether we should use rail passes or individual tickets and explain the tradeoffs.",
     "required_behaviours": [
-      "create or update a raw-Markdown artifact under 2-decisions",
+      "create or update a raw-Markdown artifact under 2-design",
       "use type decision and record options, constraints, tradeoffs, direction, and rationale"
     ],
     "forbidden_behaviours": [

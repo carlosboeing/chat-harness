@@ -72,7 +72,7 @@ const WORKBENCH_FOLDERS: ReadonlyArray<{
 }> = [
   { directory: "0-ideas", type: "idea" },
   { directory: "1-research", type: "research" },
-  { directory: "2-decisions", type: "decision" },
+  { directory: "2-design", type: "design" },
   { directory: "3-plans", type: "plan" },
   { directory: "4-reviews", type: "review" },
 ];
@@ -145,6 +145,20 @@ export async function validateWorkspace(workspace: string): Promise<Finding[]> {
   }
 
   const workbenchRoot = path.join(workspace, ".chat-harness", "workbench");
+  // Legacy Workbench folders contain user-owned records: report, never move.
+  for (const legacy of ["2-decisions"]) {
+    try {
+      await lstat(path.join(workbenchRoot, legacy));
+      findings.push({
+        code: "workspace.legacy_workbench_layout",
+        severity: "error",
+        message: "Legacy Workbench layout requires explicit user-reviewed migration; contents are preserved.",
+        location: path.join(".chat-harness", "workbench", legacy),
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
   try {
     if ((await lstat(workbenchRoot)).isDirectory()) {
       for (const folder of WORKBENCH_FOLDERS) {

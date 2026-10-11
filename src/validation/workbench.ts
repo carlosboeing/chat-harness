@@ -13,7 +13,7 @@ import { validateWorkstreamFile } from "./workstream.js";
 export type WorkbenchArtifactType =
   | "idea"
   | "research"
-  | "decision"
+  | "design"
   | "plan"
   | "review";
 

@@ -18,7 +18,7 @@ The canonical portable source of generic Chat Harness behavior. A host that can 
 
 The single Workspace-specific instruction extension. It captures domain role, judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
 
-It is seeded during setup and then user-owned. Keep it compact: domain role, high-value invariants, approvals, and only the routing pointers that are useful across the Workspace.
+The current CLI seeds it and then leaves it user-owned. vNext will separate a managed Specialist prefix from the user-owned suffix during the forthcoming reconciliation phase. Keep it compact: domain role, high-value invariants, approvals, and only the routing pointers that are useful across the Workspace.
 
 ## Specialist
 
@@ -38,7 +38,7 @@ Raw Markdown working artifacts created by explicit triggers:
 
 - **ideas** frame a new open-ended objective;
 - **research** establishes evidence for an unresolved question;
-- **decisions** turn evidence and constraints into direction;
+- **design** turns evidence and constraints into direction;
 - **plans** turn direction into executable action;
 - **reviews** evaluate an existing artifact, implementation, or outcome.
 

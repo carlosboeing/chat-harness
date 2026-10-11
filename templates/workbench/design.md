@@ -1,13 +1,13 @@
 ---
-type: decision
-title: Decision title
+type: design
+title: Design title
 status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 workstream: .chat-harness/workstreams/YYYY-MM-DD-topic.md
 ---
 
-# Decision title
+# Design title
 
 ## Decision / proposed direction
 State the chosen or proposed direction.
