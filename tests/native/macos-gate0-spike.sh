@@ -116,3 +116,7 @@ if run restore "." interrupted.backup interrupted.md "$interrupted_digest"; then
 [[ "$(cat interrupted.md)" == 'other user file' && -f interrupted.backup ]] || fail "conflict evidence discarded"
 
 echo "PASS: macOS root-anchored move, nested paths, no-clobber, inode races and SIGKILL recovery proof"
+
+# Separate disposable-Workspace journal proof; never used by installed CLI.
+cd "$root"
+GATE0_SPIKE_NATIVE="$bin" bun test tests/native/macos-journal-spike.test.ts
