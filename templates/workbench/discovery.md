@@ -1,13 +1,13 @@
 ---
-type: research
-title: Research title
+type: discovery
+title: Discovery title
 status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 workstream: .chat-harness/workstreams/YYYY-MM-DD-topic.md
 ---
 
-# Research title
+# Discovery title
 
 ## Research question
 State the specific unknown being investigated.

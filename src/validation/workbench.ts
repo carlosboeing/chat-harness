@@ -11,9 +11,9 @@ import { formatSchemaErrors, validateWorkbenchFrontmatter } from "./schema.js";
 import { validateWorkstreamFile } from "./workstream.js";
 
 export type WorkbenchArtifactType =
-  | "idea"
-  | "research"
-  | "decision"
+  | "brainstorm"
+  | "discovery"
+  | "design"
   | "plan"
   | "review";
 

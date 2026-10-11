@@ -1,13 +1,13 @@
 ---
-type: idea
-title: Idea title
+type: brainstorm
+title: Brainstorm title
 status: draft
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 workstream: .chat-harness/workstreams/YYYY-MM-DD-topic.md
 ---
 
-# Idea title
+# Brainstorm title
 
 ## Objective
 State what this objective is trying to achieve.
