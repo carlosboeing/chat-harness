@@ -37,7 +37,7 @@ describe("canonical templates",()=>{
     expect(await readFile(path.join(root,"templates","workstream.md"),"utf8")).toBe(WORKSTREAM_TEMPLATE);
   });
   test("publishes one frontmatter-first template per Workbench class",async()=>{
-    for(const [name,type] of [["brainstorm.md","brainstorm"],["discovery.md","discovery"],["design.md","design"],["plan.md","plan"],["review.md","review"]] as const){
+    for(const [name,type] of [["idea.md","idea"],["research.md","research"],["design.md","design"],["plan.md","plan"],["review.md","review"]] as const){
       const source=await readFile(path.join(root,"templates","workbench",name),"utf8");
       expect(source.startsWith("---\n")).toBe(true);
       expect(source).toContain(`type: ${type}`);

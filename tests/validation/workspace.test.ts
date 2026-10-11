@@ -48,7 +48,7 @@ describe("workspace validation", () => {
     const root = await workspace();
     await runSetup(root, { dryRun: false });
     await writeFile(
-      path.join(root, ".chat-harness", "workbench", "0-brainstorms", "native-doc.txt"),
+      path.join(root, ".chat-harness", "workbench", "0-ideas", "native-doc.txt"),
       "not markdown\n",
     );
     await writeFile(
@@ -69,7 +69,7 @@ describe("workspace validation", () => {
     const root = await workspace();
     await runSetup(root, { dryRun: false });
     const { mkdir, readFile } = await import("node:fs/promises");
-    const legacy = path.join(root, ".chat-harness", "workbench", "0-ideas");
+    const legacy = path.join(root, ".chat-harness", "workbench", "2-decisions");
     await mkdir(legacy);
     const owned = path.join(legacy, "draft.md");
     await writeFile(owned, "user-owned bytes\\n");
