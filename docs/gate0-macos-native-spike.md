@@ -1,6 +1,6 @@
 # Gate 0 macOS native helper — anchored feasibility spike
 
-**Not a production reconciliation engine.** This helper is not built into the released CLI, nor called by setup/doctor/validate, and it never automatically modifies an existing Workspace.
+**Not a production reconciliation engine.** The pending MVP packaging PRs build and ship a precompiled helper with npm/Node and macOS standalone distributions, but legacy setup/doctor/validate do **not** invoke it. The native invocation API remains unused by production reconciliation and never automatically modifies an existing Workspace.
 
 ## Focused personal-use contract
 
@@ -8,7 +8,7 @@ Practical protection against accidental edits, accidental overwrites, symlinked 
 
 ## Interface
 
-Compile on macOS: `cc -std=c11 -Wall -Wextra native/macos/gate0-safe-move.c -o gate0-safe-move`.
+For development-only direct tests, compile on macOS: `cc -std=c11 -Wall -Wextra native/macos/gate0-safe-move.c -o gate0-safe-move`. Production builds compile during macOS CI, not at runtime, and ship per-architecture SHA-256 companion files. The side-effect-free `--probe` prints `chat-harness-macos-helper/1 darwin-arm64` or `darwin-x64`.
 
 `gate0-safe-move move|promote|restore WORKSPACE_ROOT RELATIVE_PARENT SOURCE_BASE TARGET_BASE SHA256_HEX`
 
@@ -31,7 +31,8 @@ The pause/signal hooks are compiled **only** with `GATE0_TEST_HOOKS` for determi
 - **No manifest-last multi-file transaction, durable commit signal, recovery journal, cleanup protocol or actual `setup` integration.**
 - Not a complete solution for same-user malicious filesystem races: the input Workspace path can itself change after traversal, and directory entry aliases/case identity are subject to separate preflight and filesystem rules.
 - Only a macOS prototype; neither Windows nor Linux compatibility is proven.
-- No native-helper bundling/install policy for npm/standalone yet. Production packaging should not require a compiler at runtime.
+- In pending PRs #58–#59, the Node/npm bundle expects `dist/npm/native/macos/darwin-<arch>/safe-move` plus `.sha256`. Standalone expects `<executable>.macos-safe-move` plus `.sha256`, placed by the release installer or software updater. Invocation never falls back to `PATH`, checkout-local source, network fetch, or an end-user compiler.
+- The proposed npm release packaging collects both macOS architectures from dedicated macOS CI jobs; standalone release assets include their matching sidecars. CI invocation tests cover tampering, absent helpers, symlinks, supported architectures, no-overwrite and reverse move on disposable Workspaces.
 - This spike alone does not close Gate 0 or permit destructive automation. A higher-level reconciler must verify manifest ownership/digests, refuse unsupported states, and journal transaction intent before invoking the helper.
 
-Next: verify this latest spike in macOS CI, then design the smallest helper packaging and **one-file** journal-guided round trip in a disposable Workspace before attempting a multi-file upgrade. Keep existing Workspaces untouched.
+Next after these packaging PRs have passed focused CI and been reviewed: implement **read-only** on-disk manifest-backed inspection and semantic planning, then address transaction safety and remaining Gate 0 targets. Keep existing Workspaces untouched.
