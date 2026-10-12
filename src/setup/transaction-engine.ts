@@ -11,11 +11,12 @@ import { expectedCompletionMarker, matchesCompletionMarker, serializeRecoveryRec
 import { inspectAndPlanReadonlyReconciliation, type CombinedReadonlyPlan, type CombinedOperation } from "./readonly-reconcile-plan.js";
 import { observeReadonlyManagedPath } from "./inspect-manifest-disk.js";
 import { inspectManagedDestination, type ManagedFileOwner } from "../workspace/managed-path-safety.js";
-import { acquireMacosWorkspaceLease, verifiedMacosHelper, invokeMacosFilesystemOperation,
-  invokeMacosSafeMove, invokeMacosSafeStage, reserveMacosReconciliationLock, type MacosHelperRuntime } from "../workspace/macos-helper.js";
+import { acquireMacosWorkspaceLease, withMacosRootIdentity, verifiedMacosHelper, invokeMacosFilesystemOperation,
+  invokeMacosSafeMove, invokeMacosSafeStage, reserveMacosReconciliationLock, retireMacosReconciliationLock, type MacosHelperRuntime } from "../workspace/macos-helper.js";
 
 const MANIFEST = ".chat-harness/manifest.yaml", LOCK = ".chat-harness/temp/reconcile";
 const JOURNAL = LOCK + "/journal.json", TOKEN = LOCK + "/commit.token";
+const RETIRED = ".chat-harness/temp/reconcile-cleanup";
 export class ReconciliationError extends Error {
   constructor(readonly code: "setup.stale_plan" | "setup.recovery_conflict" | "setup.verification_failed", message: string) {
     super(message); this.name = "ReconciliationError";
@@ -158,15 +159,51 @@ async function cleanup(workspace: string, journal: ManagedTransactionJournal, ru
   const tokenDigest = journal.startingManifest === journal.targetManifest && journal.operations.length
     ? exactByteDigest(expectedCompletionMarker(journal)) : null;
   await discardIfPresent(workspace,journalSibling(TOKEN,"stage",journal.transactionId),tokenDigest,TOKEN,"transaction",runtime);
-  // Keep completion proof until the journal is removed. A process killed after
-  // journal removal has no mutations left to recover; a bounded orphan token
-  // still fails closed rather than being automatically guessed away.
-  await discardIfPresent(workspace,JOURNAL,exactByteDigest(serializeRecoveryRecord(journal)),JOURNAL,"transaction",runtime);
-  await discardIfPresent(workspace,TOKEN,tokenDigest,TOKEN,"transaction",runtime);
-  native(workspace,LOCK,"rmdir",undefined,runtime);
+  // Retirement is atomic commit/rollback completion evidence. The active
+  // reservation stays intact until every canonical state and sidecar is settled.
+  retireMacosReconciliationLock(workspace,runtime);
+  await cleanupRetired(workspace,journal,runtime);
+
 }
-async function recoverLocked(workspace: string, runtime?: MacosHelperRuntime): Promise<"absent"|"rolled_back"|"committed"> {
+async function cleanupRetired(workspace: string, journal: ManagedTransactionJournal, runtime?: MacosHelperRuntime): Promise<void> {
+  const token = RETIRED+"/commit.token", record = RETIRED+"/journal.json";
+  const tokenDigest = journal.startingManifest === journal.targetManifest && journal.operations.length
+    ? exactByteDigest(expectedCompletionMarker(journal)) : null;
+  await discardIfPresent(workspace,token,tokenDigest,token,"transaction",runtime);
+  await discardIfPresent(workspace,record,exactByteDigest(serializeRecoveryRecord(journal)),record,"transaction",runtime);
+  native(workspace,RETIRED,"rmdir",undefined,runtime);
+}
+async function recoverRetired(workspace: string, runtime?: MacosHelperRuntime): Promise<"rolled_back"|"committed"|"cleaned"> {
+  const names = await readdir(path.join(workspace,RETIRED));
+  // Only a retired reservation can reach this terminal empty state; an active
+  // empty reservation never gets this treatment. rmdir cannot delete content.
+  if(names.length === 0){native(workspace,RETIRED,"rmdir",undefined,runtime);return "cleaned";}
+  if(names.some(n=>n!=="journal.json" && n!=="commit.token"))conflict("Unknown retired transaction evidence");
+  const record = RETIRED+"/journal.json";
+  const bytes=await artifact(workspace,record,record,"transaction");
+  if(!bytes || bytes.length > 64*1024)conflict("Invalid retired journal");
+  const j=validateManagedJournal(JSON.parse(bytes!.toString("utf8")));
+  if(!bytes!.equals(Buffer.from(serializeRecoveryRecord(j))))conflict("Noncanonical retired journal");
+  const tokenPath=RETIRED+"/commit.token";
+  const token=await artifact(workspace,tokenPath,tokenPath,"transaction");
+  if(token && !matchesCompletionMarker(token,j))conflict("Invalid retired completion token");
+  const manifest=await digest(workspace,MANIFEST,"workspace");
+  const states=await Promise.all(j.operations.map(op=>digest(workspace,op.path,op.owner)));
+  const after=manifest === j.targetManifest && states.every((s,i)=>s===j.operations[i]!.after);
+  const before=manifest === j.startingManifest && states.every((s,i)=>s===j.operations[i]!.before);
+  if(!after && !before)conflict("Retired transaction has changed canonical outputs");
+  if(token && !after)conflict("Retired completion token contradicts canonical outputs");
+  if(after)await verifyCommittedManifest(workspace,j.targetManifest,runtime);
+  await cleanupRetired(workspace,j,runtime);
+  return after?"committed":"rolled_back";
+}
+async function recoverLocked(workspace: string, runtime?: MacosHelperRuntime): Promise<"absent"|"rolled_back"|"committed"|"cleaned"> {
   const lock = await observeReadonlyManagedPath(workspace,LOCK,"transaction");
+  const retired=await observeReadonlyManagedPath(workspace,RETIRED,"transaction");
+  if(retired.kind !== "missing") {
+    if(retired.kind !== "directory" || lock.kind !== "missing")conflict("Ambiguous active/retired transaction state");
+    return recoverRetired(workspace,runtime);
+  }
   if(lock.kind === "missing")return "absent";
   if(lock.kind !== "directory")conflict("Unsafe transaction reservation");
   const bytes = await artifact(workspace,JOURNAL,JOURNAL,"transaction");
@@ -209,10 +246,10 @@ async function recoverLocked(workspace: string, runtime?: MacosHelperRuntime): P
   return assessment.decision === "committed" ? "committed" : "rolled_back";
 }
 
-export async function recoverManagedReconciliation(workspace: string, runtime?: MacosHelperRuntime): Promise<"absent"|"rolled_back"|"committed"> {
+export async function recoverManagedReconciliation(workspace: string, runtime?: MacosHelperRuntime): Promise<"absent"|"rolled_back"|"committed"|"cleaned"> {
   verifiedMacosHelper(runtime); // Fail before acquiring or changing anything.
-  const release = await acquireMacosWorkspaceLease(workspace,runtime);
-  try {return await recoverLocked(workspace,runtime);} finally {await release();}
+  const lease = await acquireMacosWorkspaceLease(workspace,runtime);
+  try {return await recoverLocked(workspace,withMacosRootIdentity(lease.identity,runtime));} finally {await lease.release();}
 }
 
 export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, runtime?: MacosHelperRuntime): Promise<{committed:true;cleanupPending:boolean}> {
@@ -228,7 +265,8 @@ export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, r
     scaffoldDomain:plan.request.scaffoldDomain,adoptWorkspace:plan.request.adoptWorkspace,replaceAgents:plan.request.replaceAgents},releaseVersion);
   if(!fresh.safeToPresent || JSON.stringify(fresh.operations) !== JSON.stringify(plan.operations))throw new ReconciliationError("setup.stale_plan","Semantic plan changed before reservation");
   const intent = compileReadonlyTransactionIntent(plan,randomBytes(16).toString("hex"));
-  const release = await acquireMacosWorkspaceLease(plan.workspace,runtime);
+  const lease = await acquireMacosWorkspaceLease(plan.workspace,runtime);
+  runtime = withMacosRootIdentity(lease.identity,runtime);
   const bootstrapped = new Set<string>();
   try {
     // Fresh install bootstrap is additive, descriptor-anchored and authorized.
@@ -279,5 +317,5 @@ export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, r
       throw new ReconciliationError("setup.recovery_conflict",String(error)+"; "+String(recovery));
     }
     throw error;
-  } finally {await release();}
+  } finally {await lease.release();}
 }

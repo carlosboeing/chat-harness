@@ -11,7 +11,11 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <stdint.h>
 #include <unistd.h>
+
+static int guarded_root = 0;
+static unsigned long long root_dev = 0, root_ino = 0;
 
 static int valid_segment(const char *name) {
   if (!name || !*name || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
@@ -61,8 +65,11 @@ static int open_anchored_parent(const char *root, const char *parent) {
   }
   int dir = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
   if (dir < 0) return -1;
-  if (descend(&dir, root + 1) ||
-      (strcmp(parent, ".") && descend(&dir, parent))) {
+  int bad = descend(&dir, root + 1);
+  struct stat anchor;
+  if (!bad && guarded_root) bad = fstat(dir, &anchor) ||
+    (unsigned long long)anchor.st_dev != root_dev || (unsigned long long)anchor.st_ino != root_ino;
+  if (bad || (strcmp(parent, ".") && descend(&dir, parent))) {
     int saved = errno;
     close(dir);
     errno = saved == 0 ? EINVAL : saved;
@@ -92,7 +99,11 @@ static int check_file(int dir, const char *name, const char *expected, struct st
   if (!S_ISREG(after.st_mode) || !S_ISREG(leaf.st_mode) ||
       before.st_dev != after.st_dev || before.st_ino != after.st_ino ||
       after.st_dev != leaf.st_dev || after.st_ino != leaf.st_ino ||
-      before.st_size != after.st_size) goto done;
+      before.st_size != after.st_size ||
+      before.st_mtimespec.tv_sec != after.st_mtimespec.tv_sec ||
+      before.st_mtimespec.tv_nsec != after.st_mtimespec.tv_nsec ||
+      before.st_ctimespec.tv_sec != after.st_ctimespec.tv_sec ||
+      before.st_ctimespec.tv_nsec != after.st_ctimespec.tv_nsec) goto done;
   char hex[65];
   for (int i=0;i<32;i++) snprintf(hex+2*i, 3, "%02x", bytes[i]);
   ok = strcmp(hex, expected) == 0;
@@ -127,6 +138,23 @@ static void test_after_move(void) {
   test_pause("GATE0_TEST_AFTER_MOVE_DELAY_US");
 }
 
+/* Test build only: kill the orchestrator at a named native boundary. */
+static void test_boundary(const char *operation, const char *leaf) {
+#ifdef GATE0_TEST_HOOKS
+  const char *wanted = getenv("GATE0_TEST_BOUNDARY");
+  const char *signal = getenv("GATE0_TEST_BOUNDARY_SIGNAL");
+  char label[512];
+  snprintf(label, sizeof(label), "%s:%s", operation, leaf);
+  if (wanted && *wanted && signal && *signal && !strncmp(label, wanted, strlen(wanted))) {
+    int fd = open(signal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (fd >= 0) { (void)write(fd, label, strlen(label)); close(fd); }
+    usleep(2000000);
+  }
+#else
+  (void)operation; (void)leaf;
+#endif
+}
+
 static int move_no_replace(int dir, const char *from, const char *to) {
   return renameatx_np(dir, from, dir, to, RENAME_EXCL);
 }
@@ -147,6 +175,7 @@ static int stage_exclusive(const char *root, const char *parent,
   int fd = openat(dir, target, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
   if (fd < 0) { perror("stage exists or cannot create"); close(dir); return 4; }
 
+  test_boundary("stage-open", target);
   struct stat initial, after, leaf, verified;
   int ok = 1;
   if (fstat(fd, &initial) || !S_ISREG(initial.st_mode)) ok = 0;
@@ -194,6 +223,7 @@ static int stage_exclusive(const char *root, const char *parent,
     fprintf(stderr, "Stage integrity, size or identity conflict; preserve any partial file for recovery\\n");
     return 5;
   }
+  test_boundary("staged", target);
   puts("stage OK");
   return 0;
 }
@@ -247,6 +277,7 @@ static int verify_or_discard(const char *op, const char *root, const char *paren
       current.st_ino != observed.st_ino || current.st_size != observed.st_size ||
       unlinkat(dir, leaf, 0);
   }
+  if (!bad && !strcmp(op, "discard")) test_boundary("discarded", leaf);
   close(dir);
   return bad ? 5 : 0;
 }
@@ -259,14 +290,41 @@ static int lease_workspace(const char *root) {
   int dir = open_anchored_parent(root, ".");
   if (dir < 0) return 2;
   if (flock(dir, LOCK_EX | LOCK_NB)) { close(dir); return 4; }
-  puts("locked"); fflush(stdout);
+  struct stat anchor;
+  if (fstat(dir, &anchor)) { close(dir); return 5; }
+  printf("locked %llu:%llu\n", (unsigned long long)anchor.st_dev, (unsigned long long)anchor.st_ino); fflush(stdout);
   char block[64];
   while (read(STDIN_FILENO, block, sizeof(block)) > 0) {}
   close(dir);
   return 0;
 }
 
+/* Atomically retire the settled reservation before consuming commit proof.
+ * This directory move is exclusive and inode-verified just like file moves.
+ * The fixed retired namespace explains process interruption during final
+ * journal/token disposal, without guessing away an initial empty reservation.
+ */
+static int retire_transaction(const char *root) {
+  int dir = open_anchored_parent(root, ".chat-harness/temp");
+  if (dir < 0) return 2;
+  int fd = openat(dir, "reconcile", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  struct stat before, named;
+  int bad = fd < 0 || fstat(fd, &before) ||
+    renameatx_np(dir, "reconcile", dir, "reconcile-cleanup", RENAME_EXCL);
+  if (!bad) bad = fstatat(dir, "reconcile-cleanup", &named, AT_SYMLINK_NOFOLLOW) ||
+    !S_ISDIR(named.st_mode) || before.st_dev != named.st_dev || before.st_ino != named.st_ino;
+  if (!bad) test_boundary("retired", "reconcile");
+  if (fd >= 0) close(fd);
+  close(dir);
+  return bad ? 5 : 0;
+}
+
 int main(int argc, char **argv) {
+  if (argc > 2 && !strncmp(argv[argc-1], "--root-identity=", 16)) {
+    char tail;
+    if (sscanf(argv[argc-1]+16, "%llu:%llu%c", &root_dev, &root_ino, &tail) != 2) return 64;
+    guarded_root = 1; --argc;
+  }
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
 #if defined(__arm64__) || defined(__aarch64__)
@@ -279,6 +337,7 @@ int main(int argc, char **argv) {
 #endif
     return 0;
   }
+  if (argc == 3 && !strcmp(argv[1], "retire")) return retire_transaction(argv[2]);
   if (argc == 3 && !strcmp(argv[1], "lease")) return lease_workspace(argv[2]);
   if (argc == 5 && (!strcmp(argv[1], "mkdir") || !strcmp(argv[1], "rmdir")))
     return directory_operation(argv[1], argv[2], argv[3], argv[4]);
@@ -312,6 +371,7 @@ int main(int argc, char **argv) {
     close(dir); return 4;
   }
   test_after_move();
+  test_boundary("moved", target);
   if (check_file(dir, target, hash, &moved) ||
       moved.st_dev != initial.st_dev || moved.st_ino != initial.st_ino) {
     // A different inode with identical bytes is still an intervening source.

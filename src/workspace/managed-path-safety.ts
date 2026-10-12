@@ -43,7 +43,10 @@ export function assertCanonicalManagedPath(relative: string, owner: ManagedFileO
     : owner === "workspace" ? relative === ".chat-harness/WORKSPACE.md" || relative === ".chat-harness/manifest.yaml"
     : owner === "transaction" ? (relative === ".chat-harness/temp/reconcile" ||
       relative === ".chat-harness/temp/reconcile/journal.json" ||
-      relative === ".chat-harness/temp/reconcile/commit.token")
+      relative === ".chat-harness/temp/reconcile/commit.token" ||
+      relative === ".chat-harness/temp/reconcile-cleanup" ||
+      relative === ".chat-harness/temp/reconcile-cleanup/journal.json" ||
+      relative === ".chat-harness/temp/reconcile-cleanup/commit.token")
     : owner === "scaffold" ? relative === ".chat-harness/source-policy.yaml" ||
       MANAGED_DIRECTORY_PATHS.has(relative as ManagedPath) ||
       (segments.length === 1 && /^[A-Za-z0-9][A-Za-z0-9 _-]*$/.test(relative))

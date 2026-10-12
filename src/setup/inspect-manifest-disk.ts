@@ -119,6 +119,13 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
   });
 
   try {
+    const retired = await observeReadonlyManagedPath(root, ".chat-harness/temp/reconcile-cleanup", "transaction");
+    if(retired.kind !== "missing") {
+      transaction = retired.kind === "directory" ? "pending" : "unsafe";
+      findings.push(finding(transaction === "pending" ? "setup.recovery_required" : "setup.recovery_conflict",
+        ".chat-harness/temp/reconcile-cleanup","A retired reconciliation needs verified cleanup; read-only inspection does not remove it."));
+      return result();
+    }
     const lock = await observeReadonlyManagedPath(root, RECONCILE_LOCK, "transaction");
     if (lock.kind === "directory") {
       transaction = "pending";

@@ -159,7 +159,7 @@ jobs:
       - name: Run native packaging invocation and fail-closed tests
         env:
           CHAT_HARNESS_TEST_PACKAGING: "1"
-        run: bun test tests/setup/macos-helper.test.ts tests/setup/transaction-engine.test.ts tests/package/release.test.ts
+        run: bun test tests/setup/macos-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/release.test.ts
       - name: Verify sidecar mode, checksum and inclusion in npm tarball
         run: |
           test -x dist/bin/chat-harness-darwin-${{ matrix.arch }}.macos-safe-move
