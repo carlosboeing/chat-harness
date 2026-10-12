@@ -68,7 +68,7 @@ chat-harness doctor /path/to/project
 chat-harness doctor --json
 ```
 
-Checks local health without modifying files, including Workspace readability/writability, scaffold health, runtime compatibility, capability registry integrity when present, and Git when the GitHub extension development path is present.
+Checks local health without modifying files, including Workspace readability/writability, scaffold health, runtime compatibility, packaged native-helper availability, capability registry integrity when present, and Git when the GitHub extension development path is present.
 
 Runtime requirements:
 
