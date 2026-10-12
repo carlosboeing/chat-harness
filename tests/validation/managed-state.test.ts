@@ -52,7 +52,8 @@ describe("read-only manifest diagnostics",()=>{
     const r=await fixture();
     await mkdir(path.join(r,".chat-harness/temp/reconcile"),{recursive:true});
     await writeFile(path.join(r,".chat-harness/manifest.yaml"),"schema: [");
-    expect((await managedStateHealthFindings(r)).map(x=>x.code)).toEqual(["setup.recovery_required"]);
+    expect((await managedStateHealthFindings(r)).map(x=>x.code))
+      .toEqual(["setup.recovery_required","setup.recovery_conflict"]);
   });
   test("invalid schema is reported and absent manifest does not disrupt legacy validation",async()=>{
     const r=await fixture(),p=path.join(r,".chat-harness/manifest.yaml");
