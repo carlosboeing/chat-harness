@@ -1,4 +1,4 @@
-// macOS Gate 0 bounded native SPIKE, not wired to the setup CLI.
+// macOS bounded native helper; no destructive production setup integration.
 // Anchor every ancestor from "/" using openat(O_DIRECTORY|O_NOFOLLOW).
 // Exactly one source and target *in the same verified parent directory* per call.
 // Compile/test only on macOS; this does not implement manifest journaling or recovery.
@@ -131,6 +131,18 @@ static int move_no_replace(int dir, const char *from, const char *to) {
 }
 
 int main(int argc, char **argv) {
+  // Strict, side-effect-free packaged-helper protocol probe.
+  if (argc == 2 && !strcmp(argv[1], "--probe")) {
+#if defined(__arm64__) || defined(__aarch64__)
+    puts("chat-harness-macos-helper/1 darwin-arm64");
+#elif defined(__x86_64__)
+    puts("chat-harness-macos-helper/1 darwin-x64");
+#else
+    fprintf(stderr, "Unsupported native helper architecture\n");
+    return 64;
+#endif
+    return 0;
+  }
   if (argc != 7 || (strcmp(argv[1], "move") && strcmp(argv[1], "promote") &&
                     strcmp(argv[1], "restore"))) {
     fprintf(stderr, "Usage: gate0-safe-move move|promote|restore WORKSPACE_ROOT RELATIVE_PARENT SOURCE_BASE TARGET_BASE SHA256_HEX\n");
