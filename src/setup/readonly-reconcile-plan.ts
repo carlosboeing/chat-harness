@@ -241,6 +241,19 @@ export async function inspectAndPlanReadonlyReconciliation(
   }
   const request = resolveReconcileRequest(options, base.manifest);
   const targets = await inspectReconcileTargets(base.workspace, request.desiredSpecialists, base);
+  if (base.manifestState === "missing" &&
+      (targets.agents?.containsManagedMarker || targets.workspaceFile?.containsManagedMarker)) {
+    const legacyFindings = [
+      ...(targets.agents?.containsManagedMarker ? [conflict(
+        "setup.unsupported_legacy_state", "AGENTS.md", "Unmanifested Chat Harness Core marker requires migration.")] : []),
+      ...(targets.workspaceFile?.containsManagedMarker ? [conflict(
+        "setup.unsupported_legacy_state", WORKSPACE, "Unmanifested Workspace markers require migration.")] : []),
+    ];
+    return { workspace: base.workspace, request, safeToPresent: false,
+      executable: false, operations: Object.freeze([]),
+      findings: Object.freeze([...targets.findings, ...legacyFindings]),
+      sameDigestTransactionRequired: false };
+  }
   const managed = buildReadonlySemanticPreview(targets, releaseVersion, {
     adoptWorkspace: request.adoptWorkspace, replaceAgents: request.replaceAgents,
   });
