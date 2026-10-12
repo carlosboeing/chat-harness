@@ -101,6 +101,61 @@ describe("lifecycle commands", () => {
     expect(fixture.calls.metadata).toEqual([]);
   });
 
+  test("macOS software update refuses a release without native helper before mutation", async () => {
+    const fixture = dependencies(installation(), { platform: "darwin" });
+    const result = await runUpdate("0.3.0", { check: false, json: true }, fixture.deps);
+    expect(result.result.state).toBe("update_failed");
+    expect(result.findings?.[0]?.message).toMatch(/missing the macOS native helper/);
+    expect(fixture.calls.replaced).toEqual([]);
+    expect(fixture.calls.metadata).toEqual([]);
+  });
+
+  test("macOS software update verifies companion SHA-256 and passes bytes to replacement", async () => {
+    const helperBytes = new TextEncoder().encode("helper candidate");
+    const helperDigest = sha256(helperBytes);
+    const fixture = dependencies(installation());
+    const macRelease = {
+      ...release().release,
+      nativeHelper: {
+        binary: { name: "chat-harness-darwin-arm64.macos-safe-move", url: "https://example/native-helper" },
+        checksum: { name: "chat-harness-darwin-arm64.macos-safe-move.sha256", url: "https://example/native-checksum" },
+      },
+    };
+    const downloaded: string[] = [];
+    const mac = {
+      ...fixture.deps,
+      platform: "darwin" as const,
+      latestStandalone: async () => macRelease,
+      download: async (url: string) => {
+        downloaded.push(url);
+        if (url === "https://example/native-helper") return helperBytes;
+        if (url === "https://example/native-checksum") {
+          return new TextEncoder().encode(helperDigest + "  " + macRelease.nativeHelper.binary.name + "\n");
+        }
+        return fixture.deps.download(url);
+      },
+      replacePosix: (target: string, _binary: Uint8Array, _version: string, helper?: Uint8Array) => {
+        fixture.calls.replaced.push(target);
+        expect(helper).toEqual(helperBytes);
+      },
+    };
+    const result = await runUpdate("0.3.0", { check: false, json: true }, mac);
+    expect(result.result.state).toBe("updated");
+    expect(downloaded).toContain("https://example/native-helper");
+    expect(fixture.calls.metadata).toHaveLength(1);
+    expect(fixture.calls.replaced).toHaveLength(1);
+
+    const rejected = await runUpdate("0.3.0", { check: false, json: true }, {
+      ...mac,
+      download: async (url: string) => url === "https://example/native-checksum"
+        ? new TextEncoder().encode("0".repeat(64) + "  " + macRelease.nativeHelper.binary.name + "\n")
+        : mac.download(url),
+    });
+    expect(rejected.result.state).toBe("update_failed");
+    expect(rejected.findings?.[0]?.message).toMatch(/Checksum/);
+    expect(fixture.calls.replaced).toHaveLength(1);
+  });
+
   test("standalone update verifies downloads before metadata or replacement", async () => {
     const fixture = dependencies(installation(), {
       download: async () => new TextEncoder().encode("not a valid sidecar"),
@@ -291,6 +346,18 @@ describe("lifecycle commands", () => {
     expect(result.result.deferred).toBe(true);
     expect(fixture.calls.windowsUpdate).toEqual(["/home/test/.local/bin/chat-harness"]);
     expect(fixture.calls.replaced).toEqual([]);
+  });
+
+  test("macOS standalone uninstall removes its software-only native companion", async () => {
+    const fixture = dependencies(installation(), { platform: "darwin" });
+    const result = await runUninstall("0.3.0", { json: true }, fixture.deps);
+    expect(result.result.state).toBe("uninstalled");
+    expect(fixture.calls.removed).toEqual([
+      "/home/test/.local/bin/chat-harness",
+      "/home/test/.local/bin/chat-harness.macos-safe-move",
+      "/home/test/.local/bin/chat-harness.macos-safe-move.sha256",
+      "/home/test/.local/bin/.chat-harness-install.json",
+    ]);
   });
 
   test("standalone uninstall removes only executable and install metadata", async () => {
