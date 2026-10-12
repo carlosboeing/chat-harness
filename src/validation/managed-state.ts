@@ -9,6 +9,7 @@
 import type { Finding } from "../cli/result.js";
 import { inspectManifestDisk, observeReadonlyManagedPath } from "../setup/inspect-manifest-disk.js";
 import { parseWorkspaceBoundary } from "../setup/workspace-boundary.js";
+import { inspectPendingJournalHealth } from "./pending-journal.js";
 
 const WORKSPACE = ".chat-harness/WORKSPACE.md";
 
@@ -25,6 +26,10 @@ export async function managedStateHealthFindings(workspace: string): Promise<Fin
 
   // Fail closed: the transaction journal may own partial outputs. Never
   // classify them as a new or corrupt installation or attempt recovery.
+  if (inspected.transaction === "pending") {
+    findings.push(...await inspectPendingJournalHealth(inspected.workspace));
+    return findings;
+  }
   if (inspected.transaction !== "absent") return findings;
   if (inspected.manifestState !== "valid") return findings;
 
