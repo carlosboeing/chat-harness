@@ -79,11 +79,11 @@ describe("local development installer", () => {
     const companion = source + ".macos-safe-move";
     writeFileSync(companion, "helper binary");
     const digest = createHash("sha256").update("helper binary").digest("hex");
-    writeFileSync(companion + ".sha256", digest + "  " + path.basename(companion) + "\\n");
+    writeFileSync(companion + ".sha256", digest + "  " + path.basename(companion) + "\n");
     const target = installBinary(dest, source, true);
     expect(readFileSync(target, "utf8")).toBe("new executable");
     expect(readFileSync(target + ".macos-safe-move", "utf8")).toBe("helper binary");
-    expect(readFileSync(target + ".macos-safe-move.sha256", "utf8")).toBe(digest + "  chat-harness.macos-safe-move\\n");
+    expect(readFileSync(target + ".macos-safe-move.sha256", "utf8")).toBe(digest + "  chat-harness.macos-safe-move\n");
   });
 
   test("finds the first executable on PATH", () => {
