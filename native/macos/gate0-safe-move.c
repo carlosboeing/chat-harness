@@ -130,6 +130,73 @@ static int move_no_replace(int dir, const char *from, const char *to) {
   return renameatx_np(dir, from, dir, to, RENAME_EXCL);
 }
 
+/**
+ * Write a new sibling stage from stdin. Unlike pathname-based Node writes,
+ * openat pins the verified parent and O_EXCL refuses an intervening file.
+ * A partial/failed stage is kept for journal-led investigation, never deleted
+ * through a racy pathname. Maximum payload is 16 MiB.
+ */
+static int stage_exclusive(const char *root, const char *parent,
+                           const char *target, const char *hash) {
+  if (!valid_segment(target) || !valid_digest(hash)) {
+    fprintf(stderr, "Invalid stage destination or digest\\n"); return 64;
+  }
+  int dir = open_anchored_parent(root, parent);
+  if (dir < 0) { perror("stage anchored parent"); return 2; }
+  int fd = openat(dir, target, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+  if (fd < 0) { perror("stage exists or cannot create"); close(dir); return 4; }
+
+  struct stat initial, after, leaf, verified;
+  int ok = 1;
+  if (fstat(fd, &initial) || !S_ISREG(initial.st_mode)) ok = 0;
+  CC_SHA256_CTX ctx;
+  if (ok && !CC_SHA256_Init(&ctx)) ok = 0;
+  unsigned char block[8192];
+  size_t total = 0;
+  while (ok) {
+    ssize_t n = read(STDIN_FILENO, block, sizeof(block));
+    if (n == 0) break;
+    if (n < 0) {
+      if (errno == EINTR) continue;
+      ok = 0; break;
+    }
+    total += (size_t)n;
+    if (total > 16 * 1024 * 1024 ||
+        !CC_SHA256_Update(&ctx, block, (CC_LONG)n)) { ok = 0; break; }
+    ssize_t consumed = 0;
+    while (consumed < n) {
+      ssize_t written = write(fd, block + consumed, (size_t)(n - consumed));
+      if (written < 0 && errno == EINTR) continue;
+      if (written <= 0) { ok = 0; break; }
+      consumed += written;
+    }
+  }
+  unsigned char bytes[CC_SHA256_DIGEST_LENGTH];
+  if (ok && !CC_SHA256_Final(bytes, &ctx)) ok = 0;
+  char actual[65] = {0};
+  if (ok) {
+    for (int i=0;i<32;i++) snprintf(actual+2*i, 3, "%02x", bytes[i]);
+    if (strcmp(actual, hash) != 0) ok = 0;
+  }
+  if (ok && fsync(fd)) ok = 0;
+  if (ok && (fstat(fd, &after) ||
+             after.st_dev != initial.st_dev || after.st_ino != initial.st_ino ||
+             after.st_size != (off_t)total)) ok = 0;
+  close(fd);
+  if (ok && (fstatat(dir, target, &leaf, AT_SYMLINK_NOFOLLOW) ||
+             !S_ISREG(leaf.st_mode) ||
+             leaf.st_dev != initial.st_dev || leaf.st_ino != initial.st_ino)) ok = 0;
+  if (ok && (check_file(dir, target, hash, &verified) ||
+             verified.st_dev != initial.st_dev || verified.st_ino != initial.st_ino)) ok = 0;
+  close(dir);
+  if (!ok) {
+    fprintf(stderr, "Stage integrity, size or identity conflict; preserve any partial file for recovery\\n");
+    return 5;
+  }
+  puts("stage OK");
+  return 0;
+}
+
 int main(int argc, char **argv) {
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
@@ -142,6 +209,9 @@ int main(int argc, char **argv) {
     return 64;
 #endif
     return 0;
+  }
+  if (argc == 6 && !strcmp(argv[1], "stage")) {
+    return stage_exclusive(argv[2], argv[3], argv[4], argv[5]);
   }
   if (argc != 7 || (strcmp(argv[1], "move") && strcmp(argv[1], "promote") &&
                     strcmp(argv[1], "restore"))) {

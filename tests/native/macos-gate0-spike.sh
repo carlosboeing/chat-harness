@@ -117,6 +117,28 @@ if run restore "." interrupted.backup interrupted.md "$interrupted_digest"; then
 
 echo "PASS: macOS root-anchored move, nested paths, no-clobber, inode races and SIGKILL recovery proof"
 
+# Root-anchored O_EXCL stage creation: hash, collision, wrong bytes, symlinks.
+stage_body='verified new stage bytes'
+stage_hash="$(printf '%s' "$stage_body" | shasum -a 256 | awk '{print $1}')"
+printf '%s' "$stage_body" | "$bin" stage "$workspace" "." ".unit-stage" "$stage_hash"
+[[ "$(cat "$workspace/.unit-stage")" == "$stage_body" ]] || fail "exclusive stage did not contain verified bytes"
+if printf 'unexpected' | "$bin" stage "$workspace" "." ".unit-stage" "$stage_hash"; then
+  fail "stage clobbered occupied destination"
+fi
+[[ "$(cat "$workspace/.unit-stage")" == "$stage_body" ]] || fail "stage collision changed existing content"
+if printf 'bad stage data' | "$bin" stage "$workspace" "." ".mismatch-stage" "$stage_hash"; then
+  fail "stage accepted incorrect digest"
+fi
+[[ -f "$workspace/.mismatch-stage" ]] || fail "failed stage evidence was deleted"
+ln -s ".unit-stage" "$workspace/.symlink-stage"
+if printf '%s' "$stage_body" | "$bin" stage "$workspace" "." ".symlink-stage" "$stage_hash"; then
+  fail "stage followed occupied symlink"
+fi
+[[ -L "$workspace/.symlink-stage" ]] || fail "symlink stage altered"
+if printf '%s' "$stage_body" | "$bin" stage "$workspace" "redirect-parent/procedures" ".nested-stage" "$stage_hash"; then
+  fail "stage followed symlinked parent"
+fi
+
 # Separate disposable-Workspace journal proof; never used by installed CLI.
 cd "$root"
 GATE0_SPIKE_NATIVE="$bin" bun test tests/native/macos-journal-spike.test.ts

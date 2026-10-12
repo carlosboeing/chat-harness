@@ -117,3 +117,38 @@ export function invokeMacosSafeMove(input: MacosMove, info: MacosHelperRuntime =
       `no-replace ${input.operation} failed (exit ${result.status ?? "unknown"}). ${(result.stderr ?? "").trim()} Preserve the Workspace and inspect the transaction before retrying.`);
   }
 }
+
+export interface MacosStage {
+  workspace: string;
+  /** Parent directory relative to an explicit physical Workspace root. */
+  parent: string;
+  destination: string;
+  /** Lowercase raw SHA-256 hex of the exact desired bytes. */
+  digest: string;
+  content: Buffer | Uint8Array;
+}
+
+/**
+ * Descriptor-anchored, exclusive creation primitive for one stage only.
+ * No parent mkdir, journal creation, rollback or production setup integration.
+ */
+export function invokeMacosSafeStage(input: MacosStage, info: MacosHelperRuntime = runtime()): void {
+  if (!/^[0-9a-f]{64}$/.test(input.digest)) {
+    throw new MacosHelperError("invalid", "stage requires a lowercase SHA-256 hex digest.");
+  }
+  const content = Buffer.from(input.content);
+  if (content.length > 16 * 1024 * 1024 ||
+      createHash("sha256").update(content).digest("hex") !== input.digest) {
+    throw new MacosHelperError("invalid", "stage payload is oversized or differs from expected digest.");
+  }
+  const executable = verifiedMacosHelper(info);
+  const args = ["stage", input.workspace, input.parent, input.destination, input.digest];
+  const result = spawnSync(executable, args, {
+    input: content, encoding: "utf8", timeout: 15000, maxBuffer: 4096,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  if (result.error || result.status !== 0) {
+    throw new MacosHelperError("failed",
+      `exclusive native stage failed (exit ${result.status ?? "unknown"}). ${(result.stderr ?? "").trim()} Preserve the Workspace and inspect transaction state.`);
+  }
+}
