@@ -120,3 +120,7 @@ echo "PASS: macOS root-anchored move, nested paths, no-clobber, inode races and 
 # Separate disposable-Workspace journal proof; never used by installed CLI.
 cd "$root"
 GATE0_SPIKE_NATIVE="$bin" bun test tests/native/macos-journal-spike.test.ts
+
+# Multi-file manifest-last, no-replace commit and deterministic rollback rehearsal.
+# All paths are disposable test Workspaces; the installed CLI is not mutated.
+GATE0_SPIKE_NATIVE="$bin" bun test tests/native/macos-multifile-recovery-spike.test.ts
