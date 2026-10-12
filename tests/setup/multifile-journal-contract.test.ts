@@ -27,7 +27,7 @@ const journal: ManagedTransactionJournal = {
       path: file, owner: "core", action: "create", before: null, after: sha("new AGENTS"),
       stage: journalSibling(file,"stage",id), backup: null,
     },
-  ],
+  ].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0),
 };
 function snapshot(
   canonicalManifest: RecoveryObservation["canonicalManifest"] = oldManifest,
@@ -45,8 +45,8 @@ function snapshot(
 describe("multi-file journal proof and recovery classification (no I/O)",()=>{
   test("valid journal has lexical destinations and tightly named sibling artifacts",()=>{
     const result = validateManagedJournal(journal);
-    expect(result.operations.map(x=>x.path)).toEqual([proc,work,file]);
-    expect(result.operations[1]?.stage).toBe(".chat-harness/.WORKSPACE.md.chat-harness-stage-"+id);
+    expect(result.operations.map(x=>x.path)).toEqual([work,proc,file]);
+    expect(result.operations[0]?.stage).toBe(".chat-harness/.WORKSPACE.md.chat-harness-stage-"+id);
     expect(assessManagedRecovery(journal,snapshot())).toMatchObject({
       decision:"rollback",executable:false,conflicts:[],
     });
@@ -62,7 +62,7 @@ describe("multi-file journal proof and recovery classification (no I/O)",()=>{
     now.operations[2]!.stage=null;
     const result=assessManagedRecovery(journal,now);
     expect(result.decision).toBe("rollback");
-    expect(result.files.map(x=>x.state)).toEqual(["backed_up","after","after"]);
+    expect(result.files.map(x=>x.state)).toEqual(["after","backed_up","after"]);
   });
   test("new manifest proves commit only if EVERY output and backup is consistent",()=>{
     const now=snapshot(newManifest);
