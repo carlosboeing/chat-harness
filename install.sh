@@ -31,29 +31,65 @@ fi
 tmp="$(mktemp -d)"
 stage=""
 metadata_tmp=""
+helper_stage=""
+helper_checksum_stage=""
 cleanup() {
   rm -rf "$tmp"
   [ -z "$stage" ] || rm -f "$stage"
   [ -z "$metadata_tmp" ] || rm -f "$metadata_tmp"
+  [ -z "$helper_stage" ] || rm -f "$helper_stage"
+  [ -z "$helper_checksum_stage" ] || rm -f "$helper_checksum_stage"
 }
 trap cleanup EXIT INT TERM
 
 curl -fsSL "$base/$asset" -o "$tmp/$asset"
 curl -fsSL "$base/$asset.sha256" -o "$tmp/$asset.sha256"
 
-if command -v sha256sum >/dev/null 2>&1; then
-  (cd "$tmp" && sha256sum -c "$asset.sha256")
-elif command -v shasum >/dev/null 2>&1; then
-  expected="$(awk '{print $1}' "$tmp/$asset.sha256")"
-  actual="$(shasum -a 256 "$tmp/$asset" | awk '{print $1}')"
-  [ "$expected" = "$actual" ] || { echo "Checksum verification failed" >&2; exit 1; }
-else
-  echo "sha256sum or shasum is required for checksum verification" >&2
-  exit 1
+if [ "$platform" = "darwin" ]; then
+  # Must be present in the release. Never compile or fetch source on the user Mac.
+  helper_asset="$asset.macos-safe-move"
+  curl -fsSL "$base/$helper_asset" -o "$tmp/$helper_asset"
+  curl -fsSL "$base/$helper_asset.sha256" -o "$tmp/$helper_asset.sha256"
+fi
+
+verify_sha256() {
+  item="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    (cd "$tmp" && sha256sum -c "$item.sha256")
+  elif command -v shasum >/dev/null 2>&1; then
+    expected="$(awk '{print $1}' "$tmp/$item.sha256")"
+    actual="$(shasum -a 256 "$tmp/$item" | awk '{print $1}')"
+    [ "$expected" = "$actual" ] || { echo "Checksum verification failed for $item" >&2; exit 1; }
+  else
+    echo "sha256sum or shasum is required for checksum verification" >&2
+    exit 1
+  fi
+}
+
+verify_sha256 "$asset"
+if [ "$platform" = "darwin" ]; then
+  verify_sha256 "$helper_asset"
 fi
 
 mkdir -p "$INSTALL_DIR"
 destination="$INSTALL_DIR/chat-harness"
+if [ "$platform" = "darwin" ]; then
+  helper_stage="$INSTALL_DIR/.chat-harness-helper-install.$$"
+  helper_checksum_stage="$INSTALL_DIR/.chat-harness-helper-sha-install.$$"
+  install -m 0755 "$tmp/$helper_asset" "$helper_stage"
+  (
+    umask 077
+    helper_digest="$(awk '{print $1}' "$tmp/$helper_asset.sha256")"
+    printf '%s  chat-harness.macos-safe-move\n' "$helper_digest" > "$helper_checksum_stage"
+  )
+  # Companion first; an interrupted install leaves an invalid/missing helper
+  # fail-closed rather than permitting destructive filesystem operations.
+  mv -f "$helper_stage" "$INSTALL_DIR/chat-harness.macos-safe-move"
+  helper_stage=""
+  mv -f "$helper_checksum_stage" "$INSTALL_DIR/chat-harness.macos-safe-move.sha256"
+  helper_checksum_stage=""
+fi
+
 stage="$INSTALL_DIR/.chat-harness-install.$$"
 install -m 0755 "$tmp/$asset" "$stage"
 mv -f "$stage" "$destination"

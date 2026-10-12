@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import {
   findExecutableOnPath,
@@ -63,6 +64,26 @@ describe("local development installer", () => {
     expect(installed).toBe(path.join(binDir, "chat-harness"));
     expect(existsSync(installed)).toBe(true);
     expect(readFileSync(installed, "utf8")).toContain("echo local");
+  });
+
+  test("requires the local sidecar before modifying the target, and installs both with rewritten checksum", () => {
+    const root = tempRoot();
+    const source = path.join(root, "chat-harness-darwin-arm64");
+    const dest = path.join(root, "bin");
+    writeFileSync(source, "new executable");
+    mkdirSync(dest);
+    writeFileSync(path.join(dest, "chat-harness"), "old executable");
+    expect(() => installBinary(dest, source, true)).toThrow();
+    expect(readFileSync(path.join(dest, "chat-harness"), "utf8")).toBe("old executable");
+
+    const companion = source + ".macos-safe-move";
+    writeFileSync(companion, "helper binary");
+    const digest = createHash("sha256").update("helper binary").digest("hex");
+    writeFileSync(companion + ".sha256", digest + "  " + path.basename(companion) + "\n");
+    const target = installBinary(dest, source, true);
+    expect(readFileSync(target, "utf8")).toBe("new executable");
+    expect(readFileSync(target + ".macos-safe-move", "utf8")).toBe("helper binary");
+    expect(readFileSync(target + ".macos-safe-move.sha256", "utf8")).toBe(digest + "  chat-harness.macos-safe-move\n");
   });
 
   test("finds the first executable on PATH", () => {
