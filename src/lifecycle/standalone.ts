@@ -3,6 +3,7 @@ import {
   chmodSync,
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   renameSync,
   rmSync,
@@ -10,6 +11,7 @@ import {
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { verifiedMacosHelper } from "../workspace/macos-helper.js";
 
 const REPOSITORY = "carlosboeing/chat-harness";
 
@@ -196,16 +198,38 @@ export interface PosixReplacementInput {
   target: string;
   candidateBytes: Uint8Array;
   expectedVersion: string;
+  nativeHelperBytes?: Uint8Array;
   verifyVersion?: VerifyVersionFn;
+  /** Allows deterministic tests without executing an architecture-specific helper on Linux. */
+  verifyNativeHelper?: (stagedExecutable: string) => void;
   uniqueSuffix?: string;
 }
 
+/**
+ * Replaces only software-owned executable artifacts; never Workspace files.
+ * Companion helper is staged and verified before any installed artifact changes.
+ * If the process is interrupted between renames, the next invocation of the
+ * native primitive fails closed on its checksum/protocol, never falls back.
+ */
 export function replaceStandalonePosix(input: PosixReplacementInput): void {
   const verifyVersion = input.verifyVersion ?? verifyBinaryVersion;
   const suffix = input.uniqueSuffix ?? process.pid + "." + Date.now();
   const directory = path.dirname(input.target);
   const candidate = path.join(directory, ".chat-harness-update." + suffix);
   const backup = path.join(directory, ".chat-harness-backup." + suffix);
+  const helper = input.target + ".macos-safe-move";
+  const helperChecksum = helper + ".sha256";
+  const backupHelper = backup + ".macos-safe-move";
+  const backupChecksum = backupHelper + ".sha256";
+  const stagedDir = path.join(directory, ".chat-harness-helper-stage." + suffix);
+  const stagedExecutable = path.join(stagedDir, path.basename(input.target));
+  const stagedHelper = stagedExecutable + ".macos-safe-move";
+  const stagedChecksum = stagedHelper + ".sha256";
+  let hadHelper = false;
+  let movedHelper = false;
+  let movedChecksum = false;
+  let movedBinary = false;
+  let safeToCleanup = false;
 
   mkdirSync(directory, { recursive: true });
   try {
@@ -213,18 +237,90 @@ export function replaceStandalonePosix(input: PosixReplacementInput): void {
     chmodSync(candidate, 0o755);
     verifyVersion(candidate, input.expectedVersion);
 
-    copyFileSync(input.target, backup);
-    renameSync(candidate, input.target);
-
-    try {
-      verifyVersion(input.target, input.expectedVersion);
-    } catch (error) {
-      renameSync(backup, input.target);
-      throw error;
+    if (input.nativeHelperBytes) {
+      hadHelper = existsSync(helper);
+      const hadChecksum = existsSync(helperChecksum);
+      if (hadHelper !== hadChecksum) {
+        throw new Error("Existing macOS native helper is incomplete; preserving installed software for manual repair.");
+      }
+      for (const target of [helper, helperChecksum]) {
+        if (existsSync(target) && !lstatSync(target).isFile()) {
+          throw new Error("Installed macOS native helper has unsafe file type: " + target);
+        }
+      }
+      mkdirSync(stagedDir, { recursive: true });
+      writeFileSync(stagedHelper, input.nativeHelperBytes);
+      chmodSync(stagedHelper, 0o755);
+      const digest = sha256(input.nativeHelperBytes);
+      writeFileSync(stagedChecksum, digest + "  " + path.basename(stagedHelper) + "\n", "utf8");
+      const verifyNativeHelper = input.verifyNativeHelper ?? ((staged: string) => {
+        verifiedMacosHelper({
+          platform: "darwin",
+          arch: process.arch,
+          standalone: true,
+          executablePath: staged,
+          entryPath: "",
+        });
+      });
+      verifyNativeHelper(stagedExecutable);
     }
-    rmSync(backup, { force: true });
+
+    // Back up all existing software files before the first rename.
+    copyFileSync(input.target, backup);
+    if (input.nativeHelperBytes && hadHelper) {
+      copyFileSync(helper, backupHelper);
+      copyFileSync(helperChecksum, backupChecksum);
+    }
+
+    if (input.nativeHelperBytes) {
+      renameSync(stagedHelper, helper);
+      movedHelper = true;
+      renameSync(stagedChecksum, helperChecksum);
+      movedChecksum = true;
+    }
+    renameSync(candidate, input.target);
+    movedBinary = true;
+
+    verifyVersion(input.target, input.expectedVersion);
+    if (input.nativeHelperBytes) {
+      const verifyNativeHelper = input.verifyNativeHelper ?? ((staged: string) => {
+        verifiedMacosHelper({
+          platform: "darwin",
+          arch: process.arch,
+          standalone: true,
+          executablePath: staged,
+          entryPath: "",
+        });
+      });
+      verifyNativeHelper(input.target);
+    }
+    safeToCleanup = true;
+  } catch (error) {
+    try {
+      // Reverse only renames completed by this invocation, preserving old bytes.
+      if (movedBinary) renameSync(backup, input.target);
+      if (movedChecksum) {
+        if (hadHelper) renameSync(backupChecksum, helperChecksum);
+        else rmSync(helperChecksum, { force: true });
+      }
+      if (movedHelper) {
+        if (hadHelper) renameSync(backupHelper, helper);
+        else rmSync(helper, { force: true });
+      }
+      safeToCleanup = true;
+    } catch (recoveryError) {
+      throw new Error("Standalone update failed and rollback could not be verified; backups retained near " +
+        input.target + ". Cause: " + String(error) + "; rollback: " + String(recoveryError));
+    }
+    throw error;
   } finally {
     rmSync(candidate, { force: true });
-    if (existsSync(backup)) rmSync(backup, { force: true });
+    rmSync(stagedDir, { recursive: true, force: true });
+    // Never discard last known-good copies after an unsuccessful rollback.
+    if (safeToCleanup) {
+      rmSync(backup, { force: true });
+      rmSync(backupHelper, { force: true });
+      rmSync(backupChecksum, { force: true });
+    }
   }
 }
