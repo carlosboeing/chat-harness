@@ -77,7 +77,7 @@ const errorFinding = (code: string, location: string, message: string): Finding 
 
 function strictText(bytes: Buffer): string {
   // decode() rejects malformed UTF-8 instead of silently changing user bytes.
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 }
 
 async function target(workspace: string, relative: string, owner: Owner,
