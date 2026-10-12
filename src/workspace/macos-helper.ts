@@ -152,3 +152,19 @@ export function invokeMacosSafeStage(input: MacosStage, info: MacosHelperRuntime
       `exclusive native stage failed (exit ${result.status ?? "unknown"}). ${(result.stderr ?? "").trim()} Preserve the Workspace and inspect transaction state.`);
   }
 }
+
+/**
+ * Reserve only .chat-harness/temp/reconcile inside an existing verified
+ * Workspace. Returns on exclusive creation; never opens, adopts or removes
+ * another process's transaction. Apply/recovery integration is separate.
+ */
+export function reserveMacosReconciliationLock(workspace: string, info: MacosHelperRuntime = runtime()): void {
+  const executable = verifiedMacosHelper(info);
+  const result = spawnSync(executable, ["reserve", workspace], {
+    encoding: "utf8", timeout: 15000, maxBuffer: 4096, stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error || result.status !== 0) {
+    throw new MacosHelperError("failed",
+      `exclusive reconciliation reservation failed (exit ${result.status ?? "unknown"}). Preserve existing transaction state and inspect it read-only.`);
+  }
+}
