@@ -49,7 +49,7 @@ export interface LifecycleDependencies {
   realpath(target: string): string | null;
   latestStandalone(currentVersion: string): Promise<StandaloneRelease>;
   download(url: string): Promise<Uint8Array>;
-  replacePosix(target: string, bytes: Uint8Array, expectedVersion: string): void;
+  replacePosix(target: string, bytes: Uint8Array, expectedVersion: string, nativeHelper?: Uint8Array): void;
   scheduleWindowsUpdate(
     target: string,
     bytes: Uint8Array,
@@ -127,8 +127,8 @@ export const defaultLifecycleDependencies: LifecycleDependencies = {
   latestStandalone: (version) =>
     lookupLatestStandaloneRelease(process.platform, process.arch, version),
   download: downloadBytes,
-  replacePosix: (target, bytes, expectedVersion) =>
-    replaceStandalonePosix({ target, candidateBytes: bytes, expectedVersion }),
+  replacePosix: (target, bytes, expectedVersion, nativeHelper) =>
+    replaceStandalonePosix({ target, candidateBytes: bytes, expectedVersion, ...(nativeHelper ? { nativeHelperBytes: nativeHelper } : {}) }),
   scheduleWindowsUpdate: stageWindowsUpdate,
   scheduleWindowsRemove: (target, metadataPath) => {
     scheduleWindowsLifecycleJob({
@@ -383,6 +383,18 @@ export async function runUpdate(
       dependencies.download(release.checksum.url),
     ]);
     verifyDownloadedAsset(binary, checksum, release.binary.name);
+    let nativeHelperBytes: Uint8Array | undefined;
+    if (dependencies.platform === "darwin") {
+      if (!release.nativeHelper) {
+        throw new Error("Release is missing the macOS native helper; update aborted without modifying the installation.");
+      }
+      const [helperBinary, helperChecksum] = await Promise.all([
+        dependencies.download(release.nativeHelper.binary.url),
+        dependencies.download(release.nativeHelper.checksum.url),
+      ]);
+      verifyDownloadedAsset(helperBinary, helperChecksum, release.nativeHelper.binary.name);
+      nativeHelperBytes = helperBinary;
+    }
 
     const metadataPath =
       installation.metadataPath ??
@@ -414,6 +426,7 @@ export async function runUpdate(
       installation.executablePath,
       binary,
       release.version,
+      nativeHelperBytes,
     );
     return {
       result: {
@@ -549,6 +562,10 @@ export async function runUninstall(
     }
 
     dependencies.removeFile(installation.executablePath);
+    if (dependencies.platform === "darwin") {
+      dependencies.removeFile(installation.executablePath + ".macos-safe-move");
+      dependencies.removeFile(installation.executablePath + ".macos-safe-move.sha256");
+    }
     dependencies.removeFile(metadataPath);
     return { result: { state: "uninstalled", ...base } };
   } catch (error) {
