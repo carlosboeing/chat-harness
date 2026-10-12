@@ -234,7 +234,7 @@ export function buildReadonlySemanticPreview(
       }
       if (current.kind === "missing") {
         operations.push({ path: change.path, owner: "core", action: "create",
-          expected: { kind: "absent" }, afterDigest: change.afterDigest });
+          expected: { kind: "absent" }, ...(change.afterDigest ? { afterDigest: change.afterDigest } : {}) });
       } else if (current.kind !== "file" || !current.digest) {
         findings.push(errorFinding("setup.agents_collision", change.path,
           "Root instructions have unexpected type."));
@@ -246,7 +246,7 @@ export function buildReadonlySemanticPreview(
       } else {
         operations.push({ path: change.path, owner: "core",
           action: current.digest === change.afterDigest ? "unchanged" : "replace",
-          expected: { kind: "exact", digest: current.digest }, afterDigest: change.afterDigest });
+          expected: { kind: "exact", digest: current.digest }, ...(change.afterDigest ? { afterDigest: change.afterDigest } : {}) });
       }
       continue;
     }
@@ -256,7 +256,7 @@ export function buildReadonlySemanticPreview(
         "New Procedure must be absent and outside historical manifest ownership."));
     } else {
       operations.push({ path: change.path, owner: change.owner, action: "create",
-        expected: { kind: "absent" }, afterDigest: change.afterDigest });
+        expected: { kind: "absent" }, ...(change.afterDigest ? { afterDigest: change.afterDigest } : {}) });
     }
   }
 
