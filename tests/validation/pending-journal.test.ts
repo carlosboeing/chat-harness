@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { exactByteDigest } from "../../src/setup/manifest.js";
 import { managedStateHealthFindings } from "../../src/validation/managed-state.js";
+import { expectedCompletionMarker } from "../../src/setup/equal-digest-marker.js";
+import { journalSibling } from "../../src/setup/multifile-journal-contract.js";
 
 const roots: string[]=[];
 afterEach(async()=>{await Promise.all(roots.splice(0).map(r=>rm(r,{recursive:true,force:true})));});
@@ -55,9 +57,35 @@ describe("read-only pending multi-file journal health",()=>{
     await writeFile(path.join(root,".chat-harness/temp/reconcile/journal.json"),journal(true));
     await writeFile(path.join(root,".chat-harness/temp/reconcile/commit.token"),"unverified");
     expect((await managedStateHealthFindings(root)).map(f=>f.code))
-      .toEqual(["setup.recovery_required"]);
+      .toEqual(["setup.recovery_required", "setup.recovery_conflict"]);
     await writeFile(path.join(root,".chat-harness/temp/reconcile/journal.json"),journal(false));
     expect((await managedStateHealthFindings(root)).map(f=>f.code))
       .toContain("setup.recovery_conflict");
   });
+  test("exact journal-bound token is inspected without marking a pending transaction as repaired",async()=>{
+    const root=await fixture(), id="abcdef0123456789";
+    const file=".chat-harness/WORKSPACE.md";
+    const manifest=exactByteDigest("same-manifest");
+    const record={
+      schema:1 as const,transactionId:id,
+      startingManifest:manifest,targetManifest:manifest,
+      operations:[{
+        path:file,owner:"workspace" as const,action:"replace" as const,
+        before:exactByteDigest("before"),after:exactByteDigest("after"),
+        stage:journalSibling(file,"stage",id),backup:journalSibling(file,"backup",id),
+      }],
+    };
+    const journalPath=path.join(root,".chat-harness/temp/reconcile/journal.json");
+    const tokenPath=path.join(root,".chat-harness/temp/reconcile/commit.token");
+    await writeFile(journalPath,JSON.stringify(record)+"\\n");
+    const token=expectedCompletionMarker(record);
+    await writeFile(tokenPath,token);
+    expect((await managedStateHealthFindings(root)).map(f=>f.code))
+      .toEqual(["setup.recovery_required"]);
+    expect(await readFile(tokenPath,"utf8")).toBe(token);
+    await writeFile(tokenPath,token+"\\n");
+    expect((await managedStateHealthFindings(root)).map(f=>f.code))
+      .toContain("setup.recovery_conflict");
+  });
+
 });
