@@ -1,5 +1,6 @@
 import { constants, accessSync, copyFileSync, mkdirSync, renameSync, rmSync, chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -33,17 +34,45 @@ export function resolveLocalVersion(execFn: ExecFn = execFileSync, cwd = process
   }
 }
 
-export function installBinary(binDir: string, sourceBin: string): string {
+export function installBinary(binDir: string, sourceBin: string, withMacosHelper = false): string {
   if (!sourceBin) throw new Error("Source binary path is required.");
   accessSync(sourceBin, constants.R_OK);
+  const helperSource = sourceBin + ".macos-safe-move";
+  const helperSourceChecksum = helperSource + ".sha256";
+  if (withMacosHelper) {
+    accessSync(helperSource, constants.R_OK);
+    accessSync(helperSourceChecksum, constants.R_OK);
+    const bytes = readFileSync(helperSource);
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    const recorded = readFileSync(helperSourceChecksum, "utf8");
+    if (recorded !== digest + "  " + path.basename(helperSource) + "\n") {
+      throw new Error("Local macOS helper checksum is missing or invalid.");
+    }
+  }
   mkdirSync(binDir, { recursive: true });
 
   const target = path.join(binDir, "chat-harness");
   const temp = path.join(binDir, `.chat-harness.tmp.${process.pid}.${Date.now()}`);
-  copyFileSync(sourceBin, temp);
-  chmodSync(temp, 0o755);
-  renameSync(temp, target);
-  return target;
+  const helperTemp = temp + ".macos-safe-move";
+  const checksumTemp = helperTemp + ".sha256";
+  try {
+    copyFileSync(sourceBin, temp);
+    chmodSync(temp, 0o755);
+    if (withMacosHelper) {
+      copyFileSync(helperSource, helperTemp);
+      chmodSync(helperTemp, 0o755);
+      const digest = createHash("sha256").update(readFileSync(helperTemp)).digest("hex");
+      writeFileSync(checksumTemp, digest + "  chat-harness.macos-safe-move\n", "utf8");
+      renameSync(helperTemp, target + ".macos-safe-move");
+      renameSync(checksumTemp, target + ".macos-safe-move.sha256");
+    }
+    renameSync(temp, target);
+    return target;
+  } finally {
+    rmSync(temp, { force: true });
+    rmSync(helperTemp, { force: true });
+    rmSync(checksumTemp, { force: true });
+  }
 }
 
 export function findExecutableOnPath(
@@ -105,7 +134,7 @@ export async function main(): Promise<void> {
     await buildBinary(target, path.relative(root, sourceBin), path.relative(root, entrypoint));
 
     console.log("\n2. Installing local binary...");
-    const installed = installBinary(binDir, sourceBin);
+    const installed = installBinary(binDir, sourceBin, process.platform === "darwin");
     console.log(`✓ Installed ${installed}`);
 
     console.log("\n3. Verifying installed version...");
