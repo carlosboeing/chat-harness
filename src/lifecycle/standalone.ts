@@ -23,6 +23,7 @@ export interface StandaloneRelease {
   tag: string;
   binary: ReleaseAsset;
   checksum: ReleaseAsset;
+  nativeHelper?: { binary: ReleaseAsset; checksum: ReleaseAsset };
 }
 
 interface GithubReleaseAsset {
@@ -77,11 +78,26 @@ export function parseGithubRelease(
     throw new Error("Release " + tag + " does not contain " + binaryName + " and its SHA-256 sidecar.");
   }
 
+  let nativeHelper: StandaloneRelease["nativeHelper"];
+  if (platform === "darwin") {
+    const helperName = binaryName + ".macos-safe-move";
+    const helperBinary = assets.find((asset) => asset.name === helperName);
+    const helperChecksum = assets.find((asset) => asset.name === helperName + ".sha256");
+    if (!helperBinary?.browser_download_url || !helperChecksum?.browser_download_url) {
+      throw new Error("Release " + tag + " is missing the required macOS native helper and its SHA-256 checksum.");
+    }
+    nativeHelper = {
+      binary: { name: helperName, url: helperBinary.browser_download_url },
+      checksum: { name: helperName + ".sha256", url: helperChecksum.browser_download_url },
+    };
+  }
+
   return {
     version: tag.slice(1),
     tag,
     binary: { name: binaryName, url: binary.browser_download_url },
     checksum: { name: binaryName + ".sha256", url: checksum.browser_download_url },
+    ...(nativeHelper ? { nativeHelper } : {}),
   };
 }
 
