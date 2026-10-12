@@ -6,6 +6,7 @@
 import type { Finding } from "../cli/result.js";
 import { observeReadonlyManagedPath } from "../setup/inspect-manifest-disk.js";
 import { validateManagedJournal } from "../setup/multifile-journal-contract.js";
+import { matchesCompletionMarker } from "../setup/equal-digest-marker.js";
 
 const JOURNAL = ".chat-harness/temp/reconcile/journal.json";
 const TOKEN = ".chat-harness/temp/reconcile/commit.token";
@@ -46,9 +47,13 @@ export async function inspectPendingJournalHealth(workspace: string): Promise<Fi
       if (!token.bytes || token.bytes.length > 1024) {
         return [issue("setup.recovery_conflict", TOKEN, "Unreadable or oversized commit token.")];
       }
-      if (parsed.startingManifest !== parsed.targetManifest) {
+      if (parsed.startingManifest !== parsed.targetManifest || parsed.operations.length === 0) {
         return [issue("setup.recovery_conflict", TOKEN,
-          "Equal-manifest commit token unexpectedly exists for changed-manifest transaction.")];
+          "Commit token is not valid for this journal's transaction type.")];
+      }
+      if (!matchesCompletionMarker(token.bytes, parsed)) {
+        return [issue("setup.recovery_conflict", TOKEN,
+          "Commit token does not match the validated journal and target manifest.")];
       }
     }
   } catch (error) {
