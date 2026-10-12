@@ -41,7 +41,7 @@ export interface ManifestDiskInspection {
  * Inspect the transaction lock before the manifest and historical paths.
  * A pending or suspicious lock blocks all further ownership interpretation.
  */
-interface DiskEntry {
+export interface DiskEntry {
   kind: DiskKind;
   bytes?: Buffer;
 }
@@ -63,7 +63,7 @@ function stableIdentity(a: { dev: number; ino: number; size: number; mtimeMs: nu
     a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
 }
 
-async function observe(workspace: string, relative: string, owner: ManagedFileOwner): Promise<DiskEntry> {
+export async function observeReadonlyManagedPath(workspace: string, relative: string, owner: ManagedFileOwner): Promise<DiskEntry> {
   // Validates the namespace, each existing ancestor, case/Unicode aliases,
   // symlink leaves and changing ancestor identity before any content reads.
   const absolute = await inspectManagedDestination(workspace, relative, owner);
@@ -119,7 +119,7 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
   });
 
   try {
-    const lock = await observe(root, RECONCILE_LOCK, "transaction");
+    const lock = await observeReadonlyManagedPath(root, RECONCILE_LOCK, "transaction");
     if (lock.kind === "directory") {
       transaction = "pending";
       findings.push(finding("setup.recovery_required", RECONCILE_LOCK,
@@ -141,7 +141,7 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
 
   let manifestEntry: DiskEntry;
   try {
-    manifestEntry = await observe(root, MANIFEST, "workspace");
+    manifestEntry = await observeReadonlyManagedPath(root, MANIFEST, "workspace");
   } catch (error) {
     manifestState = "unsafe";
     findings.push(finding(error instanceof ManagedPathSafetyError ? error.code : "setup.manifest_unreadable",
@@ -180,7 +180,7 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
     let state: ManagedDiskState = "unsafe";
     let actualDigest: ContentDigest | undefined;
     try {
-      const entry = await observe(root, item.path, item.owner === "core" ? "core" : "specialist");
+      const entry = await observeReadonlyManagedPath(root, item.path, item.owner === "core" ? "core" : "specialist");
       kind = entry.kind;
       if (kind === "missing") state = "missing";
       else if (kind !== "file" || !entry.bytes) state = kind === "unsafe" ? "unsafe" : "wrong_type";
