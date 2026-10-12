@@ -86,7 +86,7 @@ The normal workflow is to run Chat Harness **from inside the folder you want to 
 
 ```bash
 cd /path/to/your/project
-chat-harness setup --specialist tech
+chat-harness setup --specialists tech
 chat-harness validate
 chat-harness doctor
 ```
@@ -94,7 +94,7 @@ chat-harness doctor
 The path is optional. You can target another existing directory explicitly when needed:
 
 ```bash
-chat-harness setup /path/to/your/project --specialist tech
+chat-harness setup /path/to/your/project --specialists tech
 ```
 
 Chat Harness does not search parent directories for a Workspace.
@@ -119,7 +119,7 @@ Chat Harness does not search parent directories for a Workspace.
 └── AGENTS.md
 ```
 
-It is intentionally brownfield-safe: existing user-owned Workspace and domain content is preserved, a recognizably Chat Harness-managed `AGENTS.md` can be refreshed, and unknown same-name content is never silently adopted. If setup detects an existing root project-instructions file from an earlier harness, it preserves it and marks host activation as migration-required until its still-needed Workspace-specific behavior has been reviewed.
+It is intentionally brownfield-safe: existing user-owned Workspace and domain content is preserved, a recognizably Chat Harness-managed `AGENTS.md` can be refreshed, and unknown same-name content is never silently adopted. Unsupported historical markers/layouts without a supported manifest stop setup for a separately authorized one-time migration. Manual host bindings must be refreshed and verified separately.
 
 Creating the files is only the local half of setup. To use the Workspace with **ChatGPT Projects**:
 
@@ -158,10 +158,10 @@ The goal is not to load everything. It is to recover the right state and the min
 
 A specialist gives a new Workspace domain-specific starting guidance by seeding `WORKSPACE.md`. It is **not a separate agent or runtime mode**; after setup, the file is yours to adapt.
 
-Built-in specialists are `general`, `research`, `tech`, `tax`, `finance`, `career`, `shopping`, and `travel`.
+The twelve versioned Specialists are `business`, `career`, `dev`, `education`, `finance`, `health`, `home`, `legal`, `shopping`, `tax`, `tech`, and `travel`. General/mixed use is Core only (`--specialists none`); research is Core methodology. Omitted selection preserves an installed set.
 
 ```bash
-chat-harness setup --specialist research
+chat-harness setup --specialists none
 ```
 
 Specialists capture durable domain judgement and evidence standards. Procedures remain separate: a specialist describes **how the Workspace generally works**; a Procedure describes **how a recurring task is performed**.
@@ -204,17 +204,17 @@ Workspace commands (`setup`, `validate`, and `doctor`) accept an optional `[path
 | `chat-harness update` | Check/update the installed CLI through its detected standalone or npm channel. | Keep Chat Harness software current without remembering channel-specific commands. |
 | `chat-harness uninstall` | Remove the installed CLI only. | Uninstall Chat Harness without touching Workspace/project data. |
 
-Interactive `setup` explains choices before asking for consent, shows the complete resulting Workspace tree with human-readable status labels, and asks for approval before writing.
+Interactive `setup` explains choices before asking for consent, preselects installed bundles, previews semantic path changes, and asks for approval before writing.
 
 Common setup options:
 
 | Option | What it means |
 |---|---|
-| `--specialist <id>` | Start `WORKSPACE.md` with guidance for `general`, `research`, `tech`, `tax`, `finance`, `career`, `shopping`, or `travel`. |
-| `--scaffold-domain` | Also create the selected specialist's optional starter folders. |
+| `--specialists <ids>` | Reconcile the exact desired comma-separated set; `none` selects Core only. |
+| `--scaffold-domain` | Also create the selected Specialists' additive starter-folder union. |
 | `--dry-run` | Show what setup would change without writing anything. |
 | `--replace-agents` | Explicitly overwrite an unmanaged existing `AGENTS.md`. |
-| `--replace-workspace` | Explicitly overwrite `WORKSPACE.md` with the selected specialist seed. |
+| `--adopt-workspace` | Preserve all unmarked `WORKSPACE.md` bytes as user customization. |
 | `--json` | Emit stable machine-readable output; for setup, this also disables interactive prompts. |
 | `--no-color` | Disable ANSI terminal decoration. |
 
@@ -222,8 +222,8 @@ Examples:
 
 ```bash
 chat-harness setup
-chat-harness setup --specialist travel
-chat-harness setup --specialist tech --scaffold-domain
+chat-harness setup --specialists travel
+chat-harness setup --specialists tech --scaffold-domain
 chat-harness setup --dry-run
 chat-harness validate --json
 chat-harness doctor
@@ -233,6 +233,8 @@ chat-harness uninstall
 ```
 
 Run `chat-harness --help` or `chat-harness <command> --help` for terminal help. See the complete [CLI reference](docs/cli.md) for behavior, safety rules, automation, and exit codes.
+
+Setup uses schema-1 manifest ownership, exact-byte preconditions, native non-clobbering reconciliation and verified recovery. Workspace suffixes and user files are preserved. See [reconciliation safety](docs/reconciliation.md). Windows destructive setup is fail-closed and remains a v1 release-contract blocker. Software version stays `0.3.7` until separate release approval; this branch documents the v1 implementation candidate.
 
 ## Bounded capability extension
 

@@ -41,7 +41,7 @@ function procedure(name: string): ManagedProcedureDefinition {
 /**
  * Versioned first-party domain bundles. General/mixed-use is the empty set;
  * research is cross-cutting Core methodology, not a managed Specialist.
- * This registry is not wired into the existing v0.3.7 setup CLI.
+ * Used by exact-set setup planning and managed reconciliation.
  */
 export const SPECIALISTS: Readonly<Record<SpecialistId, SpecialistDefinition>> = {
   business: { id: "business", version: 1, label: "Business & Entrepreneurship",

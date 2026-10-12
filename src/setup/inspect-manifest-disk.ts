@@ -4,7 +4,7 @@ import path from "node:path";
 
 import type { Finding } from "../cli/result.js";
 import { inspectManagedDestination, ManagedPathSafetyError, type ManagedFileOwner } from "../workspace/managed-path-safety.js";
-import { exactByteDigest, parseManifest, type ContentDigest, type WorkspaceManifest } from "./manifest.js";
+import { exactByteDigest, parseManifest, ManifestContractError, type ContentDigest, type WorkspaceManifest } from "./manifest.js";
 import { AGENTS_MANAGED_MARKER } from "./templates.js";
 
 const MANIFEST = ".chat-harness/manifest.yaml";
@@ -169,7 +169,7 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
     manifestState = "valid";
   } catch (error) {
     manifestState = "invalid";
-    findings.push(finding("setup.manifest_invalid", MANIFEST, String(error)));
+    findings.push(finding(error instanceof ManifestContractError ? error.code : "setup.manifest_invalid", MANIFEST, String(error)));
     return result(); // Never traverse unvalidated manifest paths.
   }
 

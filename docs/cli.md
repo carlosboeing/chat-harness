@@ -19,64 +19,34 @@ All user-facing commands support `--json`, `--no-color`, and `--help`.
 ## setup
 
 ```bash
-chat-harness setup
-chat-harness setup --specialist travel
-chat-harness setup /path/to/project --specialist tech
+chat-harness setup [path]
+chat-harness setup --specialists travel,shopping --scaffold-domain
+chat-harness setup --specialists none --dry-run --json
 ```
-
-Creates or safely reconciles the Workspace scaffold.
 
 | Option | Purpose |
 |---|---|
-| `--dry-run` | Show the exact reconciliation plan without writing. |
-| `--specialist <id>` | Seed `WORKSPACE.md` with domain-specific starting guidance. |
-| `--scaffold-domain` | Create the selected specialist's optional starter folders. |
-| `--replace-agents` | Explicitly overwrite an unmanaged `AGENTS.md`. |
-| `--replace-workspace` | Explicitly overwrite `WORKSPACE.md` with the selected specialist seed. |
-| `--json` | Emit structured output and disable interactive prompts. |
+| `--specialists <ids>` | Exact desired comma-separated set; `none` alone means Core only. |
+| `--scaffold-domain` | Add the union of missing optional starter directories. |
+| `--adopt-workspace` | Preserve every byte of unmarked Workspace instructions after the user boundary. |
+| `--replace-agents` | Explicit consent to replace an unmanaged root `AGENTS.md`. |
+| `--dry-run` | Inspect/plan only; never recover, create, replace, remove or clean up. |
+| `--json` | Stable semantic output; disable interactive prompts. |
+| `--no-color` | Disable terminal decoration. |
 
-Specialists: `general`, `research`, `tech`, `tax`, `finance`, `career`, `shopping`, and `travel`.
+The twelve supported IDs and optional folders are listed in [Specialists](specialists.md). Whitespace and duplicates are normalized; empty comma items, unknown IDs and `none` mixed with IDs are rejected. Omitted selection preserves installed Specialists, or selects zero on a fresh non-interactive Workspace.
 
-### Guided setup
+Interactive setup preselects installed bundles, offers a multiselect and additive folders, collects separate brownfield consent, shows the semantic path changes and asks for final approval. Dry-run never reaches mutation. A pending transaction requires recovery authorization before a fresh preview; non-interactive setup itself authorizes recovery and reconciliation.
 
-In an interactive terminal, setup:
+Legacy `--specialist`, `--replace-workspace`, `--force`, version pinning and recovery/transaction flags are unsupported. There is no silent legacy migration.
 
-1. explains what Chat Harness will add and what it will preserve;
-2. asks what the Workspace is mainly for in plain language;
-3. explains optional organizational folders and shows whether each is new or already present;
-4. protects existing unmanaged files by default and offers previews before replacement decisions;
-5. shows the complete resulting Chat Harness tree with human-readable status labels;
-6. asks whether to set up the Workspace before writing;
-7. replaces low-level operation receipts with a friendly completion tree;
-8. prints the manual Google Drive + ChatGPT connection steps when the Workspace is ready.
+### Ownership and safety
 
-Cancelling the final confirmation applies no changes.
+Schema-1 `.chat-harness/manifest.yaml` records the Core and selected versioned bundles, including exact last-applied Core/Procedure digests. Workspace customization, Source Policy, optional folders and user data are excluded. `WORKSPACE.md` uses separate managed/user markers, with an exact-byte preserved suffix. Recognizable historical markers without a supported manifest require explicit migration outside setup.
 
-### Non-interactive setup
+Setup checks all semantic preconditions under an exclusive native lease/reservation, stages updates exclusively, applies lexical non-clobbering moves, verifies moved backups and outputs, and commits the manifest last. Identical-manifest updates use separately verified atomic completion proof. Success is reported only after commit readback; failed cleanup reports a warning and retains recoverable evidence.
 
-Without interactive prompts:
-
-- omitted `--specialist` uses `general`;
-- optional folders require `--scaffold-domain`;
-- unmanaged `AGENTS.md` requires `--replace-agents` to be overwritten;
-- existing `WORKSPACE.md` requires `--replace-workspace` to be replaced.
-
-### Safety
-
-Setup does not reorganize existing domain content. Optional domain folders are additive only. Wrong-type collisions and symlinks at managed paths require user action. A recognized Chat Harness-managed `AGENTS.md` may be refreshed; unmanaged files are never silently adopted.
-
-### Optional specialist folders
-
-| Specialist | Folders |
-|---|---|
-| `general` | none |
-| `research` | `Research/` |
-| `tech` | `Projects/` |
-| `tax` | `Tax/` |
-| `finance` | `Finance/` |
-| `career` | `Profile/`, `Opportunities/` |
-| `shopping` | `Research/`, `Purchases/` |
-| `travel` | `Trips/` |
+The packaged native backend supports macOS and Linux arm64/x64. Windows mutation fails before any additive/managed write; read-only planning and software lifecycle commands remain available. This is a release-contract blocker until Windows is proven or the narrower platform contract is explicitly approved. See [Reconciliation and recovery](reconciliation.md).
 
 ## validate
 
@@ -120,7 +90,7 @@ chat-harness update --json
 
 `update` detects the running installation before doing anything:
 
-- **standalone release binary** — uses the latest stable GitHub Release for the current OS/architecture, downloads both the binary and its SHA-256 sidecar, verifies the checksum, verifies the candidate binary version, and replaces the installed executable;
+- **standalone release binary** — uses the latest stable GitHub Release for the current OS/architecture, downloads the binary, SHA-256 sidecar and required native helper/checksum, verifies the checksum, verifies the candidate binary version, and replaces the installed executable;
 - **global npm package** — queries the npm `latest` tag, then delegates mutation to `npm install -g chat-harness@latest` and verifies the installed package version;
 - **local development build** — reports the development installation and refuses to replace it with a published release;
 - **unknown/custom installation** — refuses mutation rather than guessing ownership.
@@ -189,7 +159,7 @@ For global npm installs, Chat Harness delegates to:
 npm uninstall -g chat-harness
 ```
 
-For standalone or `install:local` binaries, it removes only the detected executable and its adjacent Chat-Harness-owned installation metadata.
+For standalone or `install:local` binaries, it removes only the detected executable, packaged native companion/checksum where present, and installation metadata.
 
 On Windows, self-removal is scheduled through the same post-exit helper strategy used for replacement.
 
@@ -245,6 +215,6 @@ chat-harness uninstall --help
 
 The CLI configures the local Workspace; it cannot configure hosted AI-assistant Projects directly.
 
-For ChatGPT Projects, follow the [ChatGPT setup guide](hosts/chatgpt.md). If setup reports `migration_required`, review and migrate the still-needed Workspace-specific behavior from the existing root project instructions before activating the host binding; otherwise add the Workspace folder as a Project source and copy the complete `AGENTS.md` into Project Instructions.
+For ChatGPT Projects, follow the [ChatGPT setup guide](hosts/chatgpt.md). If setup reports unsupported legacy state, perform the separately authorized one-time migration first. After a verified setup, add the Workspace folder as a Project source and copy the complete `AGENTS.md` into Project Instructions. The CLI cannot verify whether a manual host binding is current.
 
 See [Getting started](getting-started.md) for the complete beginner flow.

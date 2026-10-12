@@ -6,18 +6,20 @@ import { inspectAndPlanReadonlyReconciliation } from "../../src/setup/readonly-r
 import { executeManagedReconciliation, recoverManagedReconciliation } from "../../src/setup/transaction-engine.js";
 
 test("unsupported mutation fails before any additive or managed writes", async () => {
-  if (process.platform === "darwin") return;
+  if (process.platform === "darwin" || process.platform === "linux") {
+    // Unsupported Windows mutation must refuse before touching the fixture.
+  }
   const root = mkdtempSync(path.join(os.tmpdir(), "harness-unsupported-"));
   try {
     const plan = await inspectAndPlanReadonlyReconciliation(root, {specialists:"shopping"}, "0.3.7");
     expect(plan.safeToPresent).toBe(true);
-    await expect(executeManagedReconciliation(plan)).rejects.toThrow("unsupported");
+    await expect(executeManagedReconciliation(plan,{platform:"win32",arch:"x64",standalone:false,entryPath:"/missing",executablePath:"/missing"})).rejects.toThrow("unsupported");
     expect(existsSync(path.join(root,".chat-harness"))).toBe(false);
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
 
-const native = process.platform === "darwin" && process.env.CHAT_HARNESS_TEST_PACKAGING === "1";
-const runtime = {platform:"darwin",arch:process.arch,standalone:false,
+const native = ["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING === "1";
+const runtime = {platform:process.platform,arch:process.arch,standalone:false,
   entryPath:path.resolve(import.meta.dir,"../../dist/npm/chat-harness.js"),executablePath:"unused"};
 
 test.skipIf(!native)("native fresh/repeated/exact-set removal preserves user bytes", async () => {

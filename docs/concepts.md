@@ -18,11 +18,11 @@ The canonical portable source of generic Chat Harness behavior. A host that can 
 
 The single Workspace-specific instruction extension. It captures domain role, judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
 
-The current CLI seeds it and then leaves it user-owned. vNext will separate a managed Specialist prefix from the user-owned suffix during the forthcoming reconciliation phase. Keep it compact: domain role, high-value invariants, approvals, and only the routing pointers that are useful across the Workspace.
+The CLI composes a managed Specialist prefix and preserves the suffix after the user boundary byte-for-byte. Keep it compact: domain role, high-value invariants, approvals, and only the routing pointers that are useful across the Workspace.
 
 ## Specialist
 
-A setup-time seed for `WORKSPACE.md`. A specialist captures durable domain judgement and evidence standards; it is not a separate agent, runtime mode, inheritance hierarchy, or Procedure package.
+A versioned setup-time bundle of managed `WORKSPACE.md` guidance and optional Procedures. A specialist captures durable domain judgement and evidence standards; it is not a separate agent, runtime mode, inheritance hierarchy, or runtime routing mode.
 
 See [Specialists](specialists.md).
 

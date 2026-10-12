@@ -159,7 +159,7 @@ jobs:
       - name: Run native packaging invocation and fail-closed tests
         env:
           CHAT_HARNESS_TEST_PACKAGING: "1"
-        run: bun test tests/setup/macos-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/release.test.ts
+        run: bun test tests/setup/macos-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/mvp-cli.test.ts tests/package/release.test.ts
       - name: Verify sidecar mode, checksum and inclusion in npm tarball
         run: |
           test -x dist/bin/chat-harness-darwin-${{ matrix.arch }}.macos-safe-move
@@ -214,3 +214,31 @@ jobs:
 
       - name: Run domain-agnostic browser runtime smoke test
         run: bun run smoke:browser
+
+  linux-helper-packaging:
+    name: Linux native reconciliation (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run build:npm
+      - run: bun run build:binary -- bun-linux-${{ matrix.arch }} dist/bin/chat-harness-linux-${{ matrix.arch }}
+      - name: Run real native transaction, race, termination and packaged entry-point checks
+        env:
+          CHAT_HARNESS_TEST_PACKAGING: "1"
+        run: |
+          bash tests/native/macos-gate0-spike.sh
+          bun test tests/setup/linux-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/mvp-cli.test.ts
+          bun scripts/smoke-built-binary.ts dist/bin/chat-harness-linux-${{ matrix.arch }}

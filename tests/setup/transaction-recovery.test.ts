@@ -11,8 +11,8 @@ import { exactByteDigest } from "../../src/setup/manifest.js";
 import { journalSibling } from "../../src/setup/multifile-journal-contract.js";
 import { expectedCompletionMarker } from "../../src/setup/equal-digest-marker.js";
 
-const enabled = process.platform === "darwin" && process.env.CHAT_HARNESS_TEST_PACKAGING === "1";
-const runtime = {platform:"darwin",arch:process.arch,standalone:false,
+const enabled = ["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING === "1";
+const runtime = {platform:process.platform,arch:process.arch,standalone:false,
  entryPath:path.resolve(import.meta.dir,"../../dist/npm/chat-harness.js"),executablePath:"unused"};
 const MANIFEST=".chat-harness/manifest.yaml", TOKEN=".chat-harness/temp/reconcile/commit.token";
 const id="0123456789abcdef0123456789abcdef";

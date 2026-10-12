@@ -34,10 +34,10 @@ export function resolveLocalVersion(execFn: ExecFn = execFileSync, cwd = process
   }
 }
 
-export function installBinary(binDir: string, sourceBin: string, withMacosHelper = false): string {
+export function installBinary(binDir: string, sourceBin: string, withMacosHelper = false, helperSuffix = ".macos-safe-move"): string {
   if (!sourceBin) throw new Error("Source binary path is required.");
   accessSync(sourceBin, constants.R_OK);
-  const helperSource = sourceBin + ".macos-safe-move";
+  const helperSource = sourceBin + helperSuffix;
   const helperSourceChecksum = helperSource + ".sha256";
   if (withMacosHelper) {
     accessSync(helperSource, constants.R_OK);
@@ -53,7 +53,7 @@ export function installBinary(binDir: string, sourceBin: string, withMacosHelper
 
   const target = path.join(binDir, "chat-harness");
   const temp = path.join(binDir, `.chat-harness.tmp.${process.pid}.${Date.now()}`);
-  const helperTemp = temp + ".macos-safe-move";
+  const helperTemp = temp + helperSuffix;
   const checksumTemp = helperTemp + ".sha256";
   try {
     copyFileSync(sourceBin, temp);
@@ -62,9 +62,9 @@ export function installBinary(binDir: string, sourceBin: string, withMacosHelper
       copyFileSync(helperSource, helperTemp);
       chmodSync(helperTemp, 0o755);
       const digest = createHash("sha256").update(readFileSync(helperTemp)).digest("hex");
-      writeFileSync(checksumTemp, digest + "  chat-harness.macos-safe-move\n", "utf8");
-      renameSync(helperTemp, target + ".macos-safe-move");
-      renameSync(checksumTemp, target + ".macos-safe-move.sha256");
+      writeFileSync(checksumTemp, digest + "  chat-harness" + helperSuffix + "\n", "utf8");
+      renameSync(helperTemp, target + helperSuffix);
+      renameSync(checksumTemp, target + helperSuffix + ".sha256");
     }
     renameSync(temp, target);
     return target;
@@ -134,7 +134,7 @@ export async function main(): Promise<void> {
     await buildBinary(target, path.relative(root, sourceBin), path.relative(root, entrypoint));
 
     console.log("\n2. Installing local binary...");
-    const installed = installBinary(binDir, sourceBin, process.platform === "darwin");
+    const installed = installBinary(binDir, sourceBin, ["darwin","linux"].includes(process.platform), process.platform === "linux" ? ".linux-safe-move" : ".macos-safe-move");
     console.log(`✓ Installed ${installed}`);
 
     console.log("\n3. Verifying installed version...");

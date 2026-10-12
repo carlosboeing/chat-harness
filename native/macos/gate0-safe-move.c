@@ -1,9 +1,24 @@
-// macOS bounded native helper; no destructive production setup integration.
+// Bounded POSIX native helper for macOS and Linux. No overwrite fallback.
 // Anchor every ancestor from "/" using openat(O_DIRECTORY|O_NOFOLLOW).
 // Exactly one source and target *in the same verified parent directory* per call.
 // Compile/test only on macOS; this does not implement manifest journaling or recovery.
 #define _DARWIN_C_SOURCE 1
+#define _GNU_SOURCE 1
+#ifdef __APPLE__
 #include <CommonCrypto/CommonDigest.h>
+#else
+#include <openssl/sha.h>
+#include <sys/syscall.h>
+#define CC_SHA256_CTX SHA256_CTX
+#define CC_SHA256_Init SHA256_Init
+#define CC_SHA256_Update SHA256_Update
+#define CC_SHA256_Final SHA256_Final
+#define CC_SHA256_DIGEST_LENGTH SHA256_DIGEST_LENGTH
+#define CC_LONG unsigned int
+#define st_mtimespec st_mtim
+#define st_ctimespec st_ctim
+#define RENAME_EXCL 1
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -132,7 +147,7 @@ static void test_after_move(void) {
   const char *flag = getenv("GATE0_TEST_AFTER_MOVE_SIGNAL");
   if (flag && *flag) {
     int fd = open(flag, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
-    if (fd >= 0) { (void)write(fd, "moved\n", 6); close(fd); }
+    if (fd >= 0) { ssize_t written = write(fd, "moved\n", 6); close(fd); if (written != 6) exit(65); }
   }
 #endif
   test_pause("GATE0_TEST_AFTER_MOVE_DELAY_US");
@@ -147,13 +162,20 @@ static void test_boundary(const char *operation, const char *leaf) {
   snprintf(label, sizeof(label), "%s:%s", operation, leaf);
   if (wanted && *wanted && signal && *signal && !strncmp(label, wanted, strlen(wanted))) {
     int fd = open(signal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
-    if (fd >= 0) { char signal_text[560]; snprintf(signal_text, sizeof(signal_text), "%s\n%ld\n", label, (long)getpid()); (void)write(fd, signal_text, strlen(signal_text)); close(fd); }
+    if (fd >= 0) { char signal_text[560]; snprintf(signal_text, sizeof(signal_text), "%s\n%ld\n", label, (long)getpid()); size_t size = strlen(signal_text); ssize_t written = write(fd, signal_text, size); close(fd); if (written != (ssize_t)size) exit(65); }
     usleep(2000000);
   }
 #else
   (void)operation; (void)leaf;
 #endif
 }
+
+#ifdef __linux__
+static int renameatx_np(int fromdir, const char *from, int todir, const char *to, unsigned int flags) {
+  if (flags != RENAME_EXCL) { errno = EINVAL; return -1; }
+  return (int)syscall(SYS_renameat2, fromdir, from, todir, to, 1 /* RENAME_NOREPLACE */);
+}
+#endif
 
 static int move_no_replace(int dir, const char *from, const char *to) {
   return renameatx_np(dir, from, dir, to, RENAME_EXCL);
@@ -327,7 +349,11 @@ int main(int argc, char **argv) {
   }
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__linux__) && defined(__aarch64__)
+    puts("chat-harness-native-helper/1 linux-arm64");
+#elif defined(__linux__) && defined(__x86_64__)
+    puts("chat-harness-native-helper/1 linux-x64");
+#elif defined(__arm64__) || defined(__aarch64__)
     puts("chat-harness-macos-helper/1 darwin-arm64");
 #elif defined(__x86_64__)
     puts("chat-harness-macos-helper/1 darwin-x64");

@@ -23,8 +23,7 @@ export interface WorkspaceManifest {
 }
 
 export class ManifestContractError extends Error {
-  readonly code = "setup.manifest_invalid";
-  constructor(message: string) {
+  constructor(message: string, readonly code: string = "setup.manifest_invalid") {
     super(message);
     this.name = "ManifestContractError";
   }
@@ -45,7 +44,7 @@ function keys(value: Record<string, unknown>, allowed: readonly string[], where:
 function version(value: unknown, where: string, maximum?: number): number {
   if (!Number.isSafeInteger(value) || (value as number) < 1) manifestError("Invalid version: " + where);
   const n = value as number;
-  if (maximum !== undefined && n > maximum) manifestError("Newer-than-bundled component version: " + where);
+  if (maximum !== undefined && n > maximum) throw new ManifestContractError("Newer-than-bundled component version: " + where, where === "core" ? "setup.core_version_too_new" : "setup.specialist_version_too_new");
   return n;
 }
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
@@ -72,7 +71,7 @@ function ownershipKey(path: string): string { return path.normalize("NFC").toLow
 export function validateManifest(value: unknown): WorkspaceManifest {
   const root = mapping(value, "manifest");
   keys(root, ["schema", "harness", "core", "specialists"], "manifest");
-  if (root.schema !== 1) manifestError("Unsupported manifest schema");
+  if (root.schema !== 1) throw new ManifestContractError("Unsupported manifest schema", "setup.manifest_schema_unsupported");
   const harness = mapping(root.harness, "harness");
   keys(harness, ["version"], "harness");
   if (typeof harness.version !== "string" || !harness.version.trim() ||
@@ -92,7 +91,7 @@ export function validateManifest(value: unknown): WorkspaceManifest {
   const out: Record<string, ManifestComponent> = {};
   const owned = new Map<string, string>([[ownershipKey("AGENTS.md"), "core"]]);
   for (const id of Object.keys(specialists).sort()) {
-    if (!isSpecialistId(id)) throw new ManifestContractError("Unknown installed Specialist ID: " + id);
+    if (!isSpecialistId(id)) throw new ManifestContractError("Unknown installed Specialist ID: " + id,"setup.specialist_unknown");
     const record = mapping(specialists[id], "specialists." + id);
     keys(record, ["version", "files"], "specialists." + id);
     const installed = version(record.version, id, SPECIALISTS[id].version);

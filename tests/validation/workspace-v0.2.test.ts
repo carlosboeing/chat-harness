@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { runSetup } from "../../src/setup/command.js";
+import { installMvpFixture } from "../helpers/mvp-workspace.js";
 import { validateWorkspace } from "../../src/validation/workspace.js";
 
 const roots: string[] = [];
@@ -27,12 +27,9 @@ describe("v0.2 workspace validation", () => {
 
   test("ignores obsolete v0.1 lifecycle content", async () => {
     const root = await workspace();
-    await runSetup(root, {
-      dryRun: false,
-      specialist: "general",
+    await installMvpFixture(root, {
+        specialists: "none",
       scaffoldDomain: false,
-      replaceAgents: false,
-      replaceWorkspace: false,
     });
 
     const lifecycle = path.join(root, ".chat-harness", "lifecycle", "2-design");
@@ -44,12 +41,9 @@ describe("v0.2 workspace validation", () => {
 
   test("validates the v0.2 Workstream current-direction contract", async () => {
     const root = await workspace();
-    await runSetup(root, {
-      dryRun: false,
-      specialist: "general",
+    await installMvpFixture(root, {
+        specialists: "none",
       scaffoldDomain: false,
-      replaceAgents: false,
-      replaceWorkspace: false,
     });
 
     await writeFile(

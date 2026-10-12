@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { runSetup } from "../../src/setup/command.js";
+import { installMvpFixture } from "../helpers/mvp-workspace.js";
 import { validateWorkspace } from "../../src/validation/workspace.js";
 
 const roots: string[] = [];
@@ -18,15 +18,15 @@ async function workspace(): Promise<string> {
 }
 
 describe("workspace validation", () => {
-  test("v0.2 setup with no workstreams is valid", async () => {
+  test("v1 fixture with no workstreams is valid", async () => {
     const root = await workspace();
-    await runSetup(root, { dryRun: false });
+    await installMvpFixture(root);
     expect(await validateWorkspace(root)).toEqual([]);
   });
 
   test("validates workstreams and Source Policy and orders findings deterministically", async () => {
     const root = await workspace();
-    await runSetup(root, { dryRun: false });
+    await installMvpFixture(root);
 
     await writeFile(
       path.join(root, ".chat-harness", "workstreams", "broken.md"),
@@ -46,7 +46,7 @@ describe("workspace validation", () => {
 
   test("rejects non-Markdown durable artifacts", async () => {
     const root = await workspace();
-    await runSetup(root, { dryRun: false });
+    await installMvpFixture(root);
     await writeFile(
       path.join(root, ".chat-harness", "workbench", "0-ideas", "native-doc.txt"),
       "not markdown\n",
@@ -67,7 +67,7 @@ describe("workspace validation", () => {
 
   test("legacy Workbench folders are diagnosed without migrating files", async () => {
     const root = await workspace();
-    await runSetup(root, { dryRun: false });
+    await installMvpFixture(root);
     const { mkdir, readFile } = await import("node:fs/promises");
     const legacy = path.join(root, ".chat-harness", "workbench", "2-decisions");
     await mkdir(legacy);

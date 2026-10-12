@@ -120,17 +120,17 @@ export async function smokeInstalledNpmPackage(
     }
 
     const setupHelp = run(bin, ["setup", "--help"], root).stdout;
-    if (!setupHelp.includes("--specialist <id>") || !setupHelp.includes("travel")) {
+    if (!setupHelp.includes("--specialists <ids>") || !setupHelp.includes("travel")) {
       throw new Error("installed setup help is missing specialist guidance");
     }
 
     const workspace = path.join(root, "workspace");
     await mkdir(workspace);
     const setup = JSON.parse(
-      run(bin, ["setup", "--specialist", "tech", "--json"], workspace).stdout,
-    ) as { success?: boolean; result?: { specialist?: string } };
-    if (setup.success !== true || setup.result?.specialist !== "tech") {
-      throw new Error("installed cwd setup with --specialist tech did not succeed");
+      run(bin, ["setup", "--specialists", "tech", "--json"], workspace).stdout,
+    ) as { success?: boolean; result?: { desired_specialists?: string[] } };
+    if (setup.success !== true || JSON.stringify(setup.result?.desired_specialists) !== JSON.stringify(["tech"])) {
+      throw new Error("installed cwd setup with --specialists tech did not succeed");
     }
 
     const validate = JSON.parse(

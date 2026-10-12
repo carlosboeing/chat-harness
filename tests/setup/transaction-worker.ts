@@ -4,4 +4,4 @@ import { executeManagedReconciliation } from "../../src/setup/transaction-engine
 const [root,entryPath,selection] = process.argv.slice(2);
 if(!root || !entryPath || selection===undefined)throw new Error("Invalid test worker arguments");
 const plan=await inspectAndPlanReadonlyReconciliation(root,{specialists:selection},"0.3.7");
-await executeManagedReconciliation(plan,{platform:"darwin",arch:process.arch,standalone:false,entryPath,executablePath:"unused"});
+await executeManagedReconciliation(plan,{platform:process.platform,arch:process.arch,standalone:false,entryPath,executablePath:"unused"});

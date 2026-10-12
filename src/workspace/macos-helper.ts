@@ -8,7 +8,7 @@ export type MacosHelperCode = "unsupported" | "missing" | "invalid" | "failed";
 
 export class MacosHelperError extends Error {
   constructor(readonly code: MacosHelperCode, detail: string) {
-    super(`macOS filesystem helper ${code}: ${detail}`);
+    super(`native filesystem helper ${code}: ${detail}`);
     this.name = "MacosHelperError";
   }
 }
@@ -38,11 +38,11 @@ function runtime(): MacosHelperRuntime {
 
 /** No PATH lookup, environment override, download, runtime compiler or source checkout. */
 export function macosHelperPath(info: MacosHelperRuntime = runtime()): string {
-  if (info.platform !== "darwin" || !["arm64", "x64"].includes(info.arch)) {
+  if (!["darwin","linux"].includes(info.platform) || !["arm64", "x64"].includes(info.arch)) {
     throw new MacosHelperError("unsupported", `${info.platform}/${info.arch}; native reconciliation is unavailable on this platform.`);
   }
-  if (info.standalone) return info.executablePath + ".macos-safe-move";
-  return path.join(path.dirname(info.entryPath), "native", "macos", `darwin-${info.arch}`, "safe-move");
+  if (info.standalone) return info.executablePath + (info.platform === "darwin" ? ".macos-safe-move" : ".linux-safe-move");
+  return path.join(path.dirname(info.entryPath), "native", info.platform === "darwin" ? "macos" : "linux", `${info.platform}-${info.arch}`, "safe-move");
 }
 
 function regularFile(file: string, executable: boolean): void {
@@ -76,15 +76,17 @@ export function verifiedMacosHelper(info: MacosHelperRuntime = runtime()): strin
 
   // Reject scripts, wrong architecture and fat/unknown binaries *before* executing.
   const cpu = info.arch === "arm64" ? 0x0100000c : 0x01000007;
-  if (bytes.length < 12 || bytes.readUInt32LE(0) !== 0xfeedfacf ||
-      bytes.readUInt32LE(4) !== cpu) {
-    throw new MacosHelperError("invalid", `helper is not a thin ${info.arch} macOS Mach-O executable.`);
-  }
+  const valid = info.platform === "darwin"
+    ? bytes.length >= 12 && bytes.readUInt32LE(0) === 0xfeedfacf && bytes.readUInt32LE(4) === cpu
+    : bytes.length >= 64 && bytes.subarray(0,4).equals(Buffer.from([0x7f,0x45,0x4c,0x46])) &&
+      bytes[4] === 2 && bytes[5] === 1 && bytes.readUInt16LE(18) === (info.arch === "arm64" ? 183 : 62) &&
+      bytes.readUInt16LE(16) === 2;
+  if (!valid) throw new MacosHelperError("invalid", `helper has wrong executable format or ${info.arch} architecture.`);
 
   const probe = spawnSync(executable, ["--probe"], {
     encoding: "utf8", timeout: 5000, maxBuffer: 4096, stdio: ["ignore", "pipe", "pipe"],
   });
-  const expected = `chat-harness-macos-helper/1 darwin-${info.arch}\n`;
+  const expected = info.platform === "darwin" ? `chat-harness-macos-helper/1 darwin-${info.arch}\n` : `chat-harness-native-helper/1 linux-${info.arch}\n`;
   if (probe.error || probe.status !== 0 || probe.stdout !== expected || probe.stderr !== "") {
     throw new MacosHelperError("invalid", "helper protocol/architecture probe failed; reinstall Chat Harness.");
   }

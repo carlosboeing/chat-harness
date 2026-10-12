@@ -58,7 +58,7 @@ A Workspace is also not an information silo. Relevant authorized context may liv
 
 `.chat-harness/WORKSPACE.md` is the single Workspace-specific instruction extension: role, domain judgement, evidence/currentness standards, invariants, output expectations, boundaries, and domain-specific approvals.
 
-[Specialists](specialists.md) seed `WORKSPACE.md` during setup. After creation, it is user-owned. There is no specialist inheritance, runtime composition, or template synchronization.
+[Specialists](specialists.md) are versioned setup-time bundles composed into the managed `WORKSPACE.md` prefix. The user-owned suffix is preserved byte-for-byte. There is no runtime agent routing or inheritance.
 
 A host that cannot consume `AGENTS.md` directly uses a narrow host binding. The binding makes the canonical instructions effective without becoming a second instruction canon. ChatGPT Project Instructions are the reference binding; see [ChatGPT host setup](hosts/chatgpt.md).
 
@@ -156,3 +156,9 @@ Compatibility is capability- and evidence-based, not inferred from vendor simila
 Chat Harness deliberately has no replacement agent loop, model-provider abstraction, workflow engine, scheduler, database, universal domain taxonomy, runtime specialist hierarchy, semantic migration framework, remote storage manager, full-screen TUI, or generic arbitrary shell/HTTP/browser capability.
 
 These abstractions should be earned by real implementation pressure.
+
+## v1 managed reconciliation
+
+The schema-1 manifest owns exact last-applied Core/Procedure bytes and integer component versions. `WORKSPACE.md` has a regenerated managed prefix and a byte-preserved user suffix; it has no durable full-file digest. Source Policy is create-once user-owned scaffold. Optional directories and domain content are never owned through creation alone.
+
+Read-only inspection/planning precedes authorization. The native executor/recovery applies bounded journal operations with non-clobbering file moves and manifest-last commitment. See [reconciliation](reconciliation.md) for platforms, process-interruption evidence and conflict handling. The historical singular setup libraries are disconnected from packaged CLI entry points.

@@ -1,0 +1,9 @@
+schema: 1
+harness:
+  version: 0.3.7
+core:
+  version: 2
+  files:
+    AGENTS.md:
+      digest: sha256:62d34da8aeb527710c8552fc5e38ff480a191c53d4591b554035f8aa1cc70759
+specialists: {}

@@ -33,6 +33,8 @@ stage=""
 metadata_tmp=""
 helper_stage=""
 helper_checksum_stage=""
+helper_suffix=".macos-safe-move"
+have_helper=0
 cleanup() {
   rm -rf "$tmp"
   [ -z "$stage" ] || rm -f "$stage"
@@ -47,7 +49,8 @@ curl -fsSL "$base/$asset.sha256" -o "$tmp/$asset.sha256"
 
 if [ "$platform" = "darwin" ]; then
   # Must be present in the release. Never compile or fetch source on the user Mac.
-  helper_asset="$asset.macos-safe-move"
+  helper_asset="$asset$helper_suffix"
+  have_helper=1
   curl -fsSL "$base/$helper_asset" -o "$tmp/$helper_asset"
   curl -fsSL "$base/$helper_asset.sha256" -o "$tmp/$helper_asset.sha256"
 fi
@@ -67,26 +70,39 @@ verify_sha256() {
 }
 
 verify_sha256 "$asset"
-if [ "$platform" = "darwin" ]; then
+if [ "$platform" = "linux" ]; then
+  helper_suffix=".linux-safe-move"
+  helper_asset="$asset$helper_suffix"
+  if curl -fsSL "$base/$helper_asset" -o "$tmp/$helper_asset" && curl -fsSL "$base/$helper_asset.sha256" -o "$tmp/$helper_asset.sha256"; then
+    have_helper=1
+  else
+    # Preserve installation of historical pre-v1 Linux releases. A stable v1
+    # release must contain its precompiled helper; never compile at install.
+    chmod 0755 "$tmp/$asset"
+    installed_version="$("$tmp/$asset" --version)"
+    case "$installed_version" in 0.*) ;; *) echo "Required Linux native helper missing" >&2; exit 1 ;; esac
+  fi
+fi
+if [ "$have_helper" = 1 ]; then
   verify_sha256 "$helper_asset"
 fi
 
 mkdir -p "$INSTALL_DIR"
 destination="$INSTALL_DIR/chat-harness"
-if [ "$platform" = "darwin" ]; then
+if [ "$have_helper" = 1 ]; then
   helper_stage="$INSTALL_DIR/.chat-harness-helper-install.$$"
   helper_checksum_stage="$INSTALL_DIR/.chat-harness-helper-sha-install.$$"
   install -m 0755 "$tmp/$helper_asset" "$helper_stage"
   (
     umask 077
     helper_digest="$(awk '{print $1}' "$tmp/$helper_asset.sha256")"
-    printf '%s  chat-harness.macos-safe-move\n' "$helper_digest" > "$helper_checksum_stage"
+    printf '%s  chat-harness%s\n' "$helper_digest" "$helper_suffix" > "$helper_checksum_stage"
   )
   # Companion first; an interrupted install leaves an invalid/missing helper
   # fail-closed rather than permitting destructive filesystem operations.
-  mv -f "$helper_stage" "$INSTALL_DIR/chat-harness.macos-safe-move"
+  mv -f "$helper_stage" "$INSTALL_DIR/chat-harness$helper_suffix"
   helper_stage=""
-  mv -f "$helper_checksum_stage" "$INSTALL_DIR/chat-harness.macos-safe-move.sha256"
+  mv -f "$helper_checksum_stage" "$INSTALL_DIR/chat-harness$helper_suffix.sha256"
   helper_checksum_stage=""
 fi
 

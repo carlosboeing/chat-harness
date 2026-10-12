@@ -18,7 +18,7 @@ import {
   workspaceAccessFindings,
 } from "../../src/doctor/checks.js";
 import { runDoctor } from "../../src/doctor/command.js";
-import { runSetup } from "../../src/setup/command.js";
+import { installMvpFixture } from "../helpers/mvp-workspace.js";
 
 const roots: string[] = [];
 
@@ -60,7 +60,7 @@ async function snapshot(root: string): Promise<string[]> {
 describe("doctor", () => {
   test("is read-only on a healthy v0.2 workspace", async () => {
     const root = await workspace();
-    await runSetup(root, { dryRun: false });
+    await installMvpFixture(root);
     const before = await snapshot(root);
 
     const output = await runDoctor(root, {
@@ -163,7 +163,7 @@ describe("doctor", () => {
 
   test("invalid registry is diagnosed but not rewritten", async () => {
     const root = await workspace();
-    await runSetup(root, { dryRun: false });
+    await installMvpFixture(root);
     await writeFile(path.join(root, "registry.json"), "{");
     const before = await readFile(path.join(root, "registry.json"), "utf8");
 

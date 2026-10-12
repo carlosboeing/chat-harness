@@ -10,7 +10,7 @@ describe("canonical templates",()=>{
   test("AGENTS stays synchronized and within Project Instructions budget",async()=>{
     const source=await readFile(path.join(root,"templates","AGENTS.md"),"utf8");
     expect(source).toBe(AGENTS_TEMPLATE);
-    expect(CORE_VERSION).toBe(1);
+    expect(CORE_VERSION).toBe(2);
     expect(source).toContain("explicit scoped approval");
     expect(source.length).toBeLessThanOrEqual(8000);
     const classify = source.indexOf("Classify each request as **Answer-only** or **Work**.");
@@ -32,6 +32,13 @@ describe("canonical templates",()=>{
     for(const id of SPECIALIST_IDS){
       expect(specialistTemplate(id).length).toBeLessThanOrEqual(3500);
     }
+  });
+  test("Core explicitly honors read-only Work and CREATE/CLOSE ownership",()=>{
+    expect(AGENTS_TEMPLATE).toContain("read-only Work");
+    expect(AGENTS_TEMPLATE).toContain("**CREATE**");
+    expect(AGENTS_TEMPLATE).toContain("**CLOSE**");
+    expect(AGENTS_TEMPLATE).toContain("what changes, where, why");
+    expect(AGENTS_TEMPLATE).toContain("Temp files retain Workstream ownership");
   });
   test("Workstream stays synchronized",async()=>{
     expect(await readFile(path.join(root,"templates","workstream.md"),"utf8")).toBe(WORKSTREAM_TEMPLATE);

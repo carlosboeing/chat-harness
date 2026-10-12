@@ -1,10 +1,14 @@
 #!/bin/bash
 set -euo pipefail
-if [[ "$(uname -s)" != Darwin ]]; then echo "This proof is macOS-only" >&2; exit 2; fi
+if [[ "$(uname -s)" != Darwin && "$(uname -s)" != Linux ]]; then echo "This proof needs a supported POSIX backend" >&2; exit 2; fi
 root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-cc -std=c11 -Wall -Wextra -D GATE0_TEST_HOOKS "$root/native/macos/gate0-safe-move.c" -o "$tmp/gate0"
+if [[ "$(uname -s)" == Linux ]]; then
+  cc -std=c11 -Wall -Wextra -Werror -Wno-deprecated-declarations -static -D GATE0_TEST_HOOKS "$root/native/macos/gate0-safe-move.c" -lcrypto -ldl -pthread -o "$tmp/gate0"
+else
+  cc -std=c11 -Wall -Wextra -D GATE0_TEST_HOOKS "$root/native/macos/gate0-safe-move.c" -o "$tmp/gate0"
+fi
 bin="$tmp/gate0"
 mkdir -p "$tmp/work/.chat-harness/procedures"
 workspace="$(cd -P "$tmp/work" && pwd -P)"
@@ -115,7 +119,7 @@ printf 'other user file\n' > interrupted.md
 if run restore "." interrupted.backup interrupted.md "$interrupted_digest"; then fail "recovery clobbered new file"; fi
 [[ "$(cat interrupted.md)" == 'other user file' && -f interrupted.backup ]] || fail "conflict evidence discarded"
 
-echo "PASS: macOS root-anchored move, nested paths, no-clobber, inode races and SIGKILL recovery proof"
+echo "PASS: POSIX root-anchored move, nested paths, no-clobber, inode races and SIGKILL recovery proof"
 
 # Root-anchored O_EXCL stage creation: hash, collision, wrong bytes, symlinks.
 stage_body='verified new stage bytes'

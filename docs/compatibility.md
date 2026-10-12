@@ -52,3 +52,7 @@ The architecture deliberately uses portable concepts. A host that can consume `A
 Reverify after a material host change, when a user reports a regression, when a host smoke fails, or before making a stronger support claim.
 
 Chat Harness versions its own software and contracts, not hosted product releases.
+
+## Native Workspace reconciliation
+
+macOS and Linux arm64/x64 have packaged native no-replace backends. Windows x64 setup mutation is unsupported and fails closed; it can still plan and diagnose read-only. A passing Windows software-lifecycle job does not prove Workspace mutation safety. This narrower implementation is an unresolved v1 Design/release approval boundary. See [reconciliation and recovery](reconciliation.md).

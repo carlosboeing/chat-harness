@@ -265,6 +265,7 @@ export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, r
     scaffoldDomain:plan.request.scaffoldDomain,adoptWorkspace:plan.request.adoptWorkspace,replaceAgents:plan.request.replaceAgents},releaseVersion);
   if(!fresh.safeToPresent || JSON.stringify(fresh.operations) !== JSON.stringify(plan.operations))throw new ReconciliationError("setup.stale_plan","Semantic plan changed before reservation");
   const intent = compileReadonlyTransactionIntent(plan,randomBytes(16).toString("hex"));
+  if(Buffer.byteLength(serializeRecoveryRecord(intent.journal),"utf8") > 64*1024)throw new ReconciliationError("setup.stale_plan","Transaction journal exceeds the bounded 64 KiB contract");
   const lease = await acquireMacosWorkspaceLease(plan.workspace,runtime);
   runtime = withMacosRootIdentity(lease.identity,runtime);
   const bootstrapped = new Set<string>();

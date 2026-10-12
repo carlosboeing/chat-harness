@@ -92,17 +92,17 @@ For the easiest first-time experience, run:
 chat-harness setup
 ```
 
-Interactive setup asks what you mainly use the Workspace for, for example travel, shopping, career, or technology.
+Interactive setup offers multiple Specialist bundles for the Workspace, for example travel, shopping, career, or technology.
 
 You can also choose directly:
 
 ```bash
-chat-harness setup --specialist travel
+chat-harness setup --specialists travel
 ```
 
-The guided setup first explains what Chat Harness will do, then asks what the Workspace is mainly for. Optional organizational folders are explained before you choose them.
+The guided setup first explains what Chat Harness will do, then preselects installed bundles and offers multiple selections. Optional organizational folders are explained before you choose them.
 
-Before writing anything, setup shows the complete Chat Harness folder/file tree with labels such as `new`, `updated`, or `already there`, then asks for approval. Existing unrelated content is left unchanged. If an existing root project-instructions file is detected, setup preserves it and marks host activation as migration-required so you can review/migrate its still-needed Workspace-specific behavior before changing the hosted Project Instructions.
+Before writing anything, setup shows semantic file/folder changes, then asks for approval. Existing unrelated content is left unchanged. Unmanaged root instructions require explicit replacement consent; unmarked Workspace instructions require adoption consent and are preserved under the user boundary. Unsupported historical installations require separate migration.
 
 ## 4. Understand what was created
 

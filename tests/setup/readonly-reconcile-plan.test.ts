@@ -188,7 +188,7 @@ describe("composed, non-executable reconciliation preview", () => {
       const plan = await inspectAndPlanReadonlyReconciliation(root,
         { replaceAgents: true, adoptWorkspace: true }, VERSION);
       expect(plan.safeToPresent).toBe(false);
-      expect(plan.findings.map(f => f.code)).toContain("setup.unsupported_legacy_state");
+      expect(plan.findings.map(f => f.code)).toContain("setup.legacy_workspace_unsupported");
       expect(plan.operations).toEqual([]);
     });
   });
@@ -200,7 +200,7 @@ describe("composed, non-executable reconciliation preview", () => {
     await unchanged(root, async () => {
       const plan = await inspectAndPlanReadonlyReconciliation(root, {}, VERSION);
       expect(plan.safeToPresent).toBe(false);
-      expect(plan.findings.map(f => f.code)).toContain("setup.unsupported_legacy_state");
+      expect(plan.findings.map(f => f.code)).toContain("setup.legacy_workspace_unsupported");
       expect(plan.operations).toEqual([]);
     });
   });

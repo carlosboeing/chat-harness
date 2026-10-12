@@ -38,7 +38,7 @@ chat-harness setup
 Or choose a specialist directly:
 
 ```bash
-chat-harness setup --specialist travel
+chat-harness setup --specialists travel
 ```
 
 When setup finishes successfully, it prints these ChatGPT connection steps again.

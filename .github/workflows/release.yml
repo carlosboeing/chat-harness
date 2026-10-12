@@ -212,6 +212,8 @@ jobs:
             dist/release/${{ matrix.asset }}.sha256
             dist/release/${{ matrix.asset }}.macos-safe-move
             dist/release/${{ matrix.asset }}.macos-safe-move.sha256
+            dist/release/${{ matrix.asset }}.linux-safe-move
+            dist/release/${{ matrix.asset }}.linux-safe-move.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -250,6 +252,26 @@ jobs:
           path: dist/native-artifacts
           merge-multiple: true
 
+      - name: Download Linux native helpers built on matching runners
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          pattern: chat-harness-linux-*
+          path: dist/linux-native-artifacts
+          merge-multiple: true
+
+      - name: Verify and stage Linux helpers into npm package
+        shell: bash
+        run: |
+          set -euo pipefail
+          for arch in arm64 x64; do
+            name="chat-harness-linux-${arch}.linux-safe-move"
+            (cd dist/linux-native-artifacts && sha256sum -c "${name}.sha256")
+            target="dist/npm/native/linux/linux-${arch}"
+            mkdir -p "${target}"
+            install -m 0755 "dist/linux-native-artifacts/${name}" "${target}/safe-move"
+            bun run checksum -- "${target}/safe-move"
+          done
+
       - name: Verify and stage both macOS architectures into npm package
         shell: bash
         run: |
@@ -267,7 +289,7 @@ jobs:
         run: |
           mkdir -p dist/release
           npm pack --dry-run --json > dist/npm-pack.json
-          bun run validate:package -- dist/npm-pack.json --require-macos-helpers
+          bun run validate:package -- dist/npm-pack.json --require-native-helpers
 
       - name: Pack npm tarball
         run: npm pack --pack-destination dist/release

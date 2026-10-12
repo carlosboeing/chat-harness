@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { Command, CommanderError, Option } from "commander";
+import { Command, CommanderError } from "commander";
 import { confirm, isCancel, note } from "@clack/prompts";
 
 import packageMetadata from "../../package.json" with { type: "json" };
@@ -19,10 +19,8 @@ import {
   type LifecycleDependencies,
 } from "../lifecycle/command.js";
 import { runWindowsLifecycleHelper } from "../lifecycle/windows.js";
-import { runSetup } from "../setup/command.js";
-import { resolveInteractiveSetup } from "../setup/interactive.js";
-import { buildSetupStructure, renderSetupTree } from "../setup/presentation.js";
-import { SPECIALIST_IDS, type SpecialistId } from "../setup/specialists.js";
+import { runMvpSetup } from "../setup/mvp-command.js";
+import { selectMvpSetup,approveMvpPlan,approveMvpRecovery } from "../setup/mvp-interactive.js";
 import { runValidate } from "../validation/command.js";
 import { resolveWorkspaceRoot, WorkspaceResolutionError } from "../workspace/resolve.js";
 
@@ -36,10 +34,10 @@ export interface CommandContext {
   options: {
     json: boolean;
     dryRun: boolean;
-    specialist: SpecialistId;
+    specialists?: string;
     scaffoldDomain: boolean;
     replaceAgents: boolean;
-    replaceWorkspace: boolean;
+    adoptWorkspace: boolean;
   };
 }
 export type CommandHandler = (context: CommandContext) => Promise<CommandHandlerResult>;
@@ -73,53 +71,14 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
   if (context.command === "doctor") return runDoctor(context.workspace);
   if (context.command === "validate") return runValidate(context.workspace);
   if (context.command === "setup") {
-    return runSetup(
-      context.workspace,
-      {
-        dryRun: context.options.dryRun,
-        specialist: context.options.specialist,
-        scaffoldDomain: context.options.scaffoldDomain,
-        replaceAgents: context.options.replaceAgents,
-        replaceWorkspace: context.options.replaceWorkspace,
-      },
-      {
-        applyOptions: {
-          beforeApply: async (plan) => {
-            if (!runtime.isTTY || !runtime.nativeTerminal || context.options.json) return;
-
-            if (plan.legacyInstructions !== "missing") {
-              note(
-                [
-                  "Existing root project instructions were detected and will not be changed.",
-                  "Chat Harness can install safely, but wait to activate the host binding until the Workspace-specific behavior has been reviewed and migrated into .chat-harness/WORKSPACE.md.",
-                ].join("\n"),
-                "Brownfield Workspace",
-              );
-            }
-
-            note(
-              [
-                "Here's how the Chat Harness part of this Workspace will look after setup:",
-                "",
-                renderSetupTree(
-                  plan.workspace,
-                  buildSetupStructure(plan, "planned"),
-                ),
-                "",
-                "Anything else already in this folder will be left exactly as it is.",
-              ].join("\n"),
-              "Review your Workspace",
-            );
-
-            const answer = await confirm({
-              message: "Set up this Workspace now?",
-              initialValue: true,
-            });
-            return !isCancel(answer) && answer;
-          },
-        },
-      },
-    );
+    return runMvpSetup(context.workspace,{
+      dryRun:context.options.dryRun,
+      ...(context.options.specialists !== undefined ? {specialists:context.options.specialists}:{}),
+      scaffoldDomain:context.options.scaffoldDomain,replaceAgents:context.options.replaceAgents,
+      adoptWorkspace:context.options.adoptWorkspace,
+    },runtime.version,runtime.isTTY && runtime.nativeTerminal && !context.options.json ? {
+      beforeApply:approveMvpPlan,beforeRecovery:approveMvpRecovery,
+    }:{});
   }
   return Promise.resolve({ result: { state: "ready" } });
 }
@@ -186,7 +145,7 @@ export async function runCli(argv: readonly string[], overrides: Partial<CliRunt
       `
 Examples:
   chat-harness setup
-  chat-harness setup --specialist travel
+  chat-harness setup --specialists travel
   chat-harness validate
   chat-harness doctor
   chat-harness update --check
@@ -223,36 +182,31 @@ Documentation:
     if (name === "setup") {
       command
         .option("--dry-run", "Inspect and return the exact reconciliation plan without mutation")
-        .addOption(
-          new Option("--specialist <id>", "Seed WORKSPACE.md with a setup-time specialist")
-            .choices([...SPECIALIST_IDS]),
-        )
-        .option("--scaffold-domain", "Create the selected specialist's additive domain starter folders")
-        .option("--replace-agents", "Overwrite an existing unmanaged AGENTS.md and let Chat Harness manage it")
-        .option("--replace-workspace", "Overwrite WORKSPACE.md with the selected specialist seed")
+        .option("--specialists <ids>", "Exact desired comma-separated Specialist IDs, or none")
+        .option("--scaffold-domain", "Create the additive union of selected Specialist starter folders")
+        .option("--replace-agents", "Explicitly replace unmanaged AGENTS.md")
+        .option("--adopt-workspace", "Preserve unmarked WORKSPACE.md bytes as user customization")
         .addHelpText(
           "after",
           `
 Behaviour:
-  Interactive setup explains what Chat Harness will do, shows the complete
-  resulting Workspace structure with human-readable status labels, and asks
-  for approval before writing. Existing unrelated content is left unchanged.
-
-  If --specialist is omitted, interactive setup asks what the Workspace is
-  mainly for; non-interactive setup uses general.
-
-  --json disables interactive prompts. --scaffold-domain creates only the
-  selected specialist's optional starter folders. Existing root project
-  instructions are preserved and pause host activation until their
-  Workspace-specific behavior has been reviewed/migrated.
+  Interactive setup selects multiple Specialists, previews semantic changes,
+  and asks for approval before writing. Unrelated user content is left unchanged.
+  --json disables interactive prompts. --dry-run never writes or recovers.
+  Omitted --specialists preserves an installed set; fresh non-interactive setup
+  is Core only. Use none for general / mixed use or to deselect all Specialists.
+  IDs: business, career, dev, education, finance, health, home, legal,
+       shopping, tax, tech, travel.
+  --scaffold-domain adds missing optional folders without owning their content.
+  Legacy --specialist, --replace-workspace and --force are unsupported.
+  Mutation requires a verified native backend; unsupported platforms fail closed.
 
 Examples:
   chat-harness setup
-  chat-harness setup --specialist travel
-  chat-harness setup --specialist tech --scaffold-domain
-  chat-harness setup --dry-run
-  chat-harness setup ~/Projects/research --specialist research
-  chat-harness setup --json
+  chat-harness setup --specialists travel,shopping
+  chat-harness setup --specialists dev --scaffold-domain
+  chat-harness setup --specialists none --dry-run --json
+  chat-harness setup ~/Projects/research --specialists none
 
 ChatGPT setup guide:
   https://github.com/carlosboeing/chat-harness/blob/main/docs/hosts/chatgpt.md
@@ -297,20 +251,20 @@ Examples:
       options: {
         json?: boolean;
         dryRun?: boolean;
-        specialist?: SpecialistId;
+        specialists?: string;
         scaffoldDomain?: boolean;
         replaceAgents?: boolean;
-        replaceWorkspace?: boolean;
+        adoptWorkspace?: boolean;
       },
     ) => {
       selectedCommand = name;
       selectedPath = inputPath;
       const workspace = await resolveWorkspaceRoot(inputPath, runtime.cwd);
       let setup = {
-        specialist: options.specialist ?? ("general" as SpecialistId),
+        ...(options.specialists !== undefined ? {specialists:options.specialists}:{}),
         scaffoldDomain: Boolean(options.scaffoldDomain),
         replaceAgents: Boolean(options.replaceAgents),
-        replaceWorkspace: Boolean(options.replaceWorkspace),
+        adoptWorkspace: Boolean(options.adoptWorkspace),
       };
 
       if (
@@ -319,16 +273,17 @@ Examples:
         runtime.nativeTerminal &&
         !options.json
       ) {
-        const interactive = await resolveInteractiveSetup(
+        const interactive = await selectMvpSetup(
           workspace,
           {
-            specialist: options.specialist,
+            ...(options.specialists !== undefined ? {specialists:options.specialists}:{}),
             scaffoldDomain: Boolean(options.scaffoldDomain),
             replaceAgents: Boolean(options.replaceAgents),
-            replaceWorkspace: Boolean(options.replaceWorkspace),
+            adoptWorkspace: Boolean(options.adoptWorkspace),
           },
+          runtime.version,
         );
-        if (interactive.cancelled) {
+        if (interactive === null) {
           const envelope = commandEnvelope({
             command: name,
             workspace,
@@ -337,7 +292,7 @@ Examples:
           exitCode = writeEnvelope(envelope, false, color, runtime);
           return;
         }
-        setup = interactive;
+        setup = { ...setup,...interactive };
       }
 
       const context: CommandContext = {

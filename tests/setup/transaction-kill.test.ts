@@ -7,20 +7,20 @@ import path from "node:path";
 import { inspectAndPlanReadonlyReconciliation } from "../../src/setup/readonly-reconcile-plan.js";
 import { executeManagedReconciliation,recoverManagedReconciliation } from "../../src/setup/transaction-engine.js";
 
-const enabled=process.platform==="darwin" && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
+const enabled=["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
 let scratch="",entry="";
 beforeAll(()=>{
  if(!enabled)return;
  scratch=realpathSync(mkdtempSync(path.join(os.tmpdir(),"harness-kill-")));
  entry=path.join(scratch,"entry.js");
- const helper=path.join(scratch,"native/macos",`darwin-${process.arch}`,"safe-move");
+ const helper=path.join(scratch,"native",process.platform === "darwin" ? "macos" : "linux",`${process.platform}-${process.arch}`,"safe-move");
  mkdirSync(path.dirname(helper),{recursive:true});
- const compiled=spawnSync("cc",["-std=c11","-O2","-Wall","-Wextra","-Werror","-DGATE0_TEST_HOOKS",path.resolve(import.meta.dir,"../../native/macos/gate0-safe-move.c"),"-o",helper],{encoding:"utf8"});
+ const compiled=spawnSync("cc",["-std=c11","-O2","-Wall","-Wextra","-Werror","-DGATE0_TEST_HOOKS",...(process.platform === "linux" ? ["-Wno-deprecated-declarations","-static"] : []),path.resolve(import.meta.dir,"../../native/macos/gate0-safe-move.c"),...(process.platform === "linux" ? ["-lcrypto","-ldl","-pthread"] : []),"-o",helper],{encoding:"utf8"});
  if(compiled.status!==0)throw new Error(compiled.stderr);
  writeFileSync(helper+".sha256",createHash("sha256").update(readFileSync(helper)).digest("hex")+"  safe-move\n");
 });
 afterAll(()=>{if(scratch)rmSync(scratch,{recursive:true,force:true});});
-const runtime=()=>({platform:"darwin",arch:process.arch,standalone:false,entryPath:entry,executablePath:"unused"});
+const runtime=()=>({platform:process.platform,arch:process.arch,standalone:false,entryPath:entry,executablePath:"unused"});
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
 for(const boundary of ["stage-open:journal.json","staged:journal.json","stage-open:.AGENTS.md.chat-harness-stage-","staged:.AGENTS.md.chat-harness-stage-","moved:AGENTS.md","moved:manifest.yaml","retired:reconcile","discarded:journal.json"]){
  test.skipIf(!enabled)(`real process termination preserves/recoverably resolves ${boundary}`,async()=>{
