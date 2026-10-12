@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -69,8 +69,10 @@ describe("macOS packaged native primitive", () => {
           { ...base, entryPath: npmEntry },
           { ...base, standalone: true, executablePath: binary },
         ];
-        const workspace = path.join(scratch, "workspace");
-        mkdirSync(workspace);
+        const workspaceAlias = path.join(scratch, "workspace");
+        mkdirSync(workspaceAlias);
+        // macOS /var may be a symlink to /private/var; C intentionally rejects aliases.
+        const workspace = realpathSync(workspaceAlias);
         for (const [index, info] of platforms.entries()) {
           expect(existsSync(verifiedMacosHelper(info))).toBe(true);
           const source = `source-${index}.md`;
