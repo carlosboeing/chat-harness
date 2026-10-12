@@ -197,6 +197,27 @@ static int stage_exclusive(const char *root, const char *parent,
   return 0;
 }
 
+static int reserve_lock(const char *root) {
+  int dir = open_anchored_parent(root, ".chat-harness/temp");
+  if (dir < 0) return 2;
+  if (mkdirat(dir, "reconcile", 0700)) {
+    close(dir);
+    return 4;
+  }
+  struct stat leaf;
+  int fd = openat(dir, "reconcile", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  int good = fd >= 0 && !fstatat(dir, "reconcile", &leaf, AT_SYMLINK_NOFOLLOW) &&
+             S_ISDIR(leaf.st_mode);
+  if (fd >= 0) {
+    struct stat pinned;
+    good = good && !fstat(fd, &pinned) &&
+           pinned.st_dev == leaf.st_dev && pinned.st_ino == leaf.st_ino;
+    close(fd);
+  }
+  close(dir);
+  return good ? 0 : 5;
+}
+
 int main(int argc, char **argv) {
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
@@ -210,6 +231,8 @@ int main(int argc, char **argv) {
 #endif
     return 0;
   }
+  if (argc == 3 && !strcmp(argv[1], "reserve"))
+    return reserve_lock(argv[2]);
   if (argc == 6 && !strcmp(argv[1], "stage")) {
     return stage_exclusive(argv[2], argv[3], argv[4], argv[5]);
   }
