@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 
 static int valid_segment(const char *name) {
@@ -72,11 +73,11 @@ static int open_anchored_parent(const char *root, const char *parent) {
 
 /** Pinned regular file and exact digest; inode compared before/after hashing. */
 static int check_file(int dir, const char *name, const char *expected, struct stat *identity) {
-  int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
   if (fd < 0) return -1;
   struct stat before, after, leaf;
   int ok = 0;
-  if (fstat(fd, &before) || !S_ISREG(before.st_mode)) goto done;
+  if (fstat(fd, &before) || !S_ISREG(before.st_mode) || before.st_size > 16 * 1024 * 1024) goto done;
   CC_SHA256_CTX ctx;
   if (!CC_SHA256_Init(&ctx)) goto done;
   unsigned char block[8192];
@@ -218,6 +219,53 @@ static int reserve_lock(const char *root) {
   return good ? 0 : 5;
 }
 
+/* Additive creation and cleanup stay relative to a no-follow parent fd.
+ * No recursive delete. File cleanup is restricted by the validated journal in
+ * the caller, and re-hashes the regular leaf immediately before unlinkat.
+ * These are process-interruption guarantees, not power-loss durability or
+ * isolation from a hostile process with the same user permissions.
+ */
+static int directory_operation(const char *op, const char *root, const char *parent, const char *leaf) {
+  if (!valid_segment(leaf)) return 64;
+  int dir = open_anchored_parent(root, parent);
+  if (dir < 0) return 2;
+  int result = !strcmp(op, "mkdir") ? mkdirat(dir, leaf, 0700) : unlinkat(dir, leaf, AT_REMOVEDIR);
+  close(dir);
+  return result ? 4 : 0;
+}
+
+static int verify_or_discard(const char *op, const char *root, const char *parent, const char *leaf, const char *digest) {
+  if (!valid_segment(leaf) || !valid_digest(digest)) return 64;
+  int dir = open_anchored_parent(root, parent);
+  if (dir < 0) return 2;
+  test_pause("GATE0_TEST_BEFORE_DISCARD_DELAY_US");
+  struct stat observed, current;
+  int bad = check_file(dir, leaf, digest, &observed);
+  if (!bad && !strcmp(op, "discard")) {
+    bad = fstatat(dir, leaf, &current, AT_SYMLINK_NOFOLLOW) ||
+      !S_ISREG(current.st_mode) || current.st_dev != observed.st_dev ||
+      current.st_ino != observed.st_ino || current.st_size != observed.st_size ||
+      unlinkat(dir, leaf, 0);
+  }
+  close(dir);
+  return bad ? 5 : 0;
+}
+
+/* A process-scoped lease on the physical Workspace serializes authorized
+ * apply/recovery. The persistent reservation remains the crash evidence.
+ * EOF or process termination releases the lease without touching user files.
+ */
+static int lease_workspace(const char *root) {
+  int dir = open_anchored_parent(root, ".");
+  if (dir < 0) return 2;
+  if (flock(dir, LOCK_EX | LOCK_NB)) { close(dir); return 4; }
+  puts("locked"); fflush(stdout);
+  char block[64];
+  while (read(STDIN_FILENO, block, sizeof(block)) > 0) {}
+  close(dir);
+  return 0;
+}
+
 int main(int argc, char **argv) {
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
@@ -231,6 +279,11 @@ int main(int argc, char **argv) {
 #endif
     return 0;
   }
+  if (argc == 3 && !strcmp(argv[1], "lease")) return lease_workspace(argv[2]);
+  if (argc == 5 && (!strcmp(argv[1], "mkdir") || !strcmp(argv[1], "rmdir")))
+    return directory_operation(argv[1], argv[2], argv[3], argv[4]);
+  if (argc == 6 && (!strcmp(argv[1], "verify") || !strcmp(argv[1], "discard")))
+    return verify_or_discard(argv[1], argv[2], argv[3], argv[4], argv[5]);
   if (argc == 3 && !strcmp(argv[1], "reserve"))
     return reserve_lock(argv[2]);
   if (argc == 6 && !strcmp(argv[1], "stage")) {

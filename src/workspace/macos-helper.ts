@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -167,4 +167,37 @@ export function reserveMacosReconciliationLock(workspace: string, info: MacosHel
     throw new MacosHelperError("failed",
       `exclusive reconciliation reservation failed (exit ${result.status ?? "unknown"}). Preserve existing transaction state and inspect it read-only.`);
   }
+}
+
+/** Fixed, descriptor-relative operations; namespace/ownership belongs to the engine. */
+export function invokeMacosFilesystemOperation(
+  operation: "mkdir" | "rmdir" | "verify" | "discard",
+  workspace: string, relative: string, digest?: string, info: MacosHelperRuntime = runtime(),
+): void {
+  const parent = path.posix.dirname(relative), leaf = path.posix.basename(relative);
+  if ((operation === "verify" || operation === "discard") && !/^[0-9a-f]{64}$/.test(digest ?? "")) {
+    throw new MacosHelperError("invalid", "operation requires exact SHA-256");
+  }
+  const result = spawnSync(verifiedMacosHelper(info), [operation,workspace,parent,leaf,...(digest ? [digest] : [])],
+    {encoding:"utf8",timeout:15000,maxBuffer:4096,stdio:["ignore","pipe","pipe"]});
+  if (result.error || result.status !== 0) throw new MacosHelperError("failed", `${operation} failed for ${relative}; preserve transaction evidence.`);
+}
+
+/** Keep the native lease alive until the returned release function is called. */
+export async function acquireMacosWorkspaceLease(workspace: string, info: MacosHelperRuntime = runtime()): Promise<() => Promise<void>> {
+  const child = spawn(verifiedMacosHelper(info), ["lease",workspace], {stdio:["pipe","pipe","pipe"]});
+  child.stdin.on("error",()=>{});
+  const exited = new Promise<void>((resolve)=>child.once("close",()=>resolve()));
+  await new Promise<void>((resolve,reject)=>{
+    const timer = setTimeout(()=>{child.kill();reject(new MacosHelperError("failed","lease timeout"));},5000);
+    let output = "";
+    child.stdout.on("data",chunk=>{
+      output += String(chunk);
+      if (output === "locked\n") {clearTimeout(timer);resolve();}
+      else if (output.length > 4096) {clearTimeout(timer);child.kill();reject(new MacosHelperError("invalid","lease protocol"));}
+    });
+    child.once("error",error=>{clearTimeout(timer);reject(error);});
+    child.once("close",()=>{clearTimeout(timer);reject(new MacosHelperError("failed","Workspace is busy or unsafe"));});
+  });
+  return async ()=>{child.stdin.end();await exited;};
 }
