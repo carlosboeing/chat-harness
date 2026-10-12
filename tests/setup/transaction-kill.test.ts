@@ -33,7 +33,13 @@ for(const boundary of ["stage-open:journal.json","staged:journal.json","stage-op
    const deadline=Date.now()+20000;
    while(!existsSync(signal) && child.exitCode===null && Date.now()<deadline)await tick();
    expect(existsSync(signal)).toBe(true);
-   const exited=new Promise<void>(resolve=>child.once("exit",()=>resolve()));child.kill("SIGKILL");await exited;
+   const helperPid=Number(readFileSync(signal,"utf8").split("\n")[1]);
+   expect(Number.isSafeInteger(helperPid) && helperPid>0).toBe(true);
+   const exited=new Promise<void>(resolve=>child.once("exit",()=>resolve()));
+   child.kill("SIGKILL");
+   // The synchronous helper is a separate process. Kill it too; otherwise
+   // already-buffered stdin may finish a journal after the parent terminates.
+   process.kill(helperPid,"SIGKILL");await exited;
    // The currently executing native primitive has at most a two-second test
    // pause; wait for its completion before acquiring the recovery lease.
    await new Promise(resolve=>setTimeout(resolve,2200));

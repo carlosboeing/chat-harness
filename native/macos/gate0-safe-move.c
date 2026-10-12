@@ -147,7 +147,7 @@ static void test_boundary(const char *operation, const char *leaf) {
   snprintf(label, sizeof(label), "%s:%s", operation, leaf);
   if (wanted && *wanted && signal && *signal && !strncmp(label, wanted, strlen(wanted))) {
     int fd = open(signal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
-    if (fd >= 0) { (void)write(fd, label, strlen(label)); close(fd); }
+    if (fd >= 0) { char signal_text[560]; snprintf(signal_text, sizeof(signal_text), "%s\n%ld\n", label, (long)getpid()); (void)write(fd, signal_text, strlen(signal_text)); close(fd); }
     usleep(2000000);
   }
 #else
