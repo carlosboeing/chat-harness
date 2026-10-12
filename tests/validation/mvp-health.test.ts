@@ -2,6 +2,7 @@ import { expect,test } from "bun:test";
 import { mkdtemp,readFile,writeFile,rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { inspectAndPlanReadonlyReconciliation } from "../../src/setup/readonly-reconcile-plan.js";
 import { installMvpFixture } from "../helpers/mvp-workspace.js";
 import { managedStateHealthFindings } from "../../src/validation/managed-state.js";
 import { runDoctor } from "../../src/doctor/command.js";
@@ -26,7 +27,23 @@ test("Career's absent recommended capability is a warning without installation",
  try{
   await installMvpFixture(root,{specialists:"career"});
   const result=await runDoctor(root);
+  const preview=await inspectAndPlanReadonlyReconciliation(root,{specialists:"career"},"0.3.7");
+  expect(preview.safeToPresent).toBe(true);
+  expect(preview.findings.some(f=>f.code==="capability.recommended_missing" && f.severity==="warning")).toBe(true);
   expect(result.findings.some(f=>f.code==="capability.recommended_missing" && f.severity==="warning")).toBe(true);
   expect(result.findings.some(f=>f.code==="capability.recommended_missing" && f.severity==="error")).toBe(false);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test("unsafe unmanifested Core is diagnosed without following it or raising an internal error",async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),"harness-unmanifested-"));
+ try{
+  const {symlink,lstat}=await import("node:fs/promises");
+  const external=path.join(root,"external.txt");await writeFile(external,"preserve outside target");
+  await symlink(external,path.join(root,"AGENTS.md"));
+  const findings=await managedStateHealthFindings(root);
+  expect(findings.some(f=>f.code==="setup.managed_path_unsafe")).toBe(true);
+  expect((await lstat(path.join(root,"AGENTS.md"))).isSymbolicLink()).toBe(true);
+  expect(await readFile(external,"utf8")).toBe("preserve outside target");
  }finally{await rm(root,{recursive:true,force:true});}
 });

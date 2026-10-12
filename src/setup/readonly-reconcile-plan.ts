@@ -6,6 +6,7 @@
  * authority and must never be called as an apply procedure. Native no-replace
  * execution must independently re-prove paths, ownership and content.
  */
+import { recommendedCapabilityFindings } from "../validation/recommended-capabilities.js";
 import { legacyLayoutFindings } from "../validation/legacy-state.js";
 import type { Finding } from "../cli/result.js";
 import { selectSpecialists, specialistSections, validateSpecialistRegistry } from "../specialists/definitions.js";
@@ -292,5 +293,5 @@ export async function inspectAndPlanReadonlyReconciliation(
       findings: Object.freeze([...combined.findings, conflict("setup.inspection_stale", MANIFEST, String(error))]),
       sameDigestTransactionRequired: false };
   }
-  return combined;
+  return {...combined,findings:Object.freeze([...combined.findings,...await recommendedCapabilityFindings(base.workspace,request.desiredSpecialists)])};
 }

@@ -41,3 +41,29 @@ test.skipIf(!native)("native fresh/repeated/exact-set removal preserves user byt
     expect(await recoverManagedReconciliation(root,runtime)).toBe("absent");
   } finally { rmSync(root,{recursive:true,force:true}); }
 },30000);
+
+test.skipIf(!native)("native Core upgrade and Specialist additions use recorded before bytes without owning user files",async()=>{
+  const {parseManifest,serializeManifest}=await import("../../src/setup/manifest.js");
+  const {AGENTS_TEMPLATE,CORE_VERSION}=await import("../../src/setup/templates.js");
+  const {exactByteDigest}=await import("../../src/setup/manifest.js");
+  const root=realpathSync(mkdtempSync(path.join(os.tmpdir(),"harness-upgrade-")));
+  try{
+    await executeManagedReconciliation(await inspectAndPlanReadonlyReconciliation(root,{specialists:"shopping"},"0.3.7"),runtime);
+    const old="<!-- chat-harness-managed: agents -->\n# Older verified Core\n";
+    writeFileSync(path.join(root,"AGENTS.md"),old);
+    const manifestPath=path.join(root,".chat-harness/manifest.yaml");
+    const installed=parseManifest(readFileSync(manifestPath,"utf8"));
+    installed.core.version=CORE_VERSION-1;installed.core.files["AGENTS.md"].digest=exactByteDigest(old);
+    writeFileSync(manifestPath,serializeManifest(installed));
+    const userFile=path.join(root,".chat-harness/procedures/user-notes.bin");
+    writeFileSync(userFile,Buffer.from([255,0,13,10]));
+    const upgraded=await inspectAndPlanReadonlyReconciliation(root,{specialists:"travel"},"0.3.7");
+    expect(upgraded.operations.some(op=>op.path==="AGENTS.md" && op.action==="replace_file")).toBe(true);
+    await executeManagedReconciliation(upgraded,runtime);
+    expect(readFileSync(path.join(root,"AGENTS.md"),"utf8")).toBe(AGENTS_TEMPLATE);
+    expect(parseManifest(readFileSync(manifestPath,"utf8")).core.version).toBe(CORE_VERSION);
+    await executeManagedReconciliation(await inspectAndPlanReadonlyReconciliation(root,{specialists:"travel,shopping"},"0.3.7"),runtime);
+    expect(existsSync(path.join(root,".chat-harness/procedures/shopping-research-methodology.md"))).toBe(true);
+    expect(readFileSync(userFile)).toEqual(Buffer.from([255,0,13,10]));
+  }finally{rmSync(root,{recursive:true,force:true});}
+},30000);

@@ -16,7 +16,7 @@ Native helpers are compiled during builds/CI and shipped beside the CLI with che
 
 ## Transaction boundary
 
-The physical Workspace root is pinned by a process-scoped native lease and its device/inode identity is checked on every native call. Existing aliases, traversal, symlinks and unsafe file types are refused. Participating setup/recovery processes serialize; editors are not globally locked.
+The physical Workspace root is pinned by a process-scoped native lease and its device/inode identity is checked on every native call. Existing aliases, traversal, symlinks and unsafe file types are refused. Participating setup/recovery processes serialize; editors are not globally locked. Active native mutations register against a pinned temp-directory lease. If the CLI parent terminates, root exclusion remains held until its already-running native child finishes; a child starting after parent/lease death fails closed.
 
 After authorization, fresh `.chat-harness/` and `temp/` may be created additively. Exclusive reservation at `temp/reconcile/` is crash evidence. The bounded, strict journal records canonical paths, lexical operations, exact before/after digests and generated siblings. All semantic preconditions are revalidated after locking. Exclusive stages are digest/identity verified before canonical mutation.
 
@@ -24,7 +24,7 @@ Create, replace and remove use no-replace moves. Replacement/removal verifies th
 
 Committed transactions verify outputs and clean forward. Uncommitted proven states roll back deterministically. An atomic move into `temp/reconcile-cleanup/` retires a fully settled transaction before consuming its journal/token, allowing recovery through final cleanup interruption. Unknown third states, changed artifacts, unexpected evidence, poisoned/incomplete journals and ambiguous active/retired state remain intact and produce recovery conflicts. No recursive deletion is used in the production engine.
 
-Additive scaffold has no rollback ownership. It may remain after an interrupted setup; existing user content is never consumed or removed to make the scaffold exact. Source Policy is create-once and excluded from managed ownership.
+Additive scaffold has no rollback ownership. It may remain after an interrupted setup; existing user content is never consumed or removed to make the scaffold exact. Source Policy is create-once, exclusively staged and atomically promoted, and excluded from managed ownership. Partial or changed additive staging remains explicit recovery evidence.
 
 ## Operator recovery
 

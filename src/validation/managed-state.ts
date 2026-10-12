@@ -36,10 +36,12 @@ export async function managedStateHealthFindings(workspace: string): Promise<Fin
   if (inspected.transaction !== "absent") return findings;
   findings.push(...await legacyLayoutFindings(workspace));
   if(inspected.manifestState === "missing") {
-    const agents=await observeReadonlyManagedPath(inspected.workspace,"AGENTS.md","core");
-    const ws=await observeReadonlyManagedPath(inspected.workspace,WORKSPACE,"workspace");
-    if(agents.bytes?.toString("utf8").startsWith(AGENTS_MANAGED_MARKER) || ws.bytes?.toString("utf8").startsWith("<!-- chat-harness-managed: workspace -->"))
-      findings.push(conflict("setup.legacy_workspace_unsupported",".chat-harness/manifest.yaml","Chat Harness markers without a supported manifest do not prove managed ownership; explicit migration is required."));
+    for(const [relative,fileOwner,marker] of [["AGENTS.md","core",AGENTS_MANAGED_MARKER],[WORKSPACE,"workspace","<!-- chat-harness-managed: workspace -->"]] as const){
+      try{
+        const file=await observeReadonlyManagedPath(inspected.workspace,relative,fileOwner);
+        if(file.bytes?.toString("utf8").startsWith(marker))findings.push(conflict("setup.legacy_workspace_unsupported",".chat-harness/manifest.yaml","Chat Harness markers without a supported manifest do not prove managed ownership; explicit migration is required."));
+      }catch(error){findings.push(conflict("setup.managed_path_unsafe",relative,String(error)));}
+    }
   }
   if (inspected.manifestState !== "valid") return findings;
   if(inspected.manifest!.core.version < CORE_VERSION)findings.push({code:"setup.core_outdated",severity:"warning",location:"AGENTS.md",message:"Installed Core is older than the bundled component.",remediation:"Preview setup to reconcile the managed Core and refresh manual host bindings."});

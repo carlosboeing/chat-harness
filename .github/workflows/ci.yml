@@ -167,6 +167,15 @@ jobs:
           npm pack --dry-run --json > dist/npm-pack.json
           bun run validate:package -- dist/npm-pack.json
 
+      - name: Archive qualified macOS helper for complete npm assembly
+        run: tar -czf native-darwin-${{ matrix.arch }}.tgz -C dist/npm/native macos/darwin-${{ matrix.arch }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mvp-native-darwin-${{ matrix.arch }}
+          path: native-darwin-${{ matrix.arch }}.tgz
+          if-no-files-found: error
+          retention-days: 7
+
   windows-lifecycle:
     runs-on: windows-2025
     timeout-minutes: 8
@@ -242,3 +251,46 @@ jobs:
           bash tests/native/macos-gate0-spike.sh
           bun test tests/setup/linux-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/mvp-cli.test.ts
           bun scripts/smoke-built-binary.ts dist/bin/chat-harness-linux-${{ matrix.arch }}
+      - name: Archive qualified Linux helper for complete npm assembly
+        run: tar -czf native-linux-${{ matrix.arch }}.tgz -C dist/npm/native linux/linux-${{ matrix.arch }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mvp-native-linux-${{ matrix.arch }}
+          path: native-linux-${{ matrix.arch }}.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  complete-npm-qualification:
+    name: Complete native npm package qualification
+    needs: [macos-helper-packaging, linux-helper-packaging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run build:npm
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          pattern: mvp-native-*
+          path: dist/qualified-native
+          merge-multiple: true
+      - name: Assemble and verify all four already-qualified native helpers
+        run: |
+          for archive in dist/qualified-native/*.tgz; do tar -xzf "$archive" -C dist/npm/native; done
+          for platform in macos/darwin linux/linux; do
+            for arch in arm64 x64; do
+              (cd "dist/npm/native/${platform}-${arch}" && sha256sum -c safe-move.sha256)
+            done
+          done
+          npm pack --dry-run --json > dist/npm-pack.json
+          bun run validate:package -- dist/npm-pack.json --require-native-helpers
+          mkdir -p dist/qualification
+          npm pack --pack-destination dist/qualification
+          package_version=$(node -p 'require("./package.json").version')
+          bun run smoke:npm-package -- "dist/qualification/chat-harness-${package_version}.tgz"

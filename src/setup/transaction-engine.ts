@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, readdir } from "node:fs/promises";
 import path from "node:path";
+import { SOURCE_POLICY_TEMPLATE } from "./templates.js";
 import { exactByteDigest, parseManifest, type ContentDigest } from "./manifest.js";
 import { compileReadonlyTransactionIntent } from "./compile-transaction-intent.js";
 import { assessManagedRecovery, journalSibling, validateManagedJournal, type ManagedTransactionJournal,
@@ -154,6 +155,7 @@ async function cleanup(workspace: string, journal: ManagedTransactionJournal, ru
     await discardIfPresent(workspace,op.stage,op.after,op.path,op.owner,runtime);
     await discardIfPresent(workspace,op.backup,op.before,op.path,op.owner,runtime);
   }
+  await discardIfPresent(workspace,journalSibling(".chat-harness/source-policy.yaml","stage",journal.transactionId),exactByteDigest(SOURCE_POLICY_TEMPLATE),".chat-harness/source-policy.yaml","scaffold",runtime);
   await discardIfPresent(workspace,journalSibling(MANIFEST,"stage",journal.transactionId),journal.targetManifest,MANIFEST,"workspace",runtime);
   await discardIfPresent(workspace,journalSibling(MANIFEST,"backup",journal.transactionId),journal.startingManifest,MANIFEST,"workspace",runtime);
   const tokenDigest = journal.startingManifest === journal.targetManifest && journal.operations.length
@@ -214,6 +216,8 @@ async function recoverLocked(workspace: string, runtime?: MacosHelperRuntime): P
   const entries = await readdir(path.join(workspace,LOCK));
   const allowed = ["journal.json","commit.token",path.posix.basename(journalSibling(TOKEN,"stage",journal.transactionId))];
   if(entries.some(e=>!allowed.includes(e)))conflict("Unknown transaction evidence");
+  const policyStage = await artifact(workspace,journalSibling(".chat-harness/source-policy.yaml","stage",journal.transactionId),".chat-harness/source-policy.yaml","scaffold");
+  if(policyStage && exactByteDigest(policyStage) !== exactByteDigest(SOURCE_POLICY_TEMPLATE))conflict("Additive Source Policy stage is incomplete or changed; preserve evidence");
   const observed = await observeRecovery(workspace,journal);
   const assessment = assessManagedRecovery(journal,observed);
   if(assessment.decision === "conflict")conflict(assessment.conflicts.join("; "));
@@ -249,7 +253,11 @@ async function recoverLocked(workspace: string, runtime?: MacosHelperRuntime): P
 export async function recoverManagedReconciliation(workspace: string, runtime?: MacosHelperRuntime): Promise<"absent"|"rolled_back"|"committed"|"cleaned"> {
   verifiedMacosHelper(runtime); // Fail before acquiring or changing anything.
   const lease = await acquireMacosWorkspaceLease(workspace,runtime);
-  try {return await recoverLocked(workspace,withMacosRootIdentity(lease.identity,runtime));} finally {await lease.release();}
+  try {
+    const base={...withMacosRootIdentity(lease.identity,runtime),leasePid:lease.pid};
+    const temp=await observeReadonlyManagedPath(workspace,".chat-harness/temp","scaffold");
+    return await recoverLocked(workspace,temp.kind === "directory" ? {...base,tempIdentity:await lease.pin()}:base);
+  } finally {await lease.release();}
 }
 
 export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, runtime?: MacosHelperRuntime): Promise<{committed:true;cleanupPending:boolean}> {
@@ -267,7 +275,7 @@ export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, r
   const intent = compileReadonlyTransactionIntent(plan,randomBytes(16).toString("hex"));
   if(Buffer.byteLength(serializeRecoveryRecord(intent.journal),"utf8") > 64*1024)throw new ReconciliationError("setup.stale_plan","Transaction journal exceeds the bounded 64 KiB contract");
   const lease = await acquireMacosWorkspaceLease(plan.workspace,runtime);
-  runtime = withMacosRootIdentity(lease.identity,runtime);
+  runtime = {...withMacosRootIdentity(lease.identity,runtime),leasePid:lease.pid};
   const bootstrapped = new Set<string>();
   try {
     // Fresh install bootstrap is additive, descriptor-anchored and authorized.
@@ -276,6 +284,7 @@ export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, r
       if(entry.kind === "missing") {native(plan.workspace,p,"mkdir",undefined,runtime);bootstrapped.add(p);}
       else if(entry.kind !== "directory")conflict("Unsafe bootstrap path: "+p);
     }
+    runtime={...runtime,tempIdentity:await lease.pin()};
     reserveMacosReconciliationLock(plan.workspace,runtime);
     stage(plan.workspace,JOURNAL,serializeRecoveryRecord(intent.journal),runtime);
     await requireState(plan,bootstrapped);
@@ -284,7 +293,10 @@ export async function executeManagedReconciliation(plan: CombinedReadonlyPlan, r
         await inspectManagedDestination(plan.workspace,op.path,"scaffold"); native(plan.workspace,op.path,"mkdir",undefined,runtime);
       }
       if(op.owner === "scaffold" && op.action === "create_file") {
-        await inspectManagedDestination(plan.workspace,op.path,"scaffold");stage(plan.workspace,op.path,op.content!,runtime);
+        await inspectManagedDestination(plan.workspace,op.path,"scaffold");
+        const stagedPolicy=journalSibling(op.path,"stage",intent.journal.transactionId);
+        stage(plan.workspace,stagedPolicy,op.content!,runtime);
+        move(plan.workspace,stagedPolicy,op.path,op.afterDigest!,runtime);
       }
     }
     for(const s of intent.stages)stage(plan.workspace,s.path,s.content,runtime);

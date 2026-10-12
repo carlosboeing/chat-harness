@@ -16,6 +16,9 @@ export class MacosHelperError extends Error {
 export interface MacosHelperRuntime {
   /** Native lease-bound physical root identity for transaction calls. */
   rootIdentity?: string;
+  tempIdentity?: string;
+  ownerPid?: number;
+  leasePid?: number;
   platform: string;
   arch: string;
   standalone: boolean;
@@ -190,12 +193,16 @@ export function invokeMacosFilesystemOperation(
 /** Keep the native lease alive until the returned release function is called. */
 function guardedArguments(args: string[], info: MacosHelperRuntime): string[] {
   if(info.rootIdentity !== undefined && !/^[0-9]+:[0-9]+$/.test(info.rootIdentity))throw new MacosHelperError("invalid","Invalid root identity");
-  return info.rootIdentity ? [...args,"--root-identity="+info.rootIdentity] : args;
+  if(info.tempIdentity !== undefined && !/^[0-9]+:[0-9]+$/.test(info.tempIdentity))throw new MacosHelperError("invalid","Invalid temp identity");
+  if(info.leasePid !== undefined && (!Number.isSafeInteger(info.leasePid) || info.leasePid<=0))throw new MacosHelperError("invalid","Invalid lease identity");
+  if(info.ownerPid !== undefined && (!Number.isSafeInteger(info.ownerPid) || info.ownerPid<=0))throw new MacosHelperError("invalid","Invalid orchestrator identity");
+  return [...args,...(info.rootIdentity ? ["--root-identity="+info.rootIdentity] : []),
+    ...(info.tempIdentity ? ["--temp-identity="+info.tempIdentity] : []),...(info.ownerPid ? ["--owner-pid="+info.ownerPid] : []),...(info.leasePid ? ["--lease-pid="+info.leasePid] : [])];
 }
 export function withMacosRootIdentity(identity: string, info: MacosHelperRuntime = runtime()): MacosHelperRuntime {
-  return {...info,rootIdentity:identity};
+  return {...info,rootIdentity:identity,ownerPid:process.pid};
 }
-export async function acquireMacosWorkspaceLease(workspace: string, info: MacosHelperRuntime = runtime()): Promise<{release:()=>Promise<void>;identity:string}> {
+export async function acquireMacosWorkspaceLease(workspace: string, info: MacosHelperRuntime = runtime()): Promise<{release:()=>Promise<void>;identity:string;pid:number;pin:()=>Promise<string>}> {
   const child = spawn(verifiedMacosHelper(info), ["lease",workspace], {stdio:["pipe","pipe","pipe"]});
   child.stdin.on("error",()=>{});
   const exited = new Promise<void>((resolve)=>child.once("close",()=>resolve()));
@@ -212,7 +219,11 @@ export async function acquireMacosWorkspaceLease(workspace: string, info: MacosH
     child.once("error",error=>{clearTimeout(timer);reject(error);});
     child.once("close",()=>{clearTimeout(timer);reject(new MacosHelperError("failed","Workspace is busy or unsafe"));});
   });
-  return {identity,release:async ()=>{child.stdin.end();await exited;}};
+  return {identity,pid:child.pid!,release:async ()=>{child.stdin.end();await exited;},pin:()=>new Promise<string>((resolve,reject)=>{
+    const timer=setTimeout(()=>{child.kill();reject(new MacosHelperError("failed","Temp registration timeout"));},5000);
+    const receive=(chunk:Buffer)=>{const match=String(chunk).match(/^pinned ([0-9]+:[0-9]+)\n$/);clearTimeout(timer);child.stdout.off("data",receive);if(match)resolve(match[1]!);else reject(new MacosHelperError("invalid","Temp registration protocol"));};
+    child.stdout.on("data",receive);child.stdin.write("pin\n");
+  })};
 }
 
 /** Atomically move a settled reservation into its bounded cleanup namespace. */

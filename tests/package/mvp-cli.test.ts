@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync,readFileSync,writeFileSync,mkdirSync,readdirSync,rmSync,realpathSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { exactByteDigest } from "../../src/setup/manifest.js";
+import { serializeRecoveryRecord } from "../../src/setup/equal-digest-marker.js";
 import { SPECIALIST_IDS } from "../../src/specialists/definitions.js";
 
 const enabled=["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
@@ -41,6 +43,15 @@ for(const distribution of ["node","standalone"] as const)test.skipIf(!enabled)(`
   const originalPolicy=readFileSync(policy);writeFileSync(policy,Buffer.concat([originalPolicy,Buffer.from("\n# user policy suffix\r\n")]));
   const keptPolicy=readFileSync(policy);
   expect(invoke(["setup"]).result.state).toBe("no_changes");
+  // A valid before-state pending journal is recovered before classification;
+  // machine output must then describe the recovered installed set accurately.
+  mkdirSync(path.join(root,".chat-harness/temp/reconcile"));
+  const digest=exactByteDigest(readFileSync(path.join(root,".chat-harness/manifest.yaml")));
+  writeFileSync(path.join(root,".chat-harness/temp/reconcile/journal.json"),serializeRecoveryRecord({schema:1,transactionId:"abcdef0123456789",startingManifest:digest,targetManifest:digest,operations:[]}));
+  const recovered=invoke(["setup"]);
+  expect(recovered.result.state).toBe("no_changes");
+  expect(recovered.result.current_specialists).toEqual([...SPECIALIST_IDS]);
+  expect(recovered.result.specialist_changes.every((c:{action:string})=>c.action==="unchanged")).toBe(true);
   expect(invoke(["setup","--specialists","none"]).result.state).toBe("changes_applied");
   expect(readFileSync(policy)).toEqual(keptPolicy);
   expect(readFileSync(path.join(root,".chat-harness/WORKSPACE.md"),"utf8").endsWith(workspace)).toBe(true);

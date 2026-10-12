@@ -11,10 +11,11 @@ export interface MvpSetupDependencies {
   /** UI approval happens while the plan is still read-only. */
   beforeApply?: (plan: CombinedReadonlyPlan)=>Promise<boolean>;
   beforeRecovery?: ()=>Promise<boolean>;
+  afterRecoverySelection?: (options:ReconcileSelectionOptions)=>Promise<ReconcileSelectionOptions|null>;
 }
 export async function runMvpSetup(workspace: string, options: MvpSetupOptions, version: string, dependencies: MvpSetupDependencies={}) {
-  const initial=await inspectManifestDisk(workspace);
-  const installed=Object.keys(initial.manifest?.specialists??{}).sort();
+  let initial=await inspectManifestDisk(workspace);
+  let installed=Object.keys(initial.manifest?.specialists??{}).sort();
   let plan: CombinedReadonlyPlan;
   try {plan=await inspectAndPlanReadonlyReconciliation(workspace,options,version);}
   catch(error) {
@@ -34,13 +35,22 @@ export async function runMvpSetup(workspace: string, options: MvpSetupOptions, v
   });
   const failure=(error:unknown)=>{
     const code=error instanceof ReconciliationError?error.code:error instanceof MacosHelperError?
-      error.code==="unsupported"?"setup.platform_unsupported":"setup.native_helper_unavailable":"setup.verification_failed";
+      error.code==="unsupported"?"setup.platform_unsupported":error.code==="failed"?"setup.verification_failed":"setup.native_helper_unavailable":"setup.verification_failed";
     return {result:result("user_action_required"),findings:[...plan.findings,{code,severity:"error" as const,message:String(error),
       remediation:"Preserve Workspace and transaction evidence. Resolve the reported problem before retrying setup."}]};
   };
   if(!options.dryRun && initial.transaction==="pending") {
     if(dependencies.beforeRecovery && !await dependencies.beforeRecovery())return {result:result("cancelled"),findings:[] as Finding[]};
-    try {await recoverManagedReconciliation(workspace);plan=await inspectAndPlanReadonlyReconciliation(workspace,options,version);}
+    try {
+      await recoverManagedReconciliation(workspace);
+      initial=await inspectManifestDisk(workspace);installed=Object.keys(initial.manifest?.specialists??{}).sort();
+      if(dependencies.afterRecoverySelection){
+        const selected=await dependencies.afterRecoverySelection(options);
+        if(selected===null)return {result:result("cancelled"),findings:[] as Finding[]};
+        options={...options,...selected};
+      }
+      plan=await inspectAndPlanReadonlyReconciliation(workspace,options,version);
+    }
     catch(error){return failure(error);}
   }
   if(!plan.safeToPresent)return {result:result("user_action_required"),findings:[...plan.findings]};

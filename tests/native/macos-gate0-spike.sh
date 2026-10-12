@@ -83,6 +83,16 @@ if wait "$pid"; then fail "concurrent changed source incorrectly accepted"; fi
 [[ -f racing.md && ! -e racing.backup ]] || fail "racing file not restored safely"
 [[ "$(cat racing.md)" == 'edited by another process' ]] || fail "racing bytes lost"
 
+# A destination appearing after source verification is never replaced.
+printf 'desired staged content\n' > promotion-race.stage
+promotion_digest="$(hash promotion-race.stage)"
+GATE0_TEST_DELAY_US=700000 "$bin" promote "$workspace" "." promotion-race.stage promotion-race.target "$promotion_digest" > "$tmp/promotion-race.log" 2>&1 &
+pid=$!
+sleep 0.20
+printf 'user appeared during promotion\n' > promotion-race.target
+if wait "$pid"; then fail "intervening destination incorrectly replaced"; fi
+[[ "$(cat promotion-race.target)" == 'user appeared during promotion' && -f promotion-race.stage ]] || fail "destination race lost user bytes"
+
 # Different inode with identical content cannot be mistaken for the same file.
 printf 'same bytes\n' > inode-race.md
 inode_digest="$(hash inode-race.md)"

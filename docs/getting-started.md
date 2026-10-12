@@ -1,5 +1,7 @@
 # Getting started
 
+These instructions describe the v1 candidate. Published pre-v1 packages may expose the old interface; use a qualified candidate build until the stable release is separately approved. Windows can plan/diagnose but cannot apply v1 setup yet.
+
 This guide is for people who want the benefits of Chat Harness without needing to understand its internal architecture first.
 
 A **Workspace** is the folder your AI assistant uses for ongoing work. Chat Harness adds a small set of instruction and state files so work is easier to resume, verify, and maintain.

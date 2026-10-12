@@ -22,7 +22,7 @@ beforeAll(()=>{
 afterAll(()=>{if(scratch)rmSync(scratch,{recursive:true,force:true});});
 const runtime=()=>({platform:process.platform,arch:process.arch,standalone:false,entryPath:entry,executablePath:"unused"});
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
-for(const boundary of ["stage-open:journal.json","staged:journal.json","stage-open:.AGENTS.md.chat-harness-stage-","staged:.AGENTS.md.chat-harness-stage-","moved:AGENTS.md","moved:manifest.yaml","retired:reconcile","discarded:journal.json"]){
+for(const boundary of ["stage-open:journal.json","staged:journal.json","stage-open:.AGENTS.md.chat-harness-stage-","stage-open:.source-policy.yaml.chat-harness-stage-","staged:.AGENTS.md.chat-harness-stage-","moved:AGENTS.md","moved:manifest.yaml","retired:reconcile","discarded:journal.json"]){
  test.skipIf(!enabled)(`real process termination preserves/recoverably resolves ${boundary}`,async()=>{
   const root=realpathSync(mkdtempSync(path.join(scratch,"workspace-")));
   const signal=path.join(scratch,"signal-"+Math.random());
@@ -67,4 +67,25 @@ test.skipIf(!enabled)("active transaction lease rejects a simultaneous executor"
   const plan=await inspectAndPlanReadonlyReconciliation(root,{},"0.3.7");
   expect(plan.safeToPresent).toBe(false);
  }finally{const done=new Promise<void>(resolve=>child.once("exit",()=>resolve()));child.kill("SIGKILL");await done;await new Promise(resolve=>setTimeout(resolve,2200));rmSync(root,{recursive:true,force:true});}
+},30000);
+
+test.skipIf(!enabled)("parent-only SIGKILL cannot release exclusion while a native backup is still running",async()=>{
+ const root=realpathSync(mkdtempSync(path.join(scratch,"parent-only-")));
+ await executeManagedReconciliation(await inspectAndPlanReadonlyReconciliation(root,{specialists:"shopping"},"0.3.7"),runtime());
+ const original=readFileSync(path.join(root,".chat-harness/WORKSPACE.md"));
+ const signal=path.join(scratch,"parent-only-signal");
+ const child=spawn(process.execPath,[path.resolve(import.meta.dir,"transaction-worker.ts"),root,entry,"none"],
+  {env:{...process.env,GATE0_TEST_BOUNDARY:"pre-move:WORKSPACE.md",GATE0_TEST_BOUNDARY_SIGNAL:signal},stdio:"ignore"});
+ try{
+  const deadline=Date.now()+20000;while(!existsSync(signal) && Date.now()<deadline)await tick();
+  expect(existsSync(signal)).toBe(true);
+  const exited=new Promise<void>(resolve=>child.once("exit",()=>resolve()));child.kill("SIGKILL");await exited;
+  // Do NOT kill its active native child. Recovery must refuse until that
+  // already-started operation completes, even though the CLI parent is dead.
+  await expect(recoverManagedReconciliation(root,runtime())).rejects.toThrow("busy");
+  expect(existsSync(path.join(root,".chat-harness/temp/reconcile/journal.json"))).toBe(true);
+  await new Promise(resolve=>setTimeout(resolve,2200));
+  expect(await recoverManagedReconciliation(root,runtime())).toBe("rolled_back");
+  expect(readFileSync(path.join(root,".chat-harness/WORKSPACE.md"))).toEqual(original);
+ }finally{child.kill("SIGKILL");await new Promise(resolve=>setTimeout(resolve,2200));rmSync(root,{recursive:true,force:true});}
 },30000);

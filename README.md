@@ -1,5 +1,7 @@
 # Chat Harness
 
+This repository describes the v1 implementation candidate. The published `0.3.7` package may still use the older setup interface; publication is a separate approval. Use a qualified build of this branch to exercise the candidate.
+
 [![release](https://img.shields.io/github/v/release/carlosboeing/chat-harness)](https://github.com/carlosboeing/chat-harness/releases)
 [![CI](https://github.com/carlosboeing/chat-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosboeing/chat-harness/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/chat-harness)](https://www.npmjs.com/package/chat-harness)
@@ -156,7 +158,7 @@ The goal is not to load everything. It is to recover the right state and the min
 
 ## Specialists
 
-A specialist gives a new Workspace domain-specific starting guidance by seeding `WORKSPACE.md`. It is **not a separate agent or runtime mode**; after setup, the file is yours to adapt.
+A Specialist is versioned domain guidance in the managed `WORKSPACE.md` prefix. It is **not a separate agent or runtime mode**. Customize the suffix after the user boundary; setup regenerates the prefix and preserves your suffix byte-for-byte.
 
 The twelve versioned Specialists are `business`, `career`, `dev`, `education`, `finance`, `health`, `home`, `legal`, `shopping`, `tax`, `tech`, and `travel`. General/mixed use is Core only (`--specialists none`); research is Core methodology. Omitted selection preserves an installed set.
 

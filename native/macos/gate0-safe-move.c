@@ -27,10 +27,15 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <stdint.h>
+#include <signal.h>
 #include <unistd.h>
 
 static int guarded_root = 0;
 static unsigned long long root_dev = 0, root_ino = 0;
+static unsigned long long temp_dev = 0, temp_ino = 0;
+static int guarded_temp = 0;
+static long owner_pid = 0, lease_pid = 0;
+static int mutation_lease = -1;
 
 static int valid_segment(const char *name) {
   if (!name || !*name || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
@@ -308,16 +313,57 @@ static int verify_or_discard(const char *op, const char *root, const char *paren
  * apply/recovery. The persistent reservation remains the crash evidence.
  * EOF or process termination releases the lease without touching user files.
  */
+static int open_temp_from_root(int rootfd) {
+  int dir = dup(rootfd);
+  if (dir < 0) return -1;
+  if (descend(&dir, ".chat-harness/temp")) { close(dir); return -1; }
+  return dir;
+}
 static int lease_workspace(const char *root) {
   int dir = open_anchored_parent(root, ".");
   if (dir < 0) return 2;
   if (flock(dir, LOCK_EX | LOCK_NB)) { close(dir); return 4; }
   struct stat anchor;
   if (fstat(dir, &anchor)) { close(dir); return 5; }
+  // Pin existing temp for the entire lease, including after parent death.
+  int mutations = open_temp_from_root(dir);
+  if (mutations >= 0) {
+    if (flock(mutations, LOCK_EX | LOCK_NB)) { close(mutations); close(dir); return 4; }
+    if (flock(mutations, LOCK_UN)) { close(mutations); close(dir); return 5; }
+  }
   printf("locked %llu:%llu\n", (unsigned long long)anchor.st_dev, (unsigned long long)anchor.st_ino); fflush(stdout);
-  char block[64];
-  while (read(STDIN_FILENO, block, sizeof(block)) > 0) {}
+  char block[4]; ssize_t n;
+  while ((n = read(STDIN_FILENO, block, sizeof(block))) > 0) {
+    if (n != 4 || memcmp(block, "pin\n", 4)) { if (mutations >= 0) close(mutations); close(dir); return 64; }
+    if (mutations < 0) mutations = open_temp_from_root(dir);
+    struct stat pinned;
+    if (mutations < 0 || fstat(mutations, &pinned)) { if (mutations >= 0) close(mutations); close(dir); return 5; }
+    printf("pinned %llu:%llu\n", (unsigned long long)pinned.st_dev, (unsigned long long)pinned.st_ino); fflush(stdout);
+  }
+  // EOF can mean SIGKILL of the CLI, not completion of its synchronous native
+  // child. Drain every registered mutation before releasing root exclusion.
+  if (mutations >= 0) { if (flock(mutations, LOCK_EX)) { close(mutations); close(dir); return 5; } close(mutations); }
   close(dir);
+  return 0;
+}
+
+static int register_mutation(const char *root, const char *operation, const char *parent, const char *leaf) {
+  if (owner_pid && ((long)getppid() != owner_pid || kill((pid_t)owner_pid, 0) || (lease_pid && kill((pid_t)lease_pid, 0)))) return -1;
+  mutation_lease = open_anchored_parent(root, ".chat-harness/temp");
+  if (mutation_lease < 0) {
+    // Before temp exists, only the two authorized additive bootstrap mkdirs
+    // can run. No managed canonical operation can bypass registration.
+    if (!strcmp(operation, "mkdir") && ((!strcmp(parent, ".") && !strcmp(leaf, ".chat-harness")) ||
+        (!strcmp(parent, ".chat-harness") && !strcmp(leaf, "temp")))) return 0;
+    return -1;
+  }
+  struct stat pinned;
+  if (guarded_temp && (fstat(mutation_lease, &pinned) ||
+      (unsigned long long)pinned.st_dev != temp_dev || (unsigned long long)pinned.st_ino != temp_ino)) return -1;
+  if (flock(mutation_lease, LOCK_SH | LOCK_NB)) return -1;
+  // Checking the live parent under registration closes startup-after-death;
+  // the held registration, not a PID poll, protects already-running operations.
+  if (owner_pid && ((long)getppid() != owner_pid || kill((pid_t)owner_pid, 0) || (lease_pid && kill((pid_t)lease_pid, 0)))) return -1;
   return 0;
 }
 
@@ -342,10 +388,20 @@ static int retire_transaction(const char *root) {
 }
 
 int main(int argc, char **argv) {
-  if (argc > 2 && !strncmp(argv[argc-1], "--root-identity=", 16)) {
+  while (argc > 2) {
     char tail;
-    if (sscanf(argv[argc-1]+16, "%llu:%llu%c", &root_dev, &root_ino, &tail) != 2) return 64;
-    guarded_root = 1; --argc;
+    if (!strncmp(argv[argc-1], "--root-identity=", 16)) {
+      if (sscanf(argv[argc-1]+16, "%llu:%llu%c", &root_dev, &root_ino, &tail) != 2) return 64;
+      guarded_root = 1;
+    } else if (!strncmp(argv[argc-1], "--temp-identity=", 16)) {
+      if (sscanf(argv[argc-1]+16, "%llu:%llu%c", &temp_dev, &temp_ino, &tail) != 2) return 64;
+      guarded_temp = 1;
+    } else if (!strncmp(argv[argc-1], "--lease-pid=", 12)) {
+      if (sscanf(argv[argc-1]+12, "%ld%c", &lease_pid, &tail) != 1 || lease_pid <= 0) return 64;
+    } else if (!strncmp(argv[argc-1], "--owner-pid=", 12)) {
+      if (sscanf(argv[argc-1]+12, "%ld%c", &owner_pid, &tail) != 1 || owner_pid <= 0) return 64;
+    } else break;
+    --argc;
   }
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
@@ -362,6 +418,11 @@ int main(int argc, char **argv) {
     return 64;
 #endif
     return 0;
+  }
+  if (argc >= 3 && owner_pid && strcmp(argv[1], "lease")) {
+    if (register_mutation(argv[2], argv[1], argc > 3 ? argv[3] : "", argc > 4 ? argv[4] : "")) {
+      fprintf(stderr, "Active mutation registration is unavailable, parent died, or temp identity changed\n"); return 5;
+    }
   }
   if (argc == 3 && !strcmp(argv[1], "retire")) return retire_transaction(argv[2]);
   if (argc == 3 && !strcmp(argv[1], "lease")) return lease_workspace(argv[2]);
@@ -391,6 +452,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Source identity/content does not match expected digest\n");
     close(dir); return 3;
   }
+  test_boundary("pre-move", source);
   test_pause("GATE0_TEST_DELAY_US");
   if (move_no_replace(dir, source, target)) {
     perror("destination exists, unsupported filesystem, or rename conflict");

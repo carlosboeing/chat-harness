@@ -78,6 +78,7 @@ function defaultHandler(context: CommandContext, runtime: CliRuntime): Promise<C
       adoptWorkspace:context.options.adoptWorkspace,
     },runtime.version,runtime.isTTY && runtime.nativeTerminal && !context.options.json ? {
       beforeApply:approveMvpPlan,beforeRecovery:approveMvpRecovery,
+      afterRecoverySelection:options=>selectMvpSetup(context.workspace,options,runtime.version),
     }:{});
   }
   return Promise.resolve({ result: { state: "ready" } });
