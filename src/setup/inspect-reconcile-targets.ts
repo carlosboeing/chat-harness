@@ -5,6 +5,7 @@
  * exclusive lock; these optimistic preconditions are NOT mutation authority.
  */
 import type { Finding } from "../cli/result.js";
+import path from "node:path";
 import { SPECIALISTS, selectSpecialists } from "../specialists/definitions.js";
 import { AGENTS_MANAGED_MARKER, AGENTS_TEMPLATE } from "./templates.js";
 import { buildDesiredManifest, exactByteDigest, parseManifest, previewManifestChanges,
@@ -116,10 +117,14 @@ async function target(workspace: string, relative: string, owner: Owner,
 export async function inspectReconcileTargets(
   workspace: string,
   specialistSelection: readonly string[] | "none",
+  inspectedManifest?: ManifestDiskInspection,
 ): Promise<ReconcileTargetInspection> {
   const selectedIds = specialistSelection === "none" ? [] :
     selectSpecialists(specialistSelection).map(s => s.id);
-  const base = await inspectManifestDisk(workspace);
+  const base = inspectedManifest ?? await inspectManifestDisk(workspace);
+  if (inspectedManifest && base.workspace !== path.resolve(workspace)) {
+    throw new Error("Read-only manifest snapshot belongs to a different Workspace");
+  }
   const findings = [...base.findings];
   const initial = (): ReconcileTargetInspection => ({
     workspace: base.workspace, selectedIds: Object.freeze([...selectedIds]),
