@@ -77,13 +77,13 @@ describe("read-only pending multi-file journal health",()=>{
     };
     const journalPath=path.join(root,".chat-harness/temp/reconcile/journal.json");
     const tokenPath=path.join(root,".chat-harness/temp/reconcile/commit.token");
-    await writeFile(journalPath,JSON.stringify(record)+"\\n");
+    await writeFile(journalPath,JSON.stringify(record)+"\n");
     const token=expectedCompletionMarker(record);
     await writeFile(tokenPath,token);
     expect((await managedStateHealthFindings(root)).map(f=>f.code))
       .toEqual(["setup.recovery_required"]);
     expect(await readFile(tokenPath,"utf8")).toBe(token);
-    await writeFile(tokenPath,token+"\\n");
+    await writeFile(tokenPath,token+"\n");
     expect((await managedStateHealthFindings(root)).map(f=>f.code))
       .toContain("setup.recovery_conflict");
   });
