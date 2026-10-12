@@ -1,3 +1,4 @@
+import { managedStateHealthFindings } from "../validation/managed-state.js";
 import {
   detectInstallationMode,
   gitFindings,
@@ -38,6 +39,7 @@ export async function runDoctor(
       dependencies.accessCheck,
     )),
     ...(await scaffoldFindings(workspace)),
+    ...(await managedStateHealthFindings(workspace)),
     ...(await localIntegrityFindings(workspace)),
     ...runtimeFindings(mode, runtimeFacts),
     ...(await gitFindings(workspace)),

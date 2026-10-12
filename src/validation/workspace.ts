@@ -2,6 +2,7 @@ import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { Finding } from "../cli/result.js";
 import { loadSourcePolicy } from "../source-policy/load.js";
+import { managedStateHealthFindings } from "./managed-state.js";
 import {
   AGENTS_TEMPLATE,
   isManagedAgentsSource,
@@ -80,6 +81,7 @@ const WORKBENCH_FOLDERS: ReadonlyArray<{
 export async function validateWorkspace(workspace: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const inspection = await inspectWorkspace(workspace);
+  findings.push(...await managedStateHealthFindings(workspace));
 
   for (const observation of inspection.observations) {
     const expected = expectedManagedKind(observation.path);
