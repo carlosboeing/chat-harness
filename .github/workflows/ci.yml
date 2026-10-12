@@ -131,6 +131,42 @@ jobs:
         if: runner.os == 'macOS'
         run: bash tests/native/macos-gate0-spike.sh
 
+  macos-helper-packaging:
+    name: macOS helper packaging (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    steps:
+      - name: Checkout Chat Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build Node/npm with host-arch helper
+        run: bun run build:npm
+      - name: Build standalone with matching native helper
+        run: bun run build:binary -- bun-darwin-${{ matrix.arch }} dist/bin/chat-harness-darwin-${{ matrix.arch }}
+      - name: Run native packaging invocation and fail-closed tests
+        env:
+          CHAT_HARNESS_TEST_PACKAGING: "1"
+        run: bun test tests/setup/macos-helper.test.ts tests/package/release.test.ts
+      - name: Verify sidecar mode, checksum and inclusion in npm tarball
+        run: |
+          test -x dist/bin/chat-harness-darwin-${{ matrix.arch }}.macos-safe-move
+          test -x dist/npm/native/macos/darwin-${{ matrix.arch }}/safe-move
+          npm pack --dry-run --json > dist/npm-pack.json
+          bun run validate:package -- dist/npm-pack.json
+
   windows-lifecycle:
     runs-on: windows-2025
     timeout-minutes: 8

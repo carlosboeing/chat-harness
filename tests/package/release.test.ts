@@ -40,6 +40,18 @@ describe("release packaging", () => {
     ).toEqual([]);
   });
 
+  test("requires two native macOS architectures only for complete release npm packages", () => {
+    const paths = ["package.json", "README.md", "LICENSE", "dist/npm/chat-harness.js"];
+    expect(validatePackedPaths(paths)).toEqual([]);
+    expect(validatePackedPaths(paths, true)).toHaveLength(4);
+    const both = [...paths];
+    for (const arch of ["arm64", "x64"]) {
+      const helper = `dist/npm/native/macos/darwin-${arch}/safe-move`;
+      both.push(helper, helper + ".sha256");
+    }
+    expect(validatePackedPaths(both, true)).toEqual([]);
+  });
+
   test("rejects private/runtime-only repository material from npm packages", () => {
     const errors = validatePackedPaths([
       "package.json",
