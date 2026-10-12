@@ -18,7 +18,12 @@ export function expectedCompletionMarker(value: ManagedTransactionJournal): stri
 }
 
 export function matchesCompletionMarker(bytes: Uint8Array, record: ManagedTransactionJournal): boolean {
-  const expected = Buffer.from(expectedCompletionMarker(record));
-  const received = Buffer.from(bytes);
-  return received.length === expected.length && received.equals(expected);
+  try {
+    const expected = Buffer.from(expectedCompletionMarker(record));
+    const received = Buffer.from(bytes);
+    return received.length === expected.length && received.equals(expected);
+  } catch {
+    // Invalid or mismatched journal identity must not be accepted as proof.
+    return false;
+  }
 }
