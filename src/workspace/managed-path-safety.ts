@@ -1,7 +1,7 @@
 import { link, lstat, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
-export type ManagedFileOwner = "core" | "specialist" | "workspace";
+export type ManagedFileOwner = "core" | "specialist" | "workspace" | "transaction";
 
 export class ManagedPathSafetyError extends Error {
   readonly code = "setup.managed_path_unsafe";
@@ -40,6 +40,7 @@ export function assertCanonicalManagedPath(relative: string, owner: ManagedFileO
   }
   const permitted = owner === "core" ? relative === "AGENTS.md"
     : owner === "workspace" ? relative === ".chat-harness/WORKSPACE.md" || relative === ".chat-harness/manifest.yaml"
+    : owner === "transaction" ? relative === ".chat-harness/temp/reconcile"
     : segments.length >= 3 && segments[0] === ".chat-harness" && segments[1] === "procedures";
   if (!permitted) fail(relative, "destination outside " + owner + " namespace");
 }
