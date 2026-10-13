@@ -55,11 +55,11 @@ describe("read-only manifest diagnostics",()=>{
     expect((await managedStateHealthFindings(r)).map(x=>x.code))
       .toEqual(["setup.recovery_required","setup.recovery_conflict"]);
   });
-  test("invalid schema is reported and absent manifest does not disrupt legacy validation",async()=>{
+  test("invalid schema and unsupported unmanifested markers are distinct",async()=>{
     const r=await fixture(),p=path.join(r,".chat-harness/manifest.yaml");
     await writeFile(p,"schema: 999");
-    expect((await managedStateHealthFindings(r)).map(x=>x.code)).toContain("setup.manifest_invalid");
+    expect((await managedStateHealthFindings(r)).map(x=>x.code)).toContain("setup.manifest_schema_unsupported");
     await rm(p);
-    expect(await managedStateHealthFindings(r)).toEqual([]);
+    expect((await managedStateHealthFindings(r)).map(f=>f.code)).toContain("setup.legacy_workspace_unsupported");
   });
 });

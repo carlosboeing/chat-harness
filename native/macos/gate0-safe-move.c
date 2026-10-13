@@ -1,16 +1,41 @@
-// macOS bounded native helper; no destructive production setup integration.
+// Bounded POSIX native helper for macOS and Linux. No overwrite fallback.
 // Anchor every ancestor from "/" using openat(O_DIRECTORY|O_NOFOLLOW).
 // Exactly one source and target *in the same verified parent directory* per call.
 // Compile/test only on macOS; this does not implement manifest journaling or recovery.
 #define _DARWIN_C_SOURCE 1
+#define _GNU_SOURCE 1
+#ifdef __APPLE__
 #include <CommonCrypto/CommonDigest.h>
+#else
+#include <openssl/sha.h>
+#include <sys/syscall.h>
+#define CC_SHA256_CTX SHA256_CTX
+#define CC_SHA256_Init SHA256_Init
+#define CC_SHA256_Update SHA256_Update
+#define CC_SHA256_Final SHA256_Final
+#define CC_SHA256_DIGEST_LENGTH SHA256_DIGEST_LENGTH
+#define CC_LONG unsigned int
+#define st_mtimespec st_mtim
+#define st_ctimespec st_ctim
+#define RENAME_EXCL 1
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
+#include <stdint.h>
+#include <signal.h>
 #include <unistd.h>
+
+static int guarded_root = 0;
+static unsigned long long root_dev = 0, root_ino = 0;
+static unsigned long long temp_dev = 0, temp_ino = 0;
+static int guarded_temp = 0;
+static long owner_pid = 0, lease_pid = 0;
+static int mutation_lease = -1;
 
 static int valid_segment(const char *name) {
   if (!name || !*name || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
@@ -60,8 +85,11 @@ static int open_anchored_parent(const char *root, const char *parent) {
   }
   int dir = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
   if (dir < 0) return -1;
-  if (descend(&dir, root + 1) ||
-      (strcmp(parent, ".") && descend(&dir, parent))) {
+  int bad = descend(&dir, root + 1);
+  struct stat anchor;
+  if (!bad && guarded_root) bad = fstat(dir, &anchor) ||
+    (unsigned long long)anchor.st_dev != root_dev || (unsigned long long)anchor.st_ino != root_ino;
+  if (bad || (strcmp(parent, ".") && descend(&dir, parent))) {
     int saved = errno;
     close(dir);
     errno = saved == 0 ? EINVAL : saved;
@@ -72,11 +100,11 @@ static int open_anchored_parent(const char *root, const char *parent) {
 
 /** Pinned regular file and exact digest; inode compared before/after hashing. */
 static int check_file(int dir, const char *name, const char *expected, struct stat *identity) {
-  int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
   if (fd < 0) return -1;
   struct stat before, after, leaf;
   int ok = 0;
-  if (fstat(fd, &before) || !S_ISREG(before.st_mode)) goto done;
+  if (fstat(fd, &before) || !S_ISREG(before.st_mode) || before.st_size > 16 * 1024 * 1024) goto done;
   CC_SHA256_CTX ctx;
   if (!CC_SHA256_Init(&ctx)) goto done;
   unsigned char block[8192];
@@ -91,7 +119,11 @@ static int check_file(int dir, const char *name, const char *expected, struct st
   if (!S_ISREG(after.st_mode) || !S_ISREG(leaf.st_mode) ||
       before.st_dev != after.st_dev || before.st_ino != after.st_ino ||
       after.st_dev != leaf.st_dev || after.st_ino != leaf.st_ino ||
-      before.st_size != after.st_size) goto done;
+      before.st_size != after.st_size ||
+      before.st_mtimespec.tv_sec != after.st_mtimespec.tv_sec ||
+      before.st_mtimespec.tv_nsec != after.st_mtimespec.tv_nsec ||
+      before.st_ctimespec.tv_sec != after.st_ctimespec.tv_sec ||
+      before.st_ctimespec.tv_nsec != after.st_ctimespec.tv_nsec) goto done;
   char hex[65];
   for (int i=0;i<32;i++) snprintf(hex+2*i, 3, "%02x", bytes[i]);
   ok = strcmp(hex, expected) == 0;
@@ -120,11 +152,35 @@ static void test_after_move(void) {
   const char *flag = getenv("GATE0_TEST_AFTER_MOVE_SIGNAL");
   if (flag && *flag) {
     int fd = open(flag, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
-    if (fd >= 0) { (void)write(fd, "moved\n", 6); close(fd); }
+    if (fd >= 0) { ssize_t written = write(fd, "moved\n", 6); close(fd); if (written != 6) exit(65); }
   }
 #endif
   test_pause("GATE0_TEST_AFTER_MOVE_DELAY_US");
 }
+
+/* Test build only: kill the orchestrator at a named native boundary. */
+static void test_boundary(const char *operation, const char *leaf) {
+#ifdef GATE0_TEST_HOOKS
+  const char *wanted = getenv("GATE0_TEST_BOUNDARY");
+  const char *signal = getenv("GATE0_TEST_BOUNDARY_SIGNAL");
+  char label[512];
+  snprintf(label, sizeof(label), "%s:%s", operation, leaf);
+  if (wanted && *wanted && signal && *signal && !strncmp(label, wanted, strlen(wanted))) {
+    int fd = open(signal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (fd >= 0) { char signal_text[560]; snprintf(signal_text, sizeof(signal_text), "%s\n%ld\n", label, (long)getpid()); size_t size = strlen(signal_text); ssize_t written = write(fd, signal_text, size); close(fd); if (written != (ssize_t)size) exit(65); }
+    usleep(2000000);
+  }
+#else
+  (void)operation; (void)leaf;
+#endif
+}
+
+#ifdef __linux__
+static int renameatx_np(int fromdir, const char *from, int todir, const char *to, unsigned int flags) {
+  if (flags != RENAME_EXCL) { errno = EINVAL; return -1; }
+  return (int)syscall(SYS_renameat2, fromdir, from, todir, to, 1 /* RENAME_NOREPLACE */);
+}
+#endif
 
 static int move_no_replace(int dir, const char *from, const char *to) {
   return renameatx_np(dir, from, dir, to, RENAME_EXCL);
@@ -146,6 +202,7 @@ static int stage_exclusive(const char *root, const char *parent,
   int fd = openat(dir, target, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
   if (fd < 0) { perror("stage exists or cannot create"); close(dir); return 4; }
 
+  test_boundary("stage-open", target);
   struct stat initial, after, leaf, verified;
   int ok = 1;
   if (fstat(fd, &initial) || !S_ISREG(initial.st_mode)) ok = 0;
@@ -193,6 +250,7 @@ static int stage_exclusive(const char *root, const char *parent,
     fprintf(stderr, "Stage integrity, size or identity conflict; preserve any partial file for recovery\\n");
     return 5;
   }
+  test_boundary("staged", target);
   puts("stage OK");
   return 0;
 }
@@ -218,10 +276,140 @@ static int reserve_lock(const char *root) {
   return good ? 0 : 5;
 }
 
+/* Additive creation and cleanup stay relative to a no-follow parent fd.
+ * No recursive delete. File cleanup is restricted by the validated journal in
+ * the caller, and re-hashes the regular leaf immediately before unlinkat.
+ * These are process-interruption guarantees, not power-loss durability or
+ * isolation from a hostile process with the same user permissions.
+ */
+static int directory_operation(const char *op, const char *root, const char *parent, const char *leaf) {
+  if (!valid_segment(leaf)) return 64;
+  int dir = open_anchored_parent(root, parent);
+  if (dir < 0) return 2;
+  int result = !strcmp(op, "mkdir") ? mkdirat(dir, leaf, 0700) : unlinkat(dir, leaf, AT_REMOVEDIR);
+  close(dir);
+  return result ? 4 : 0;
+}
+
+static int verify_or_discard(const char *op, const char *root, const char *parent, const char *leaf, const char *digest) {
+  if (!valid_segment(leaf) || !valid_digest(digest)) return 64;
+  int dir = open_anchored_parent(root, parent);
+  if (dir < 0) return 2;
+  test_pause("GATE0_TEST_BEFORE_DISCARD_DELAY_US");
+  struct stat observed, current;
+  int bad = check_file(dir, leaf, digest, &observed);
+  if (!bad && !strcmp(op, "discard")) {
+    bad = fstatat(dir, leaf, &current, AT_SYMLINK_NOFOLLOW) ||
+      !S_ISREG(current.st_mode) || current.st_dev != observed.st_dev ||
+      current.st_ino != observed.st_ino || current.st_size != observed.st_size ||
+      unlinkat(dir, leaf, 0);
+  }
+  if (!bad && !strcmp(op, "discard")) test_boundary("discarded", leaf);
+  close(dir);
+  return bad ? 5 : 0;
+}
+
+/* A process-scoped lease on the physical Workspace serializes authorized
+ * apply/recovery. The persistent reservation remains the crash evidence.
+ * EOF or process termination releases the lease without touching user files.
+ */
+static int open_temp_from_root(int rootfd) {
+  int dir = dup(rootfd);
+  if (dir < 0) return -1;
+  if (descend(&dir, ".chat-harness/temp")) { close(dir); return -1; }
+  return dir;
+}
+static int lease_workspace(const char *root) {
+  int dir = open_anchored_parent(root, ".");
+  if (dir < 0) return 2;
+  if (flock(dir, LOCK_EX | LOCK_NB)) { close(dir); return 4; }
+  struct stat anchor;
+  if (fstat(dir, &anchor)) { close(dir); return 5; }
+  // Pin existing temp for the entire lease, including after parent death.
+  int mutations = open_temp_from_root(dir);
+  if (mutations >= 0) {
+    if (flock(mutations, LOCK_EX | LOCK_NB)) { close(mutations); close(dir); return 4; }
+    if (flock(mutations, LOCK_UN)) { close(mutations); close(dir); return 5; }
+  }
+  printf("locked %llu:%llu\n", (unsigned long long)anchor.st_dev, (unsigned long long)anchor.st_ino); fflush(stdout);
+  char block[4]; ssize_t n;
+  while ((n = read(STDIN_FILENO, block, sizeof(block))) > 0) {
+    if (n != 4 || memcmp(block, "pin\n", 4)) { if (mutations >= 0) close(mutations); close(dir); return 64; }
+    if (mutations < 0) mutations = open_temp_from_root(dir);
+    struct stat pinned;
+    if (mutations < 0 || fstat(mutations, &pinned)) { if (mutations >= 0) close(mutations); close(dir); return 5; }
+    printf("pinned %llu:%llu\n", (unsigned long long)pinned.st_dev, (unsigned long long)pinned.st_ino); fflush(stdout);
+  }
+  // EOF can mean SIGKILL of the CLI, not completion of its synchronous native
+  // child. Drain every registered mutation before releasing root exclusion.
+  if (mutations >= 0) { if (flock(mutations, LOCK_EX)) { close(mutations); close(dir); return 5; } close(mutations); }
+  close(dir);
+  return 0;
+}
+
+static int register_mutation(const char *root, const char *operation, const char *parent, const char *leaf) {
+  if (owner_pid && ((long)getppid() != owner_pid || kill((pid_t)owner_pid, 0) || (lease_pid && kill((pid_t)lease_pid, 0)))) return -1;
+  mutation_lease = open_anchored_parent(root, ".chat-harness/temp");
+  if (mutation_lease < 0) {
+    // Before temp exists, only the two authorized additive bootstrap mkdirs
+    // can run. No managed canonical operation can bypass registration.
+    if (!strcmp(operation, "mkdir") && ((!strcmp(parent, ".") && !strcmp(leaf, ".chat-harness")) ||
+        (!strcmp(parent, ".chat-harness") && !strcmp(leaf, "temp")))) return 0;
+    return -1;
+  }
+  struct stat pinned;
+  if (guarded_temp && (fstat(mutation_lease, &pinned) ||
+      (unsigned long long)pinned.st_dev != temp_dev || (unsigned long long)pinned.st_ino != temp_ino)) return -1;
+  if (flock(mutation_lease, LOCK_SH | LOCK_NB)) return -1;
+  // Checking the live parent under registration closes startup-after-death;
+  // the held registration, not a PID poll, protects already-running operations.
+  if (owner_pid && ((long)getppid() != owner_pid || kill((pid_t)owner_pid, 0) || (lease_pid && kill((pid_t)lease_pid, 0)))) return -1;
+  return 0;
+}
+
+/* Atomically retire the settled reservation before consuming commit proof.
+ * This directory move is exclusive and inode-verified just like file moves.
+ * The fixed retired namespace explains process interruption during final
+ * journal/token disposal, without guessing away an initial empty reservation.
+ */
+static int retire_transaction(const char *root) {
+  int dir = open_anchored_parent(root, ".chat-harness/temp");
+  if (dir < 0) return 2;
+  int fd = openat(dir, "reconcile", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+  struct stat before, named;
+  int bad = fd < 0 || fstat(fd, &before) ||
+    renameatx_np(dir, "reconcile", dir, "reconcile-cleanup", RENAME_EXCL);
+  if (!bad) bad = fstatat(dir, "reconcile-cleanup", &named, AT_SYMLINK_NOFOLLOW) ||
+    !S_ISDIR(named.st_mode) || before.st_dev != named.st_dev || before.st_ino != named.st_ino;
+  if (!bad) test_boundary("retired", "reconcile");
+  if (fd >= 0) close(fd);
+  close(dir);
+  return bad ? 5 : 0;
+}
+
 int main(int argc, char **argv) {
+  while (argc > 2) {
+    char tail;
+    if (!strncmp(argv[argc-1], "--root-identity=", 16)) {
+      if (sscanf(argv[argc-1]+16, "%llu:%llu%c", &root_dev, &root_ino, &tail) != 2) return 64;
+      guarded_root = 1;
+    } else if (!strncmp(argv[argc-1], "--temp-identity=", 16)) {
+      if (sscanf(argv[argc-1]+16, "%llu:%llu%c", &temp_dev, &temp_ino, &tail) != 2) return 64;
+      guarded_temp = 1;
+    } else if (!strncmp(argv[argc-1], "--lease-pid=", 12)) {
+      if (sscanf(argv[argc-1]+12, "%ld%c", &lease_pid, &tail) != 1 || lease_pid <= 0) return 64;
+    } else if (!strncmp(argv[argc-1], "--owner-pid=", 12)) {
+      if (sscanf(argv[argc-1]+12, "%ld%c", &owner_pid, &tail) != 1 || owner_pid <= 0) return 64;
+    } else break;
+    --argc;
+  }
   // Strict, side-effect-free packaged-helper protocol probe.
   if (argc == 2 && !strcmp(argv[1], "--probe")) {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__linux__) && defined(__aarch64__)
+    puts("chat-harness-native-helper/1 linux-arm64");
+#elif defined(__linux__) && defined(__x86_64__)
+    puts("chat-harness-native-helper/1 linux-x64");
+#elif defined(__arm64__) || defined(__aarch64__)
     puts("chat-harness-macos-helper/1 darwin-arm64");
 #elif defined(__x86_64__)
     puts("chat-harness-macos-helper/1 darwin-x64");
@@ -231,6 +419,17 @@ int main(int argc, char **argv) {
 #endif
     return 0;
   }
+  if (argc >= 3 && owner_pid && strcmp(argv[1], "lease")) {
+    if (register_mutation(argv[2], argv[1], argc > 3 ? argv[3] : "", argc > 4 ? argv[4] : "")) {
+      fprintf(stderr, "Active mutation registration is unavailable, parent died, or temp identity changed\n"); return 5;
+    }
+  }
+  if (argc == 3 && !strcmp(argv[1], "retire")) return retire_transaction(argv[2]);
+  if (argc == 3 && !strcmp(argv[1], "lease")) return lease_workspace(argv[2]);
+  if (argc == 5 && (!strcmp(argv[1], "mkdir") || !strcmp(argv[1], "rmdir")))
+    return directory_operation(argv[1], argv[2], argv[3], argv[4]);
+  if (argc == 6 && (!strcmp(argv[1], "verify") || !strcmp(argv[1], "discard")))
+    return verify_or_discard(argv[1], argv[2], argv[3], argv[4], argv[5]);
   if (argc == 3 && !strcmp(argv[1], "reserve"))
     return reserve_lock(argv[2]);
   if (argc == 6 && !strcmp(argv[1], "stage")) {
@@ -253,12 +452,14 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Source identity/content does not match expected digest\n");
     close(dir); return 3;
   }
+  test_boundary("pre-move", source);
   test_pause("GATE0_TEST_DELAY_US");
   if (move_no_replace(dir, source, target)) {
     perror("destination exists, unsupported filesystem, or rename conflict");
     close(dir); return 4;
   }
   test_after_move();
+  test_boundary("moved", target);
   if (check_file(dir, target, hash, &moved) ||
       moved.st_dev != initial.st_dev || moved.st_ino != initial.st_ino) {
     // A different inode with identical bytes is still an intervening source.

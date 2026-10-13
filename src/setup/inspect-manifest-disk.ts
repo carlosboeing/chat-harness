@@ -4,7 +4,7 @@ import path from "node:path";
 
 import type { Finding } from "../cli/result.js";
 import { inspectManagedDestination, ManagedPathSafetyError, type ManagedFileOwner } from "../workspace/managed-path-safety.js";
-import { exactByteDigest, parseManifest, type ContentDigest, type WorkspaceManifest } from "./manifest.js";
+import { exactByteDigest, parseManifest, ManifestContractError, type ContentDigest, type WorkspaceManifest } from "./manifest.js";
 import { AGENTS_MANAGED_MARKER } from "./templates.js";
 
 const MANIFEST = ".chat-harness/manifest.yaml";
@@ -119,6 +119,13 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
   });
 
   try {
+    const retired = await observeReadonlyManagedPath(root, ".chat-harness/temp/reconcile-cleanup", "transaction");
+    if(retired.kind !== "missing") {
+      transaction = retired.kind === "directory" ? "pending" : "unsafe";
+      findings.push(finding(transaction === "pending" ? "setup.recovery_required" : "setup.recovery_conflict",
+        ".chat-harness/temp/reconcile-cleanup","A retired reconciliation needs verified cleanup; read-only inspection does not remove it."));
+      return result();
+    }
     const lock = await observeReadonlyManagedPath(root, RECONCILE_LOCK, "transaction");
     if (lock.kind === "directory") {
       transaction = "pending";
@@ -162,7 +169,7 @@ export async function inspectManifestDisk(workspace: string): Promise<ManifestDi
     manifestState = "valid";
   } catch (error) {
     manifestState = "invalid";
-    findings.push(finding("setup.manifest_invalid", MANIFEST, String(error)));
+    findings.push(finding(error instanceof ManifestContractError ? error.code : "setup.manifest_invalid", MANIFEST, String(error)));
     return result(); // Never traverse unvalidated manifest paths.
   }
 

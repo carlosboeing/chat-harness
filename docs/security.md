@@ -82,3 +82,7 @@ Prefer structured findings, result states, sanitized provenance, action receipts
 ## Reporting issues
 
 The public reporting process is defined in repository-root [`SECURITY.md`](../SECURITY.md).
+
+## v1 managed-file mutation
+
+Only manifest-recorded Core/Procedure bytes and the marked Workspace prefix are reconciled. User suffix bytes, Source Policy, optional directories and unowned files retain their ownership. Native no-replace moves and post-backup checks preserve intervening edits; ambiguous recovery preserves evidence and stops. Read-only commands never recover. See [reconciliation](reconciliation.md) for native platform limits and tested process-interruption guarantees. Power-loss durability and hostile same-user isolation are not claimed.

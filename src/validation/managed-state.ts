@@ -6,6 +6,9 @@
  * path until the new setup contract is activated. A pending transaction must
  * nevertheless be reported first, even when no manifest exists.
  */
+import { CORE_VERSION,AGENTS_MANAGED_MARKER } from "../setup/templates.js";
+import { SPECIALISTS } from "../specialists/definitions.js";
+import { legacyLayoutFindings } from "./legacy-state.js";
 import type { Finding } from "../cli/result.js";
 import { inspectManifestDisk, observeReadonlyManagedPath } from "../setup/inspect-manifest-disk.js";
 import { parseWorkspaceBoundary } from "../setup/workspace-boundary.js";
@@ -27,11 +30,23 @@ export async function managedStateHealthFindings(workspace: string): Promise<Fin
   // Fail closed: the transaction journal may own partial outputs. Never
   // classify them as a new or corrupt installation or attempt recovery.
   if (inspected.transaction === "pending") {
-    findings.push(...await inspectPendingJournalHealth(inspected.workspace));
+    findings.push(...await inspectPendingJournalHealth(inspected.workspace,inspected.findings.some(f=>f.location === ".chat-harness/temp/reconcile-cleanup") ? ".chat-harness/temp/reconcile-cleanup" : ".chat-harness/temp/reconcile"));
     return findings;
   }
   if (inspected.transaction !== "absent") return findings;
+  findings.push(...await legacyLayoutFindings(workspace));
+  if(inspected.manifestState === "missing") {
+    for(const [relative,fileOwner,marker] of [["AGENTS.md","core",AGENTS_MANAGED_MARKER],[WORKSPACE,"workspace","<!-- chat-harness-managed: workspace -->"]] as const){
+      try{
+        const file=await observeReadonlyManagedPath(inspected.workspace,relative,fileOwner);
+        if(file.bytes?.toString("utf8").startsWith(marker))findings.push(conflict("setup.legacy_workspace_unsupported",".chat-harness/manifest.yaml","Chat Harness markers without a supported manifest do not prove managed ownership; explicit migration is required."));
+      }catch(error){findings.push(conflict("setup.managed_path_unsafe",relative,String(error)));}
+    }
+  }
   if (inspected.manifestState !== "valid") return findings;
+  if(inspected.manifest!.core.version < CORE_VERSION)findings.push({code:"setup.core_outdated",severity:"warning",location:"AGENTS.md",message:"Installed Core is older than the bundled component.",remediation:"Preview setup to reconcile the managed Core and refresh manual host bindings."});
+  for(const [id,component] of Object.entries(inspected.manifest!.specialists))if(component.version < SPECIALISTS[id as keyof typeof SPECIALISTS].version)
+    findings.push({code:"setup.specialist_outdated",severity:"warning",location:id,message:"Installed Specialist is older than the bundled component.",remediation:"Preview setup to update the installed desired set."});
 
   // The recorded Core/Procedure files, historical paths, SHA-256 ownership,
   // markers and case aliases have already been inspected above.

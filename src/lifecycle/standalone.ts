@@ -81,8 +81,8 @@ export function parseGithubRelease(
   }
 
   let nativeHelper: StandaloneRelease["nativeHelper"];
-  if (platform === "darwin") {
-    const helperName = binaryName + ".macos-safe-move";
+  if (platform === "darwin" || (platform === "linux" && (assets.some(a=>a.name === binaryName+".linux-safe-move") || Number(tag.slice(1).split(".")[0])>=1))) {
+    const helperName = binaryName + (platform === "linux" ? ".linux-safe-move" : ".macos-safe-move");
     const helperBinary = assets.find((asset) => asset.name === helperName);
     const helperChecksum = assets.find((asset) => asset.name === helperName + ".sha256");
     if (!helperBinary?.browser_download_url || !helperChecksum?.browser_download_url) {
@@ -199,6 +199,7 @@ export interface PosixReplacementInput {
   candidateBytes: Uint8Array;
   expectedVersion: string;
   nativeHelperBytes?: Uint8Array;
+  nativeHelperPlatform?: "darwin" | "linux";
   verifyVersion?: VerifyVersionFn;
   /** Allows deterministic tests without executing an architecture-specific helper on Linux. */
   verifyNativeHelper?: (stagedExecutable: string) => void;
@@ -217,13 +218,15 @@ export function replaceStandalonePosix(input: PosixReplacementInput): void {
   const directory = path.dirname(input.target);
   const candidate = path.join(directory, ".chat-harness-update." + suffix);
   const backup = path.join(directory, ".chat-harness-backup." + suffix);
-  const helper = input.target + ".macos-safe-move";
+  const helperPlatform=input.nativeHelperPlatform??"darwin";
+  const helperSuffix=helperPlatform === "linux" ? ".linux-safe-move" : ".macos-safe-move";
+  const helper = input.target + helperSuffix;
   const helperChecksum = helper + ".sha256";
-  const backupHelper = backup + ".macos-safe-move";
+  const backupHelper = backup + helperSuffix;
   const backupChecksum = backupHelper + ".sha256";
   const stagedDir = path.join(directory, ".chat-harness-helper-stage." + suffix);
   const stagedExecutable = path.join(stagedDir, path.basename(input.target));
-  const stagedHelper = stagedExecutable + ".macos-safe-move";
+  const stagedHelper = stagedExecutable + helperSuffix;
   const stagedChecksum = stagedHelper + ".sha256";
   let hadHelper = false;
   let movedHelper = false;
@@ -255,7 +258,7 @@ export function replaceStandalonePosix(input: PosixReplacementInput): void {
       writeFileSync(stagedChecksum, digest + "  " + path.basename(stagedHelper) + "\n", "utf8");
       const verifyNativeHelper = input.verifyNativeHelper ?? ((staged: string) => {
         verifiedMacosHelper({
-          platform: "darwin",
+          platform: helperPlatform,
           arch: process.arch,
           standalone: true,
           executablePath: staged,
@@ -285,7 +288,7 @@ export function replaceStandalonePosix(input: PosixReplacementInput): void {
     if (input.nativeHelperBytes) {
       const verifyNativeHelper = input.verifyNativeHelper ?? ((staged: string) => {
         verifiedMacosHelper({
-          platform: "darwin",
+          platform: helperPlatform,
           arch: process.arch,
           standalone: true,
           executablePath: staged,

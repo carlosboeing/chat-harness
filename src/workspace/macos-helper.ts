@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,12 +8,17 @@ export type MacosHelperCode = "unsupported" | "missing" | "invalid" | "failed";
 
 export class MacosHelperError extends Error {
   constructor(readonly code: MacosHelperCode, detail: string) {
-    super(`macOS filesystem helper ${code}: ${detail}`);
+    super(`native filesystem helper ${code}: ${detail}`);
     this.name = "MacosHelperError";
   }
 }
 
 export interface MacosHelperRuntime {
+  /** Native lease-bound physical root identity for transaction calls. */
+  rootIdentity?: string;
+  tempIdentity?: string;
+  ownerPid?: number;
+  leasePid?: number;
   platform: string;
   arch: string;
   standalone: boolean;
@@ -36,11 +41,11 @@ function runtime(): MacosHelperRuntime {
 
 /** No PATH lookup, environment override, download, runtime compiler or source checkout. */
 export function macosHelperPath(info: MacosHelperRuntime = runtime()): string {
-  if (info.platform !== "darwin" || !["arm64", "x64"].includes(info.arch)) {
+  if (!["darwin","linux"].includes(info.platform) || !["arm64", "x64"].includes(info.arch)) {
     throw new MacosHelperError("unsupported", `${info.platform}/${info.arch}; native reconciliation is unavailable on this platform.`);
   }
-  if (info.standalone) return info.executablePath + ".macos-safe-move";
-  return path.join(path.dirname(info.entryPath), "native", "macos", `darwin-${info.arch}`, "safe-move");
+  if (info.standalone) return info.executablePath + (info.platform === "darwin" ? ".macos-safe-move" : ".linux-safe-move");
+  return path.join(path.dirname(info.entryPath), "native", info.platform === "darwin" ? "macos" : "linux", `${info.platform}-${info.arch}`, "safe-move");
 }
 
 function regularFile(file: string, executable: boolean): void {
@@ -74,15 +79,17 @@ export function verifiedMacosHelper(info: MacosHelperRuntime = runtime()): strin
 
   // Reject scripts, wrong architecture and fat/unknown binaries *before* executing.
   const cpu = info.arch === "arm64" ? 0x0100000c : 0x01000007;
-  if (bytes.length < 12 || bytes.readUInt32LE(0) !== 0xfeedfacf ||
-      bytes.readUInt32LE(4) !== cpu) {
-    throw new MacosHelperError("invalid", `helper is not a thin ${info.arch} macOS Mach-O executable.`);
-  }
+  const valid = info.platform === "darwin"
+    ? bytes.length >= 12 && bytes.readUInt32LE(0) === 0xfeedfacf && bytes.readUInt32LE(4) === cpu
+    : bytes.length >= 64 && bytes.subarray(0,4).equals(Buffer.from([0x7f,0x45,0x4c,0x46])) &&
+      bytes[4] === 2 && bytes[5] === 1 && bytes.readUInt16LE(18) === (info.arch === "arm64" ? 183 : 62) &&
+      bytes.readUInt16LE(16) === 2;
+  if (!valid) throw new MacosHelperError("invalid", `helper has wrong executable format or ${info.arch} architecture.`);
 
   const probe = spawnSync(executable, ["--probe"], {
     encoding: "utf8", timeout: 5000, maxBuffer: 4096, stdio: ["ignore", "pipe", "pipe"],
   });
-  const expected = `chat-harness-macos-helper/1 darwin-${info.arch}\n`;
+  const expected = info.platform === "darwin" ? `chat-harness-macos-helper/1 darwin-${info.arch}\n` : `chat-harness-native-helper/1 linux-${info.arch}\n`;
   if (probe.error || probe.status !== 0 || probe.stdout !== expected || probe.stderr !== "") {
     throw new MacosHelperError("invalid", "helper protocol/architecture probe failed; reinstall Chat Harness.");
   }
@@ -109,7 +116,7 @@ export function invokeMacosSafeMove(input: MacosMove, info: MacosHelperRuntime =
     throw new MacosHelperError("invalid", "expected lowercase 64-character SHA-256 digest.");
   }
   const args = [input.operation, input.workspace, input.parent, input.source, input.destination, input.digest];
-  const result = spawnSync(executable, args, {
+  const result = spawnSync(executable, guardedArguments(args, info), {
     encoding: "utf8", timeout: 15000, maxBuffer: 4096, stdio: ["ignore", "pipe", "pipe"],
   });
   if (result.error || result.status !== 0) {
@@ -143,7 +150,7 @@ export function invokeMacosSafeStage(input: MacosStage, info: MacosHelperRuntime
   }
   const executable = verifiedMacosHelper(info);
   const args = ["stage", input.workspace, input.parent, input.destination, input.digest];
-  const result = spawnSync(executable, args, {
+  const result = spawnSync(executable, guardedArguments(args, info), {
     input: content, encoding: "utf8", timeout: 15000, maxBuffer: 4096,
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -160,11 +167,68 @@ export function invokeMacosSafeStage(input: MacosStage, info: MacosHelperRuntime
  */
 export function reserveMacosReconciliationLock(workspace: string, info: MacosHelperRuntime = runtime()): void {
   const executable = verifiedMacosHelper(info);
-  const result = spawnSync(executable, ["reserve", workspace], {
+  const result = spawnSync(executable, guardedArguments(["reserve", workspace], info), {
     encoding: "utf8", timeout: 15000, maxBuffer: 4096, stdio: ["ignore", "pipe", "pipe"],
   });
   if (result.error || result.status !== 0) {
     throw new MacosHelperError("failed",
       `exclusive reconciliation reservation failed (exit ${result.status ?? "unknown"}). Preserve existing transaction state and inspect it read-only.`);
   }
+}
+
+/** Fixed, descriptor-relative operations; namespace/ownership belongs to the engine. */
+export function invokeMacosFilesystemOperation(
+  operation: "mkdir" | "rmdir" | "verify" | "discard",
+  workspace: string, relative: string, digest?: string, info: MacosHelperRuntime = runtime(),
+): void {
+  const parent = path.posix.dirname(relative), leaf = path.posix.basename(relative);
+  if ((operation === "verify" || operation === "discard") && !/^[0-9a-f]{64}$/.test(digest ?? "")) {
+    throw new MacosHelperError("invalid", "operation requires exact SHA-256");
+  }
+  const result = spawnSync(verifiedMacosHelper(info), guardedArguments([operation,workspace,parent,leaf,...(digest ? [digest] : [])], info),
+    {encoding:"utf8",timeout:15000,maxBuffer:4096,stdio:["ignore","pipe","pipe"]});
+  if (result.error || result.status !== 0) throw new MacosHelperError("failed", `${operation} failed for ${relative}; preserve transaction evidence.`);
+}
+
+/** Keep the native lease alive until the returned release function is called. */
+function guardedArguments(args: string[], info: MacosHelperRuntime): string[] {
+  if(info.rootIdentity !== undefined && !/^[0-9]+:[0-9]+$/.test(info.rootIdentity))throw new MacosHelperError("invalid","Invalid root identity");
+  if(info.tempIdentity !== undefined && !/^[0-9]+:[0-9]+$/.test(info.tempIdentity))throw new MacosHelperError("invalid","Invalid temp identity");
+  if(info.leasePid !== undefined && (!Number.isSafeInteger(info.leasePid) || info.leasePid<=0))throw new MacosHelperError("invalid","Invalid lease identity");
+  if(info.ownerPid !== undefined && (!Number.isSafeInteger(info.ownerPid) || info.ownerPid<=0))throw new MacosHelperError("invalid","Invalid orchestrator identity");
+  return [...args,...(info.rootIdentity ? ["--root-identity="+info.rootIdentity] : []),
+    ...(info.tempIdentity ? ["--temp-identity="+info.tempIdentity] : []),...(info.ownerPid ? ["--owner-pid="+info.ownerPid] : []),...(info.leasePid ? ["--lease-pid="+info.leasePid] : [])];
+}
+export function withMacosRootIdentity(identity: string, info: MacosHelperRuntime = runtime()): MacosHelperRuntime {
+  return {...info,rootIdentity:identity,ownerPid:process.pid};
+}
+export async function acquireMacosWorkspaceLease(workspace: string, info: MacosHelperRuntime = runtime()): Promise<{release:()=>Promise<void>;identity:string;pid:number;pin:()=>Promise<string>}> {
+  const child = spawn(verifiedMacosHelper(info), ["lease",workspace], {stdio:["pipe","pipe","pipe"]});
+  child.stdin.on("error",()=>{});
+  const exited = new Promise<void>((resolve)=>child.once("close",()=>resolve()));
+  let identity = "";
+  await new Promise<void>((resolve,reject)=>{
+    const timer = setTimeout(()=>{child.kill();reject(new MacosHelperError("failed","lease timeout"));},5000);
+    let output = "";
+    child.stdout.on("data",chunk=>{
+      output += String(chunk);
+      const match=output.match(/^locked ([0-9]+:[0-9]+)\n$/);
+      if (match) {identity=match[1]!;clearTimeout(timer);resolve();}
+      else if (output.length > 4096) {clearTimeout(timer);child.kill();reject(new MacosHelperError("invalid","lease protocol"));}
+    });
+    child.once("error",error=>{clearTimeout(timer);reject(error);});
+    child.once("close",()=>{clearTimeout(timer);reject(new MacosHelperError("failed","Workspace is busy or unsafe"));});
+  });
+  return {identity,pid:child.pid!,release:async ()=>{child.stdin.end();await exited;},pin:()=>new Promise<string>((resolve,reject)=>{
+    const timer=setTimeout(()=>{child.kill();reject(new MacosHelperError("failed","Temp registration timeout"));},5000);
+    const receive=(chunk:Buffer)=>{const match=String(chunk).match(/^pinned ([0-9]+:[0-9]+)\n$/);clearTimeout(timer);child.stdout.off("data",receive);if(match)resolve(match[1]!);else reject(new MacosHelperError("invalid","Temp registration protocol"));};
+    child.stdout.on("data",receive);child.stdin.write("pin\n");
+  })};
+}
+
+/** Atomically move a settled reservation into its bounded cleanup namespace. */
+export function retireMacosReconciliationLock(workspace: string, info: MacosHelperRuntime = runtime()): void {
+  const result = spawnSync(verifiedMacosHelper(info), guardedArguments(["retire",workspace], info),
+    {encoding:"utf8",timeout:15000,maxBuffer:4096,stdio:["ignore","pipe","pipe"]});
+  if(result.error || result.status !== 0)throw new MacosHelperError("failed","Could not retire transaction; preserve evidence.");
 }

@@ -147,7 +147,7 @@ export async function scaffoldFindings(
         code: "doctor.scaffold_missing",
         severity: "warning",
         message:
-          `Expected ${expectedKind} is missing; setup can establish the v0.2 harness scaffold.`,
+          `Expected ${expectedKind} is missing; setup can establish the v1 harness scaffold.`,
         location: observation.path,
         remediation: "Run chat-harness setup.",
       });

@@ -17,7 +17,7 @@ import { exactByteDigest, parseManifest, serializeManifest } from "../../src/set
 import { AGENTS_TEMPLATE, CORE_VERSION } from "../../src/setup/templates.js";
 
 const native = process.env.GATE0_SPIKE_NATIVE;
-if (process.platform !== "darwin" || !native) throw new Error("Compile native helper and supply GATE0_SPIKE_NATIVE");
+if (!["darwin","linux"].includes(process.platform) || !native) throw new Error("Compile native helper and supply GATE0_SPIKE_NATIVE");
 const tx = "abcdef0123456789";
 const JPATH = ".chat-harness/temp/reconcile/journal.json";
 const MPATH = ".chat-harness/manifest.yaml";

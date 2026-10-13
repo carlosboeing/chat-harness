@@ -128,7 +128,7 @@ export const defaultLifecycleDependencies: LifecycleDependencies = {
     lookupLatestStandaloneRelease(process.platform, process.arch, version),
   download: downloadBytes,
   replacePosix: (target, bytes, expectedVersion, nativeHelper) =>
-    replaceStandalonePosix({ target, candidateBytes: bytes, expectedVersion, ...(nativeHelper ? { nativeHelperBytes: nativeHelper } : {}) }),
+    replaceStandalonePosix({ target, candidateBytes: bytes, expectedVersion, ...(nativeHelper ? { nativeHelperBytes: nativeHelper, nativeHelperPlatform: process.platform === "linux" ? "linux" as const : "darwin" as const } : {}) }),
   scheduleWindowsUpdate: stageWindowsUpdate,
   scheduleWindowsRemove: (target, metadataPath) => {
     scheduleWindowsLifecycleJob({
@@ -565,6 +565,10 @@ export async function runUninstall(
     if (dependencies.platform === "darwin") {
       dependencies.removeFile(installation.executablePath + ".macos-safe-move");
       dependencies.removeFile(installation.executablePath + ".macos-safe-move.sha256");
+    }
+    if(dependencies.platform === "linux") {
+      if(dependencies.pathExists(installation.executablePath + ".linux-safe-move"))dependencies.removeFile(installation.executablePath + ".linux-safe-move");
+      if(dependencies.pathExists(installation.executablePath + ".linux-safe-move.sha256"))dependencies.removeFile(installation.executablePath + ".linux-safe-move.sha256");
     }
     dependencies.removeFile(metadataPath);
     return { result: { state: "uninstalled", ...base } };

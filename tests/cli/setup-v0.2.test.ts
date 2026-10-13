@@ -1,91 +1,15 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { lstat, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+// Negative compatibility fixtures for the removed pre-v1 CLI contract.
+import { expect,test } from "bun:test";
+import { mkdtemp,readdir,rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-
-import { runCli, type CliRuntime } from "../../src/cli/main.js";
-
-const roots: string[] = [];
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
-});
-
-async function workspace(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "chat-harness-cli-v02-"));
-  roots.push(root);
-  return root;
+import { runCli } from "../../src/cli/main.js";
+for(const args of [["--specialist","career"],["--specialist","general"],["--replace-workspace"],["--force"]]){
+ test(`obsolete setup syntax ${args.join(" ")} is rejected without mutation`,async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),"harness-legacy-cli-"));
+  try{
+   expect(await runCli(["setup",root,...args],{cwd:root,isTTY:false,stdout:()=>{},stderr:()=>{}})).toBe(2);
+   expect(await readdir(root)).toEqual([]);
+  }finally{await rm(root,{recursive:true,force:true});}
+ });
 }
-
-function capture(cwd: string): { runtime: Partial<CliRuntime>; stdout: () => string } {
-  let stdout = "";
-  return {
-    runtime: {
-      cwd,
-      env: {},
-      isTTY: false,
-      nativeTerminal: false,
-      stdout: (text) => { stdout += text; },
-      stderr: () => {},
-    },
-    stdout: () => stdout,
-  };
-}
-
-describe("setup v0.2 CLI", () => {
-  test("--specialist seeds WORKSPACE and --scaffold-domain is explicit", async () => {
-    const root = await workspace();
-    const io = capture(root);
-    expect(await runCli(["setup", root, "--specialist", "career", "--scaffold-domain", "--json"], io.runtime)).toBe(0);
-
-    const envelope = JSON.parse(io.stdout());
-    expect(envelope.result.specialist).toBe("career");
-    expect(envelope.result.host_action).toContain("Google Drive");
-    expect(envelope.result.host_action).toContain("Project Instructions");
-    expect(await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8")).toContain("evidence-grounded");
-    expect(await readFile(path.join(root, "AGENTS.md"), "utf8")).toContain("chat-harness-managed: agents");
-    expect((await lstat(path.join(root, "Profile"))).isDirectory()).toBe(true);
-    expect((await lstat(path.join(root, "Opportunities"))).isDirectory()).toBe(true);
-  });
-
-  test("JSON structure keeps an existing optional folder visible", async () => {
-    const root = await workspace();
-    await mkdir(path.join(root, "Trips"));
-    const io = capture(root);
-
-    expect(
-      await runCli(
-        [
-          "setup",
-          root,
-          "--specialist",
-          "travel",
-          "--scaffold-domain",
-          "--json",
-        ],
-        io.runtime,
-      ),
-    ).toBe(0);
-
-    const envelope = JSON.parse(io.stdout());
-    expect(envelope.result.structure).toContainEqual({
-      path: "Trips",
-      kind: "directory",
-      status: "already_there",
-    });
-  });
-
-  test("omitted specialist is deterministically general in non-interactive mode", async () => {
-    const root = await workspace();
-    const io = capture(root);
-    expect(await runCli(["setup", root, "--json"], io.runtime)).toBe(0);
-    const envelope = JSON.parse(io.stdout());
-    expect(envelope.result.specialist).toBe("general");
-    expect(await readFile(path.join(root, ".chat-harness", "WORKSPACE.md"), "utf8")).toContain("General");
-  });
-
-  test("invalid specialist is a usage error", async () => {
-    const root = await workspace();
-    const io = capture(root);
-    expect(await runCli(["setup", root, "--specialist", "unknown"], io.runtime)).toBe(2);
-  });
-});

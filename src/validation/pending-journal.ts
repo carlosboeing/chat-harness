@@ -3,6 +3,8 @@
  * A valid journal is still a pending transaction: it does not grant permission
  * to remove the lock, restore backups or trust a commit token.
  */
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 import type { Finding } from "../cli/result.js";
 import { observeReadonlyManagedPath } from "../setup/inspect-manifest-disk.js";
 import { validateManagedJournal } from "../setup/multifile-journal-contract.js";
@@ -18,7 +20,9 @@ function issue(code: string, location: string, reason: string): Finding {
 }
 
 /** Call only after the parent transaction reservation is a real directory. */
-export async function inspectPendingJournalHealth(workspace: string): Promise<Finding[]> {
+export async function inspectPendingJournalHealth(workspace: string, directory: ".chat-harness/temp/reconcile" | ".chat-harness/temp/reconcile-cleanup" = ".chat-harness/temp/reconcile"): Promise<Finding[]> {
+  const JOURNAL=directory+"/journal.json", TOKEN=directory+"/commit.token";
+  if(directory.endsWith("reconcile-cleanup") && (await readdir(path.join(workspace,directory))).length===0)return [];
   let parsed;
   try {
     const entry = await observeReadonlyManagedPath(workspace, JOURNAL, "transaction");

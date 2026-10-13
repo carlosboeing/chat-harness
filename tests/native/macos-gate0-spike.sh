@@ -1,10 +1,14 @@
 #!/bin/bash
 set -euo pipefail
-if [[ "$(uname -s)" != Darwin ]]; then echo "This proof is macOS-only" >&2; exit 2; fi
+if [[ "$(uname -s)" != Darwin && "$(uname -s)" != Linux ]]; then echo "This proof needs a supported POSIX backend" >&2; exit 2; fi
 root="$(cd "$(dirname "$0")/../.." && pwd -P)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-cc -std=c11 -Wall -Wextra -D GATE0_TEST_HOOKS "$root/native/macos/gate0-safe-move.c" -o "$tmp/gate0"
+if [[ "$(uname -s)" == Linux ]]; then
+  cc -std=c11 -Wall -Wextra -Werror -Wno-deprecated-declarations -static -D GATE0_TEST_HOOKS "$root/native/macos/gate0-safe-move.c" -lcrypto -ldl -pthread -o "$tmp/gate0"
+else
+  cc -std=c11 -Wall -Wextra -D GATE0_TEST_HOOKS "$root/native/macos/gate0-safe-move.c" -o "$tmp/gate0"
+fi
 bin="$tmp/gate0"
 mkdir -p "$tmp/work/.chat-harness/procedures"
 workspace="$(cd -P "$tmp/work" && pwd -P)"
@@ -79,6 +83,16 @@ if wait "$pid"; then fail "concurrent changed source incorrectly accepted"; fi
 [[ -f racing.md && ! -e racing.backup ]] || fail "racing file not restored safely"
 [[ "$(cat racing.md)" == 'edited by another process' ]] || fail "racing bytes lost"
 
+# A destination appearing after source verification is never replaced.
+printf 'desired staged content\n' > promotion-race.stage
+promotion_digest="$(hash promotion-race.stage)"
+GATE0_TEST_DELAY_US=700000 "$bin" promote "$workspace" "." promotion-race.stage promotion-race.target "$promotion_digest" > "$tmp/promotion-race.log" 2>&1 &
+pid=$!
+sleep 0.20
+printf 'user appeared during promotion\n' > promotion-race.target
+if wait "$pid"; then fail "intervening destination incorrectly replaced"; fi
+[[ "$(cat promotion-race.target)" == 'user appeared during promotion' && -f promotion-race.stage ]] || fail "destination race lost user bytes"
+
 # Different inode with identical content cannot be mistaken for the same file.
 printf 'same bytes\n' > inode-race.md
 inode_digest="$(hash inode-race.md)"
@@ -115,7 +129,7 @@ printf 'other user file\n' > interrupted.md
 if run restore "." interrupted.backup interrupted.md "$interrupted_digest"; then fail "recovery clobbered new file"; fi
 [[ "$(cat interrupted.md)" == 'other user file' && -f interrupted.backup ]] || fail "conflict evidence discarded"
 
-echo "PASS: macOS root-anchored move, nested paths, no-clobber, inode races and SIGKILL recovery proof"
+echo "PASS: POSIX root-anchored move, nested paths, no-clobber, inode races and SIGKILL recovery proof"
 
 # Root-anchored O_EXCL stage creation: hash, collision, wrong bytes, symlinks.
 stage_body='verified new stage bytes'

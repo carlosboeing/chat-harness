@@ -12,8 +12,8 @@ import { exactByteDigest, parseManifest, serializeManifest } from "../../src/set
 import { CORE_VERSION } from "../../src/setup/templates.js";
 
 const native = process.env.GATE0_SPIKE_NATIVE;
-if (process.platform !== "darwin" || !native) {
-  throw new Error("macOS-only test: compile the native helper and set GATE0_SPIKE_NATIVE");
+if (!["darwin","linux"].includes(process.platform) || !native) {
+  throw new Error("POSIX-only test: compile the native helper and set GATE0_SPIKE_NATIVE");
 }
 
 const PARENT = ".chat-harness/procedures";

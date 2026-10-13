@@ -1,84 +1,38 @@
 # Specialists
 
-Specialists give a new Workspace useful domain-specific guidance without turning Chat Harness into a multi-agent runtime.
-
-A specialist is a **setup-time seed for `.chat-harness/WORKSPACE.md`**. It defines the kind of judgement the assistant should apply, the strongest evidence for the domain, important failure modes and boundaries, and what good output should look like.
-
-After setup, `WORKSPACE.md` is user-owned. Keep it compact: high-leverage domain role, invariants, evidence/currentness rules, approval boundaries, and a few routing pointers. Detailed recurring methodology belongs in Procedures/Guides and should be retrieved when triggered. There is no runtime specialist inheritance, composition, or template synchronization.
-
-## Choose what the Workspace is mainly for
-
-For most people, run setup from inside the Workspace and let the guided flow explain the choices:
+Specialists are versioned setup-time bundles, not agents. Their managed guidance is composed into `.chat-harness/WORKSPACE.md` in lexical ID order. General or mixed use is Core only: zero Specialists. Research methodology belongs to Core.
 
 ```bash
-chat-harness setup
+chat-harness setup --specialists travel,shopping
+chat-harness setup --specialists "finance, tax,finance"
+chat-harness setup --specialists none
 ```
 
-Or choose directly:
+Selection is an exact desired set: whitespace is trimmed and duplicate IDs collapse. `none` must appear alone. Omitted selection preserves the installed set; fresh non-interactive setup defaults to Core only. Interactive setup preselects installed bundles and offers a multiselect plus General / mixed use as an exclusive empty selection.
 
-```bash
-chat-harness setup --specialist tech
-```
-
-The optional `[path]` argument is only needed when targeting another existing directory:
-
-```bash
-chat-harness setup /path/to/project --specialist tech
-```
-
-If `--specialist` is omitted, interactive setup asks what the Workspace is mainly for and defaults to `general`; non-interactive setup uses `general`.
-
-| Specialist | Best fit | Emphasis |
+| ID | Domain | Optional additive folders |
 |---|---|---|
-| `general` | Broad knowledge work | factual integrity, source quality, currentness, explicit uncertainty, pragmatic output |
-| `research` | Evidence-heavy investigation | precise framing, primary evidence, provenance, contradictory evidence, reproducibility |
-| `tech` | Engineering and technical research | Principal/Staff+ judgement, real repositories, maintainability, operability, security, cost, anti-overengineering |
-| `tax` | Tax research and planning | jurisdiction and tax period, primary authority, ownership/treatment distinctions, conservative factual discipline |
-| `finance` | Financial analysis | goals, horizon, liquidity, risk, fees, tax, scenarios, provider evidence |
-| `career` | Career positioning | evidence-grounded claims, no invented achievements, current opportunity facts, restrained writing |
-| `shopping` | Purchase research | buyer fit, broad discovery, true net cost, reliability, support, current terms |
-| `travel` | Travel planning | traveller fit, realistic logistics, current entry/schedule facts, confirmed vs proposed plans |
+| `business` | Business & Entrepreneurship | None |
+| `career` | Career | `Opportunities/`, `Profile/` |
+| `dev` | Software Development | `Projects/` |
+| `education` | Education & Learning | None |
+| `finance` | Finance | `Finance/` |
+| `health` | Health | None |
+| `home` | Home & Property | None |
+| `legal` | Legal | None |
+| `shopping` | Shopping | `Purchases/`, `Research/` |
+| `tax` | Tax | `Tax/` |
+| `tech` | Technology & IT | None |
+| `travel` | Travel | `Trips/` |
 
-These descriptions summarize the templates implemented by setup; the generated `WORKSPACE.md` contains the actual guidance.
+Choose `tech` for selecting, configuring and troubleshooting devices, services, networks and AI products. Choose `dev` for building software, APIs, MCP servers and agentic systems. They are selected by the objective, not by a runtime router.
 
-## Specialist vs Procedure
+Shopping owns two manifest-recorded Procedures under `.chat-harness/procedures/`: `shopping-research-methodology.md` and `deal-discovery-and-channel-optimization.md`. Deselecting Shopping removes these only when their exact last-applied bytes still match. Unknown files and changed Procedures are preserved and cause conflicts.
 
-Specialists and Procedures solve different problems:
+Career recommends `linkedin.job.lookup`; it does not install or require it. Doctor reports missing local verification as a warning. Capability declarations grant no new permissions.
 
-```text
-Specialist = how this Workspace generally works
-Procedure  = how a recurring task is performed
-```
+Customize only the suffix after `<!-- chat-harness-user: workspace -->`. Setup preserves that suffix byte-for-byte, regenerates the managed prefix, and rejects malformed/duplicate markers. Unmarked instructions require `--adopt-workspace`; adoption preserves the entire original byte sequence under the boundary. A marker alone never grants manifest ownership.
 
-Selecting a specialist does not install Procedures or create a separate agent.
+`--scaffold-domain` creates the union of missing selected-Specialist starter folders. These are user-owned, additive and never automatically removed.
 
-## Customize the Workspace
-
-The generated `WORKSPACE.md` is meant to evolve. Add the domain invariants, preferred evidence sources, approval boundaries, output conventions, and judgement rules that are specific to the real Workspace.
-
-Keep generic Chat Harness behavior in `AGENTS.md`. For ChatGPT, copy the complete `AGENTS.md` into Project Instructions and leave specialist/domain guidance in `WORKSPACE.md`. Avoid duplicating the same behavioral rule across both files.
-
-Setup does not silently overwrite an existing `WORKSPACE.md`; replacement requires an explicit choice.
-
-## Optional domain folders
-
-Specialists can also suggest a small domain folder layout, but those folders are not core architecture. Interactive setup **shows the exact suggested folders before asking** whether to create them. Non-interactive setup requires `--scaffold-domain`.
-
-| Specialist | Optional starter folders |
-|---|---|
-| `general` | none |
-| `research` | `Research/` |
-| `tech` | `Projects/` |
-| `tax` | `Tax/` |
-| `finance` | `Finance/` |
-| `career` | `Opportunities/`, `Profile/` |
-| `shopping` | `Purchases/`, `Research/` |
-| `travel` | `Trips/` |
-
-Domain scaffolding is additive only. Chat Harness does not rename, move, merge, fuzzy-match, or reorganize an existing corpus.
-
-## Related documentation
-
-- [Architecture](architecture.md) — instruction ownership and runtime retrieval.
-- [Concepts](concepts.md) — canonical terminology.
-- [ChatGPT host binding](hosts/chatgpt.md) — where `AGENTS.md` and `WORKSPACE.md` belong.
+Bundle content is embedded in Node/npm and standalone builds. Edit `src/specialists/assets/`, increment the affected integer component version when effective behavior changes, and regenerate/check with `bun scripts/generate-specialist-assets.ts`.

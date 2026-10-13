@@ -80,7 +80,7 @@ describe("CLI surface", () => {
 
     const output = io.stdout();
     expect(output).toContain("Create, validate, diagnose, update, and uninstall Chat Harness");
-    expect(output).toContain("chat-harness setup --specialist travel");
+    expect(output).toContain("chat-harness setup --specialists travel");
     expect(output).toContain("current directory");
     expect(output.replace(/\s+/g, " ")).toContain("do not search parent directories");
     expect(output).toContain("Exit codes:");
@@ -101,12 +101,12 @@ describe("CLI surface", () => {
     expect(await runCli(["setup", "--help"], io.runtime)).toBe(0);
     const output = io.stdout();
 
-    expect(output).toContain("--specialist <id>");
+    expect(output).toContain("--specialists <ids>");
     expect(output).toContain("general");
     expect(output).toContain("travel");
     expect(output).toContain("is left unchanged");
     expect(output).toContain("--json disables interactive prompts");
-    expect(output).toContain("chat-harness setup --specialist travel");
+    expect(output).toContain("chat-harness setup --specialists travel");
     expect(output).toContain("ChatGPT setup guide:");
     expect(output).not.toContain("v0.2 Workspace scaffold");
   });
@@ -134,7 +134,7 @@ describe("CLI surface", () => {
       await mkdir(nested);
       const io = capture(root);
 
-      const code = await runCli([command, nested, "--json"], io.runtime);
+      const code = await runCli([command, nested, "--json", ...(command === "setup" ? ["--dry-run"] : [])], io.runtime);
       expect(code).toBe(command === "validate" ? 1 : 0);
 
       const envelope = JSON.parse(io.stdout());
@@ -142,7 +142,7 @@ describe("CLI surface", () => {
       expect(envelope.workspace).toBe(await realpath(nested));
       expect(envelope.result.state).toBe(
         command === "setup"
-          ? "changes_applied"
+          ? "changes_planned"
           : command === "validate"
             ? "failed"
             : "healthy",
@@ -159,7 +159,7 @@ describe("CLI surface", () => {
       await mkdir(path.join(root, ".chat-harness"));
       const io = capture(child);
 
-      const code = await runCli([command, "--json"], io.runtime);
+      const code = await runCli([command, "--json", ...(command === "setup" ? ["--dry-run"] : [])], io.runtime);
       expect(code).toBe(command === "validate" ? 1 : 0);
 
       const envelope = JSON.parse(io.stdout());
@@ -227,7 +227,7 @@ describe("CLI surface", () => {
       isTTY: false,
     });
 
-    const code = await runCli(["setup", root], io.runtime);
+    const code = await runCli(["setup", root,"--dry-run"], io.runtime);
     expect(code).toBe(0);
     expect(io.stdout()).not.toContain("\u001b[");
     expect(io.stdout()).not.toContain("\u001b[?25");

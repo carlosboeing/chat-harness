@@ -22,7 +22,7 @@ describe("macOS packaged native primitive", () => {
   });
 
   test("fails closed before filesystem activity on unsupported platforms", () => {
-    for (const [platform, arch] of [["linux", "x64"], ["win32", "x64"], ["darwin", "ia32"]]) {
+    for (const [platform, arch] of [["freebsd", "x64"], ["win32", "x64"], ["darwin", "ia32"]]) {
       expect(() => verifiedMacosHelper({ ...base, platform, arch })).toThrow(/unsupported/);
     }
   });
@@ -56,7 +56,7 @@ describe("macOS packaged native primitive", () => {
       expect(() => verifiedMacosHelper({ ...base, entryPath })).toThrow(/checksum/);
       const fake = readFileSync(p);
       writeFileSync(p + ".sha256", `${createHash("sha256").update(fake).digest("hex")}  ${path.basename(p)}\n`);
-      expect(() => verifiedMacosHelper({ ...base, entryPath })).toThrow(/Mach-O/);
+      expect(() => verifiedMacosHelper({ ...base, entryPath })).toThrow(/executable format/);
     } finally { rmSync(tmp, { recursive: true, force: true }); }
   });
 

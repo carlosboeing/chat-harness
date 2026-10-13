@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm,readdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -37,15 +37,23 @@ async function main(): Promise<void> {
     }
 
     const setupHelp = run(binary, ["setup", "--help"], workspace, env);
-    if (!setupHelp.includes("--specialist <id>")) {
-      throw new Error("standalone setup help is missing --specialist");
+    if (!setupHelp.includes("--specialists <ids>")) {
+      throw new Error("standalone setup help is missing --specialists");
     }
 
+    if(process.platform === "win32") {
+      const preview=JSON.parse(run(binary,["setup","--specialists","tech","--dry-run","--json"],workspace,env));
+      if(preview.result.state!=="changes_planned")throw new Error("Windows read-only plan failed");
+      const refused=spawnSync(binary,["setup","--specialists","tech","--json"],{cwd:workspace,env,encoding:"utf8"});
+      if(refused.status!==1 || !JSON.parse(refused.stdout).findings.some((f:{code:string})=>f.code==="setup.platform_unsupported"))throw new Error("Windows mutation did not fail closed");
+      if((await readdir(workspace)).length)throw new Error("Unsupported Windows setup changed the Workspace");
+      return;
+    }
     const setup = JSON.parse(
-      run(binary, ["setup", "--specialist", "tech", "--json"], workspace, env),
-    ) as { success?: boolean; result?: { specialist?: string } };
-    if (setup.success !== true || setup.result?.specialist !== "tech") {
-      throw new Error("standalone cwd setup with --specialist tech did not succeed");
+      run(binary, ["setup", "--specialists", "tech", "--json"], workspace, env),
+    ) as { success?: boolean; result?: { desired_specialists?: string[] } };
+    if (setup.success !== true || JSON.stringify(setup.result?.desired_specialists) !== JSON.stringify(["tech"])) {
+      throw new Error("standalone cwd setup with --specialists tech did not succeed");
     }
 
     const validate = JSON.parse(

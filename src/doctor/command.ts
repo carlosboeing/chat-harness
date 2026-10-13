@@ -1,3 +1,7 @@
+import { recommendedCapabilityFindings } from "../validation/recommended-capabilities.js";
+import { type SpecialistId } from "../specialists/definitions.js";
+import { inspectManifestDisk } from "../setup/inspect-manifest-disk.js";
+import { nativeHelperHealthFindings } from "./native-helper.js";
 import { managedStateHealthFindings } from "../validation/managed-state.js";
 import {
   detectInstallationMode,
@@ -33,6 +37,7 @@ export async function runDoctor(
 ) {
   const runtimeFacts = dependencies.runtimeFacts ?? defaultRuntimeFacts();
   const mode = detectInstallationMode(runtimeFacts);
+  const installed=await inspectManifestDisk(workspace);
   const findings = [
     ...(await workspaceAccessFindings(
       workspace,
@@ -41,7 +46,9 @@ export async function runDoctor(
     ...(await scaffoldFindings(workspace)),
     ...(await managedStateHealthFindings(workspace)),
     ...(await localIntegrityFindings(workspace)),
+    ...(await recommendedCapabilityFindings(workspace,Object.keys(installed.manifest?.specialists??{}) as SpecialistId[])),
     ...runtimeFindings(mode, runtimeFacts),
+    ...nativeHelperHealthFindings(),
     ...(await gitFindings(workspace)),
     ...hostedStateFindings(),
   ];

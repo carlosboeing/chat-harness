@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { buildLinuxHelper } from "./build-linux-helper.js";
 import { buildMacosHelper } from "./build-macos-helper.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,6 +37,7 @@ export async function buildBinary(target: string, outfile: string, entrypoint = 
   );
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`bun build exited with status ${result.status}`);
+  if(target === "bun-linux-arm64" || target === "bun-linux-x64")await buildLinuxHelper(target.endsWith("arm64")?"arm64":"x64",absolute+".linux-safe-move");
   if (target === "bun-darwin-arm64" || target === "bun-darwin-x64") {
     await buildMacosHelper(target.endsWith("arm64") ? "arm64" : "x64", absolute + ".macos-safe-move");
   }

@@ -6,6 +6,8 @@
  * authority and must never be called as an apply procedure. Native no-replace
  * execution must independently re-prove paths, ownership and content.
  */
+import { recommendedCapabilityFindings } from "../validation/recommended-capabilities.js";
+import { legacyLayoutFindings } from "../validation/legacy-state.js";
 import type { Finding } from "../cli/result.js";
 import { selectSpecialists, specialistSections, validateSpecialistRegistry } from "../specialists/definitions.js";
 import { exactByteDigest, serializeManifest, type ContentDigest } from "./manifest.js";
@@ -135,11 +137,11 @@ export function combineReadonlyPreviews(
   // trustworthy ownership or guess a prior transaction outcome.
   if (targets.base.manifestState === "missing") {
     if (targets.agents?.kind === "file" && targets.agents.containsManagedMarker) {
-      findings.push(conflict("setup.unsupported_legacy_state", "AGENTS.md",
+      findings.push(conflict("setup.legacy_workspace_unsupported", "AGENTS.md",
         "Chat Harness-marked Core instructions exist without a supported manifest; migrate manually."));
     }
     if (targets.workspaceFile?.kind === "file" && targets.workspaceFile.containsManagedMarker) {
-      findings.push(conflict("setup.unsupported_legacy_state", WORKSPACE,
+      findings.push(conflict("setup.legacy_workspace_unsupported", WORKSPACE,
         "Chat Harness Workspace ownership markers exist without a supported manifest; migrate manually."));
     }
   }
@@ -235,6 +237,8 @@ export async function inspectAndPlanReadonlyReconciliation(
       (base.manifestState !== "valid" && base.manifestState !== "missing") ||
       base.findings.some(f => f.severity === "error")) return stop([...base.findings]);
 
+  const legacy=await legacyLayoutFindings(base.workspace);
+  if(legacy.length)return stop(legacy);
   const registryIssues = validateSpecialistRegistry();
   if (registryIssues.length) {
     return stop(registryIssues.map(issue => conflict("setup.registry_invalid", "specialists", issue)));
@@ -245,9 +249,9 @@ export async function inspectAndPlanReadonlyReconciliation(
       (targets.agents?.containsManagedMarker || targets.workspaceFile?.containsManagedMarker)) {
     const legacyFindings = [
       ...(targets.agents?.containsManagedMarker ? [conflict(
-        "setup.unsupported_legacy_state", "AGENTS.md", "Unmanifested Chat Harness Core marker requires migration.")] : []),
+        "setup.legacy_workspace_unsupported", "AGENTS.md", "Unmanifested Chat Harness Core marker requires migration.")] : []),
       ...(targets.workspaceFile?.containsManagedMarker ? [conflict(
-        "setup.unsupported_legacy_state", WORKSPACE, "Unmanifested Workspace markers require migration.")] : []),
+        "setup.legacy_workspace_unsupported", WORKSPACE, "Unmanifested Workspace markers require migration.")] : []),
     ];
     return { workspace: base.workspace, request, safeToPresent: false,
       executable: false, operations: Object.freeze([]),
@@ -289,5 +293,5 @@ export async function inspectAndPlanReadonlyReconciliation(
       findings: Object.freeze([...combined.findings, conflict("setup.inspection_stale", MANIFEST, String(error))]),
       sameDigestTransactionRequired: false };
   }
-  return combined;
+  return {...combined,findings:Object.freeze([...combined.findings,...await recommendedCapabilityFindings(base.workspace,request.desiredSpecialists)])};
 }

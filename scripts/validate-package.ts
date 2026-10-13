@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 interface NpmPackEntry { path?: string }
 interface NpmPackResult { files?: NpmPackEntry[] }
 
-export function validatePackedPaths(paths: readonly string[], requireMacosHelpers = false): string[] {
+export function validatePackedPaths(paths: readonly string[], requireMacosHelpers = false, requireLinuxHelpers = false): string[] {
   const errors: string[] = [];
   const forbidden = [
     ".chat-harness/",
@@ -34,6 +34,10 @@ export function validatePackedPaths(paths: readonly string[], requireMacosHelper
       }
     }
   }
+  if(requireLinuxHelpers)for(const arch of ["arm64","x64"]){
+    const prefix=`dist/npm/native/linux/linux-${arch}/safe-move`;
+    for(const required of [prefix,prefix+".sha256"])if(!paths.includes(required))errors.push(`npm package missing required Linux helper: ${required}`);
+  }
   return errors.sort();
 }
 
@@ -42,7 +46,7 @@ async function main(): Promise<void> {
   if (!manifest) throw new Error("Usage: bun scripts/validate-package.ts <npm-pack-json>");
   const parsed = JSON.parse(await readFile(manifest, "utf8")) as NpmPackResult[];
   const paths = parsed[0]?.files?.map((entry) => entry.path).filter((value): value is string => Boolean(value)) ?? [];
-  const errors = validatePackedPaths(paths, process.argv[3] === "--require-macos-helpers");
+  const errors = validatePackedPaths(paths, ["--require-macos-helpers","--require-native-helpers"].includes(process.argv[3]??""), process.argv[3] === "--require-native-helpers");
   if (errors.length > 0) {
     for (const error of errors) process.stderr.write(`package validation failed: ${error}\n`);
     process.exit(1);
