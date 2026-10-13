@@ -18,7 +18,11 @@ $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("chat-harness-" + [guid]
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 $stage = $null
 $metadataTemp = $null
+$previousProgressPreference = $ProgressPreference
 try {
+  # Windows PowerShell 5.1's per-chunk progress rendering makes large binary
+  # downloads disproportionately slow. Restore the caller's preference below.
+  $ProgressPreference = "SilentlyContinue"
   $binary = Join-Path $tempDir $asset
   $checksum = "$binary.sha256"
   Invoke-WebRequest -UseBasicParsing "$base/$asset" -OutFile $binary
@@ -87,6 +91,7 @@ try {
 
   Write-Host "Installed chat-harness to $destination"
 } finally {
+  $ProgressPreference = $previousProgressPreference
   if ($stage) { Remove-Item -Force $stage -ErrorAction SilentlyContinue }
   if ($stage) { Remove-Item -Force "$stage.windows-safe-move.exe", "$stage.windows-safe-move.exe.sha256" -ErrorAction SilentlyContinue }
   if ($metadataTemp) { Remove-Item -Force $metadataTemp -ErrorAction SilentlyContinue }
