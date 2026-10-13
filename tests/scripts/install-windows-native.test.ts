@@ -1,6 +1,6 @@
 import { expect,test } from "bun:test";
 import { createServer } from "node:http";
-import { spawn } from "node:child_process";
+import { spawn,spawnSync } from "node:child_process";
 import { mkdtemp,readFile,writeFile,rm,mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,8 +12,8 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
   const entry=path.join(root,"fixture.ts"),binaryPath=path.resolve(import.meta.dir,"../../dist/tests/install-fixture.exe");
   await mkdir(path.dirname(binaryPath),{recursive:true});
   await writeFile(entry,'console.log("1.0.0");\n');
-  const build=await Bun.build({entrypoints:[entry],compile:{target:"bun-windows-x64",outfile:binaryPath}});
-  expect(build.success).toBe(true);
+  const build=spawnSync(process.execPath,["build","--compile","--target=bun-windows-x64",entry,"--outfile",binaryPath],{encoding:"utf8",timeout:60000});
+  if(build.error || build.status!==0)throw new Error("Installer fixture compilation failed: "+build.stderr);
   const binary=await readFile(binaryPath),helper=await readFile(path.resolve(import.meta.dir,"../../dist/npm/native/windows/win32-x64/safe-move.exe"));
   const asset="chat-harness-windows-x64.exe",native=asset+".windows-safe-move.exe";
   const hash=(b:Buffer)=>createHash("sha256").update(b).digest("hex");
@@ -25,6 +25,7 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
     const body=files[name??""];if(body===undefined){res.writeHead(404);res.end();}else res.end(body);
   });
   await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+  console.log("PowerShell installer fixture compiled and local release server listening.");
   const address=server.address();if(!address || typeof address==="string")throw new Error("Fixture server did not bind");
   const script=path.join(root,"install.ps1"),directory=path.join(root,"bin");
   const source=await readFile(path.resolve(import.meta.dir,"../../install.ps1"),"utf8");
