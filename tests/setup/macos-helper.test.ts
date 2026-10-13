@@ -22,7 +22,7 @@ describe("macOS packaged native primitive", () => {
   });
 
   test("fails closed before filesystem activity on unsupported platforms", () => {
-    for (const [platform, arch] of [["freebsd", "x64"], ["win32", "x64"], ["darwin", "ia32"]]) {
+    for (const [platform, arch] of [["freebsd", "x64"], ["win32", "arm64"], ["darwin", "ia32"]]) {
       expect(() => verifiedMacosHelper({ ...base, platform, arch })).toThrow(/unsupported/);
     }
   });

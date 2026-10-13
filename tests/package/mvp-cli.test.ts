@@ -7,9 +7,9 @@ import { exactByteDigest } from "../../src/setup/manifest.js";
 import { serializeRecoveryRecord } from "../../src/setup/equal-digest-marker.js";
 import { SPECIALIST_IDS } from "../../src/specialists/definitions.js";
 
-const enabled=["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
+const enabled=["darwin","linux","win32"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
 const npmCli=path.resolve(import.meta.dir,"../../dist/npm/chat-harness.js");
-const binary=path.resolve(import.meta.dir,`../../dist/bin/chat-harness-${process.platform}-${process.arch}`);
+const binary=path.resolve(import.meta.dir,`../../dist/bin/chat-harness-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`);
 function tree(root:string){
  const result:Record<string,string>={};
  function visit(dir:string){for(const file of readdirSync(path.join(root,dir),{withFileTypes:true})){

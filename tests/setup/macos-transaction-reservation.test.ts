@@ -3,7 +3,7 @@ import { reserveMacosReconciliationLock, type MacosHelperRuntime } from "../../s
 
 const linux: MacosHelperRuntime = {
   platform: "win32",
-  arch: "x64",
+  arch: "arm64",
   standalone: false,
   entryPath: "/path/to/dist/npm/chat-harness.js",
   executablePath: "/path/to/chat-harness",

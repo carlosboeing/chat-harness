@@ -8,15 +8,15 @@ This describes the v1 implementation candidate. The software remains `0.3.7`; me
 |---|---|---|
 | macOS arm64/x64 | `renameatx_np(RENAME_EXCL)`, descriptor-relative no-follow traversal | Packaged native executor |
 | Linux arm64/x64 | `renameat2(RENAME_NOREPLACE)`, descriptor-relative no-follow traversal | Packaged static native executor; kernel/filesystem must implement the primitive |
-| Windows x64 | No proven destructive backend | Fail closed before any scaffold or managed write |
+| Windows x64, local fixed NTFS volume | Handle-relative NT opens and source-handle no-replace rename | Packaged MSVC helper, CNG SHA-256 and process-interruption fixtures |
 
-Windows software install/update/uninstall and read-only setup planning remain available. Green Windows lifecycle CI is not evidence of destructive reconciliation safety. Stable v1 publication needs a verified Windows implementation or explicit Design approval narrowing the mutation-platform contract.
+Windows mutation is qualified separately from software lifecycle. The Windows native CI job exercises actual Node/standalone setup, collision and junction refusal, multi-file rollback/commit, identical-digest completion, process termination and a surviving native writer after lease termination. UNC/network paths, reparse-point ancestors, other volumes and unsupported architectures fail closed. Manual host/domain acceptance and final release signoff remain required.
 
 Native helpers are compiled during builds/CI and shipped beside the CLI with checksums. Linux helpers statically include SHA-256 and libc. Runtime invocation verifies executable format, architecture, checksum and protocol at exact package-relative locations. There is no PATH helper lookup, compiler fallback, runtime source checkout or network fetch for embedded assets. Missing/tampered/unsupported helpers or filesystems fail closed.
 
 ## Transaction boundary
 
-The physical Workspace root is pinned by a process-scoped native lease and its device/inode identity is checked on every native call. Existing aliases, traversal, symlinks and unsafe file types are refused. Participating setup/recovery processes serialize; editors are not globally locked. Active native mutations register against a pinned temp-directory lease. If the CLI parent terminates, root exclusion remains held until its already-running native child finishes; a child starting after parent/lease death fails closed.
+The physical Workspace root is pinned by a process-scoped native lease and its device/inode identity is checked on every native call. Existing aliases, traversal, symlinks and unsafe file types are refused. Participating setup/recovery processes serialize; editors are not globally locked. POSIX native mutations register against a pinned temp-directory lease. Windows uses physical-root-identity named exclusion and mutation gates; a new lease checks both, including after lease termination. Windows ancestor handles deny delete sharing, and each hashed source handle denies concurrent write/delete sharing through its conditional rename. If the CLI parent terminates, root exclusion remains held until its already-running native child finishes; a child starting after parent/lease death fails closed.
 
 After authorization, fresh `.chat-harness/` and `temp/` may be created additively. Exclusive reservation at `temp/reconcile/` is crash evidence. The bounded, strict journal records canonical paths, lexical operations, exact before/after digests and generated siblings. All semantic preconditions are revalidated after locking. Exclusive stages are digest/identity verified before canonical mutation.
 

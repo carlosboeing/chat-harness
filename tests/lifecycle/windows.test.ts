@@ -53,6 +53,29 @@ function dependencies(overrides: Partial<WindowsHelperDependencies> = {}): Windo
 }
 
 describe("Windows lifecycle helper", () => {
+  test("native Windows update replaces all three software files and restores them on verification failure", async () => {
+    for(const fail of [false,true]) {
+      const root=tempRoot(),fixture=job(root);
+      const suffix=".windows-safe-move.exe";
+      fixture.nativeHelper={staged:fixture.staged!+suffix,backupPath:fixture.backupPath!+suffix,digest:"0".repeat(64)};
+      const originals=new Map([[fixture.target,"old binary"],[fixture.target+suffix,"old native"],[fixture.target+suffix+".sha256","old checksum"]]);
+      for(const [p,b] of originals)writeFileSync(p,b);
+      writeFileSync(fixture.staged!,"new binary");writeFileSync(fixture.nativeHelper.staged,"new native");writeFileSync(fixture.nativeHelper.staged+".sha256","new checksum");
+      const action=runWindowsLifecycleJob(fixture,dependencies({verifyNativeHelper:()=>{if(fail)throw new Error("helper mismatch");}}));
+      if(fail)await expect(action).rejects.toThrow("helper mismatch");else await action;
+      for(const [p,b] of originals)expect(readFileSync(p,"utf8")).toBe(fail?b:b.replace("old","new"));
+    }
+  });
+
+  test("Windows uninstall removes its native companion pair and preserves Workspace files",async()=>{
+    const root=tempRoot(),fixture=job(root);fixture.action="remove";
+    const suffix=".windows-safe-move.exe";
+    for(const p of [fixture.target,fixture.target+suffix,fixture.target+suffix+".sha256",path.join(root,"AGENTS.md")])writeFileSync(p,"preserve or remove");
+    await runWindowsLifecycleJob(fixture,dependencies());
+    expect(existsSync(fixture.target+suffix)).toBe(false);
+    expect(existsSync(fixture.target+suffix+".sha256")).toBe(false);
+    expect(readFileSync(path.join(root,"AGENTS.md"),"utf8")).toBe("preserve or remove");
+  });
   test("rejects malformed jobs", () => {
     expect(() => parseWindowsLifecycleJob("{}")).toThrow(/Invalid Windows lifecycle job/);
     expect(() => parseWindowsLifecycleJob("not-json")).toThrow(/Invalid Windows lifecycle job/);

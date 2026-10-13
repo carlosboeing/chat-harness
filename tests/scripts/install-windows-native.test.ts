@@ -1,0 +1,57 @@
+import { expect,test } from "bun:test";
+import { createServer } from "node:http";
+import { spawn,spawnSync } from "node:child_process";
+import { mkdtemp,readFile,writeFile,rm,mkdir } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createHash } from "node:crypto";
+
+const enabled=process.platform==="win32" && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
+test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pair and rejects a changed helper before replacement",async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),"harness-install-windows-"));
+  const entry=path.join(root,"fixture.ts"),binaryPath=path.resolve(import.meta.dir,"../../dist/tests/install-fixture.exe");
+  await mkdir(path.dirname(binaryPath),{recursive:true});
+  await writeFile(entry,'console.log("1.0.0");\n');
+  const build=spawnSync(process.execPath,["build","--compile","--target=bun-windows-x64",entry,"--outfile",binaryPath],{encoding:"utf8",timeout:60000});
+  if(build.error || build.status!==0)throw new Error("Installer fixture compilation failed: "+build.stderr);
+  const binary=await readFile(binaryPath),helper=await readFile(path.resolve(import.meta.dir,"../../dist/npm/native/windows/win32-x64/safe-move.exe"));
+  const asset="chat-harness-windows-x64.exe",native=asset+".windows-safe-move.exe";
+  const hash=(b:Buffer)=>createHash("sha256").update(b).digest("hex");
+  let tampered=false;
+  const server=createServer((req,res)=>{
+    const name=req.url?.slice(1);
+    console.log("Installer fixture request:",name);
+    const files:Record<string,Buffer|string>={[asset]:binary,[asset+".sha256"]:hash(binary)+"  "+asset+"\n",
+      [native]:tampered?Buffer.from("changed helper"):helper,[native+".sha256"]:hash(helper)+"  "+native+"\n"};
+    const body=files[name??""];if(body===undefined){res.writeHead(404);res.end();}else res.end(body);
+  });
+  await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+  console.log("PowerShell installer fixture compiled and local release server listening.");
+  const address=server.address();if(!address || typeof address==="string")throw new Error("Fixture server did not bind");
+  const script=path.join(root,"install.ps1"),directory=path.join(root,"bin");
+  const source=await readFile(path.resolve(import.meta.dir,"../../install.ps1"),"utf8");
+  // Redirect the actual installer to a disposable local release fixture.
+  await writeFile(script,'Set-PSDebug -Trace 1\n'+source.replace('$tempDir = Join-Path',`$base = "http://127.0.0.1:${address.port}"\n$tempDir = Join-Path`));
+  const install=(shell="pwsh.exe")=>new Promise<number>((resolve,reject)=>{
+    const environment={...process.env,CHAT_HARNESS_VERSION:"1.0.0",CHAT_HARNESS_INSTALL_DIR:directory};
+    // GitHub's PowerShell 7 parent exports its module search path. A fresh
+    // Windows PowerShell 5.1 must discover its own built-in module directory.
+    if(shell==="powershell.exe")for(const key of Object.keys(environment))if(key.toLowerCase()==="psmodulepath")delete environment[key];
+    const child=spawn(shell,["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script],{
+      env:environment,stdio:["ignore","pipe","pipe"]});
+    let output="";child.stdout.on("data",c=>{output=(output+String(c)).slice(-7000);});
+    const timer=setTimeout(()=>{child.kill("SIGKILL");reject(new Error("PowerShell installer fixture timed out in "+shell+"\n"+output+"\n"+error));},30000);
+    let error="";child.stderr.on("data",c=>error+=String(c));child.on("error",error=>{clearTimeout(timer);reject(error);});child.on("exit",code=>{clearTimeout(timer);if(code && !tampered)reject(new Error(error));else resolve(code??1);});
+  });
+  try {
+    expect(await install()).toBe(0);
+    const target=path.join(directory,"chat-harness.exe.windows-safe-move.exe");
+    expect(await readFile(target)).toEqual(helper);
+    expect(await readFile(target+".sha256","utf8")).toBe(hash(helper)+"  chat-harness.exe.windows-safe-move.exe\n");
+    expect(await install("powershell.exe")).toBe(0);
+    tampered=true;
+    expect(await install()).not.toBe(0);
+    expect(await readFile(target)).toEqual(helper);
+    expect(await readFile(path.join(directory,"chat-harness.exe"))).toEqual(binary);
+  } finally {server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));await rm(root,{recursive:true,force:true});}
+},90000);

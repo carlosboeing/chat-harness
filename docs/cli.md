@@ -46,7 +46,7 @@ Schema-1 `.chat-harness/manifest.yaml` records the Core and selected versioned b
 
 Setup checks all semantic preconditions under an exclusive native lease/reservation, stages updates exclusively, applies lexical non-clobbering moves, verifies moved backups and outputs, and commits the manifest last. Identical-manifest updates use separately verified atomic completion proof. Success is reported only after commit readback; failed cleanup reports a warning and retains recoverable evidence.
 
-The packaged native backend supports macOS and Linux arm64/x64. Windows mutation fails before any additive/managed write; read-only planning and software lifecycle commands remain available. This is a release-contract blocker until Windows is proven or the narrower platform contract is explicitly approved. See [Reconciliation and recovery](reconciliation.md).
+The packaged native backend supports macOS and Linux arm64/x64, plus Windows x64 on local fixed NTFS volumes. Windows uses handle-relative conditional renames and refuses network paths, reparse-point ancestors and unsupported filesystems. Every platform refuses unavailable or invalid packaged helpers. Manual acceptance and release signoff remain separate. See [Reconciliation and recovery](reconciliation.md).
 
 ## validate
 

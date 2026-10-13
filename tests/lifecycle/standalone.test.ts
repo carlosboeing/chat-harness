@@ -29,6 +29,15 @@ function tempRoot(): string {
 }
 
 describe("standalone lifecycle", () => {
+  test("Windows v1 requires its native helper pair while historical releases remain readable", () => {
+    const name="chat-harness-windows-x64.exe";
+    const assets=[{name,browser_download_url:"https://example/windows"},{name:name+".sha256",browser_download_url:"https://example/checksum"}];
+    expect(parseGithubRelease({tag_name:"v0.3.7",assets},"win32","x64").nativeHelper).toBeUndefined();
+    expect(()=>parseGithubRelease({tag_name:"v1.0.0",assets},"win32","x64")).toThrow("native helper");
+    const helper=name+".windows-safe-move.exe";
+    const release=parseGithubRelease({tag_name:"v1.0.0",assets:[...assets,{name:helper,browser_download_url:"https://example/helper"},{name:helper+".sha256",browser_download_url:"https://example/helper-checksum"}]},"win32","x64");
+    expect(release.nativeHelper?.binary.name).toBe(helper);
+  });
   test("maps only released platform and architecture targets", () => {
     expect(standaloneAssetName("darwin", "arm64")).toBe("chat-harness-darwin-arm64");
     expect(standaloneAssetName("linux", "x64")).toBe("chat-harness-linux-x64");

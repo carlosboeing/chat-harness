@@ -13,12 +13,12 @@ test("unsupported mutation fails before any additive or managed writes", async (
   try {
     const plan = await inspectAndPlanReadonlyReconciliation(root, {specialists:"shopping"}, "0.3.7");
     expect(plan.safeToPresent).toBe(true);
-    await expect(executeManagedReconciliation(plan,{platform:"win32",arch:"x64",standalone:false,entryPath:"/missing",executablePath:"/missing"})).rejects.toThrow("unsupported");
+    await expect(executeManagedReconciliation(plan,{platform:"win32",arch:"arm64",standalone:false,entryPath:"/missing",executablePath:"/missing"})).rejects.toThrow("unsupported");
     expect(existsSync(path.join(root,".chat-harness"))).toBe(false);
   } finally { rmSync(root,{recursive:true,force:true}); }
 });
 
-const native = ["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING === "1";
+const native = ["darwin","linux","win32"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING === "1";
 const runtime = {platform:process.platform,arch:process.arch,standalone:false,
   entryPath:path.resolve(import.meta.dir,"../../dist/npm/chat-harness.js"),executablePath:"unused"};
 

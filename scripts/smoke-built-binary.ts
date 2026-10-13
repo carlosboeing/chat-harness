@@ -44,10 +44,7 @@ async function main(): Promise<void> {
     if(process.platform === "win32") {
       const preview=JSON.parse(run(binary,["setup","--specialists","tech","--dry-run","--json"],workspace,env));
       if(preview.result.state!=="changes_planned")throw new Error("Windows read-only plan failed");
-      const refused=spawnSync(binary,["setup","--specialists","tech","--json"],{cwd:workspace,env,encoding:"utf8"});
-      if(refused.status!==1 || !JSON.parse(refused.stdout).findings.some((f:{code:string})=>f.code==="setup.platform_unsupported"))throw new Error("Windows mutation did not fail closed");
-      if((await readdir(workspace)).length)throw new Error("Unsupported Windows setup changed the Workspace");
-      return;
+      if((await readdir(workspace)).length)throw new Error("Windows dry-run changed the Workspace");
     }
     const setup = JSON.parse(
       run(binary, ["setup", "--specialists", "tech", "--json"], workspace, env),
