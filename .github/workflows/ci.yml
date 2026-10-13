@@ -176,6 +176,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  windows-native:
+    name: Windows native reconciliation (x64)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build npm with packaged MSVC x64 helper
+        run: bun run build:npm
+      - name: Build standalone with packaged Windows helper
+        run: bun run build:binary -- bun-windows-x64 dist/bin/chat-harness-windows-x64.exe
+      - name: Prove native collision, junction, transactions, real termination and package behavior
+        env:
+          CHAT_HARNESS_TEST_PACKAGING: "1"
+        run: bun test tests/setup/windows-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/mvp-cli.test.ts
+      - name: Archive qualified Windows helper for complete npm assembly
+        run: tar -czf native-windows-x64.tgz -C dist/npm/native windows/win32-x64
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mvp-native-windows-x64
+          path: native-windows-x64.tgz
+          if-no-files-found: error
+          retention-days: 7
+
   windows-lifecycle:
     runs-on: windows-2025
     timeout-minutes: 8
@@ -262,7 +289,7 @@ jobs:
 
   complete-npm-qualification:
     name: Complete native npm package qualification
-    needs: [macos-helper-packaging, linux-helper-packaging]
+    needs: [macos-helper-packaging, linux-helper-packaging, windows-native]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -280,7 +307,7 @@ jobs:
           pattern: mvp-native-*
           path: dist/qualified-native
           merge-multiple: true
-      - name: Assemble and verify all four already-qualified native helpers
+      - name: Assemble and verify all five already-qualified native helpers
         run: |
           for archive in dist/qualified-native/*.tgz; do tar -xzf "$archive" -C dist/npm/native; done
           for platform in macos/darwin linux/linux; do
@@ -288,6 +315,7 @@ jobs:
               (cd "dist/npm/native/${platform}-${arch}" && sha256sum -c safe-move.sha256)
             done
           done
+          (cd dist/npm/native/windows/win32-x64 && sha256sum -c safe-move.exe.sha256)
           npm pack --dry-run --json > dist/npm-pack.json
           bun run validate:package -- dist/npm-pack.json --require-native-helpers
           mkdir -p dist/qualification

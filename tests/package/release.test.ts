@@ -15,6 +15,12 @@ afterEach(async () => {
 });
 
 describe("release packaging", () => {
+  test("complete native npm packaging requires the Windows executable and checksum", () => {
+    const paths=["package.json","README.md","LICENSE","dist/npm/chat-harness.js"];
+    expect(validatePackedPaths(paths,false,false,true)).toHaveLength(2);
+    paths.push("dist/npm/native/windows/win32-x64/safe-move.exe","dist/npm/native/windows/win32-x64/safe-move.exe.sha256");
+    expect(validatePackedPaths(paths,false,false,true)).toEqual([]);
+  });
   test("computes stable SHA-256 digests", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "chat-harness-hash-"));
     roots.push(root);

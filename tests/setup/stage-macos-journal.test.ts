@@ -21,7 +21,7 @@ const record: ManagedTransactionJournal = {
 };
 
 const unavailable: MacosHelperRuntime = {
-  platform: "win32", arch: "x64", standalone: false,
+  platform: "win32", arch: "arm64", standalone: false,
   entryPath: "/nonexistent/app.js", executablePath: "/nonexistent/bin",
 };
 

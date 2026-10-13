@@ -1,23 +1,29 @@
 import { beforeAll,afterAll,expect,test } from "bun:test";
 import { spawn,spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync,mkdtempSync,realpathSync,rmSync,existsSync,readFileSync,writeFileSync } from "node:fs";
+import { copyFileSync,mkdirSync,mkdtempSync,realpathSync,rmSync,existsSync,readFileSync,writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { buildWindowsHelper } from "../../scripts/build-windows-helper.js";
 import { inspectAndPlanReadonlyReconciliation } from "../../src/setup/readonly-reconcile-plan.js";
 import { executeManagedReconciliation,recoverManagedReconciliation } from "../../src/setup/transaction-engine.js";
 
-const enabled=["darwin","linux"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
+const enabled=["darwin","linux","win32"].includes(process.platform) && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
 let scratch="",entry="";
-beforeAll(()=>{
+beforeAll(async()=>{
  if(!enabled)return;
  scratch=realpathSync(mkdtempSync(path.join(os.tmpdir(),"harness-kill-")));
  entry=path.join(scratch,"entry.js");
- const helper=path.join(scratch,"native",process.platform === "darwin" ? "macos" : "linux",`${process.platform}-${process.arch}`,"safe-move");
+ const helper=path.join(scratch,"native",process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux",`${process.platform}-${process.arch}`,process.platform === "win32" ? "safe-move.exe" : "safe-move");
  mkdirSync(path.dirname(helper),{recursive:true});
+ if(process.platform === "win32") {
+  const built=path.resolve(import.meta.dir,"../../dist/tests/windows-safe-move.exe");
+  await buildWindowsHelper("x64",built,true);copyFileSync(built,helper);
+ } else {
  const compiled=spawnSync("cc",["-std=c11","-O2","-Wall","-Wextra","-Werror","-DGATE0_TEST_HOOKS",...(process.platform === "linux" ? ["-Wno-deprecated-declarations","-static"] : []),path.resolve(import.meta.dir,"../../native/macos/gate0-safe-move.c"),...(process.platform === "linux" ? ["-lcrypto","-ldl","-pthread"] : []),"-o",helper],{encoding:"utf8"});
  if(compiled.status!==0)throw new Error(compiled.stderr);
- writeFileSync(helper+".sha256",createHash("sha256").update(readFileSync(helper)).digest("hex")+"  safe-move\n");
+ }
+ writeFileSync(helper+".sha256",createHash("sha256").update(readFileSync(helper)).digest("hex")+"  "+path.basename(helper)+"\n");
 });
 afterAll(()=>{if(scratch)rmSync(scratch,{recursive:true,force:true});});
 const runtime=()=>({platform:process.platform,arch:process.arch,standalone:false,entryPath:entry,executablePath:"unused"});

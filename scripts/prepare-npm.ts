@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildLinuxHelper,linuxNpmHelperPath } from "./build-linux-helper.js";
 import { buildMacosHelper, npmHelperPath } from "./build-macos-helper.js";
+import { buildWindowsHelper, windowsNpmHelperPath } from "./build-windows-helper.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const output = path.join(root, "dist", "npm", "chat-harness.js");
@@ -12,6 +13,7 @@ export async function prepareNpmCli(): Promise<void> {
   const shebang = "#!/usr/bin/env node\n";
   await writeFile(output, source.startsWith("#!") ? source : shebang + source, "utf8");
   await chmod(output, 0o755);
+  if(process.platform === "win32" && process.arch === "x64")await buildWindowsHelper("x64",windowsNpmHelperPath());
   if(process.platform === "linux" && ["arm64","x64"].includes(process.arch))await buildLinuxHelper(process.arch,linuxNpmHelperPath(process.arch));
   // Local macOS builds stage the host architecture. Release npm packaging
   // collects *both* precompiled architectures from macOS CI artifacts.
