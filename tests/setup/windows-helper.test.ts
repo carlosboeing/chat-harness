@@ -13,6 +13,21 @@ test("Windows x64 uses a packaged executable and rejects unqualified architectur
   expect(()=>macosHelperPath({...base,arch:"arm64"})).toThrow("unsupported");
 });
 
+test("Windows helper rejects checksum-consistent scripts and wrong PE architecture before probing",()=>{
+ const root=mkdtempSync(path.join(os.tmpdir(),"harness-pe-"));
+ const helper=path.join(root,"native/windows/win32-x64/safe-move.exe");
+ const info={platform:"win32",arch:"x64",standalone:false,entryPath:path.join(root,"entry.js"),executablePath:"unused"};
+ try {
+  mkdirSync(path.dirname(helper),{recursive:true});
+  const wrong=Buffer.alloc(128);wrong.writeUInt16LE(0x5a4d,0);wrong.writeUInt32LE(64,0x3c);
+  wrong.writeUInt32LE(0x00004550,64);wrong.writeUInt16LE(0xaa64,68);wrong.writeUInt16LE(0x20b,88);
+  for(const bytes of [Buffer.from("#!/bin/sh\necho untrusted\n"),wrong]) {
+   writeFileSync(helper,bytes);writeFileSync(helper+".sha256",createHash("sha256").update(bytes).digest("hex")+"  safe-move.exe\n");
+   expect(()=>verifiedMacosHelper(info)).toThrow("wrong executable format");
+  }
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 const enabled=process.platform==="win32" && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
 const runtime={platform:process.platform,arch:process.arch,standalone:false,entryPath:path.resolve(import.meta.dir,"../../dist/npm/chat-harness.js"),executablePath:"unused"};
 const hash=(bytes:string)=>createHash("sha256").update(bytes).digest("hex");

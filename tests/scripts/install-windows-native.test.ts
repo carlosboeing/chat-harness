@@ -31,8 +31,8 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
   const source=await readFile(path.resolve(import.meta.dir,"../../install.ps1"),"utf8");
   // Redirect the actual installer to a disposable local release fixture.
   await writeFile(script,source.replace('$tempDir = Join-Path',`$base = "http://127.0.0.1:${address.port}"\n$tempDir = Join-Path`));
-  const install=()=>new Promise<number>((resolve,reject)=>{
-    const child=spawn("pwsh.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script],{
+  const install=(shell="pwsh.exe")=>new Promise<number>((resolve,reject)=>{
+    const child=spawn(shell,["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script],{
       env:{...process.env,CHAT_HARNESS_VERSION:"1.0.0",CHAT_HARNESS_INSTALL_DIR:directory},stdio:["ignore","ignore","pipe"]});
     const timer=setTimeout(()=>{child.kill("SIGKILL");reject(new Error("PowerShell installer fixture timed out"));},30000);
     let error="";child.stderr.on("data",c=>error+=String(c));child.on("error",error=>{clearTimeout(timer);reject(error);});child.on("exit",code=>{clearTimeout(timer);if(code && !tampered)reject(new Error(error));else resolve(code??1);});
@@ -42,6 +42,7 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
     const target=path.join(directory,"chat-harness.exe.windows-safe-move.exe");
     expect(await readFile(target)).toEqual(helper);
     expect(await readFile(target+".sha256","utf8")).toBe(hash(helper)+"  chat-harness.exe.windows-safe-move.exe\n");
+    expect(await install("powershell.exe")).toBe(0);
     tampered=true;
     expect(await install()).not.toBe(0);
     expect(await readFile(target)).toEqual(helper);
