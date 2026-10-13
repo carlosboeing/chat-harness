@@ -193,7 +193,7 @@ jobs:
       - name: Prove native collision, junction, transactions, real termination and package behavior
         env:
           CHAT_HARNESS_TEST_PACKAGING: "1"
-        run: bun test tests/setup/windows-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/mvp-cli.test.ts
+        run: bun test tests/setup/windows-helper.test.ts tests/setup/transaction-engine.test.ts tests/setup/transaction-recovery.test.ts tests/setup/transaction-kill.test.ts tests/package/mvp-cli.test.ts tests/scripts/install-windows-native.test.ts
       - name: Archive qualified Windows helper for complete npm assembly
         run: tar -czf native-windows-x64.tgz -C dist/npm/native windows/win32-x64
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

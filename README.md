@@ -236,7 +236,7 @@ chat-harness uninstall
 
 Run `chat-harness --help` or `chat-harness <command> --help` for terminal help. See the complete [CLI reference](docs/cli.md) for behavior, safety rules, automation, and exit codes.
 
-Setup uses schema-1 manifest ownership, exact-byte preconditions, native non-clobbering reconciliation and verified recovery. Workspace suffixes and user files are preserved. See [reconciliation safety](docs/reconciliation.md). Windows destructive setup is fail-closed and remains a v1 release-contract blocker. Software version stays `0.3.7` until separate release approval; this branch documents the v1 implementation candidate.
+Setup uses schema-1 manifest ownership, exact-byte preconditions, native non-clobbering reconciliation and verified recovery. Workspace suffixes and user files are preserved. See [reconciliation safety](docs/reconciliation.md). Windows x64 setup uses a qualified native backend on local fixed NTFS volumes; unsupported paths/filesystems fail closed. Manual acceptance and release signoff remain open. Software version stays `0.3.7` until separate release approval; this branch documents the v1 implementation candidate.
 
 ## Bounded capability extension
 

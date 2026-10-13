@@ -1,7 +1,7 @@
 import { beforeAll,afterAll,expect,test } from "bun:test";
 import { spawn,spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync,mkdirSync,mkdtempSync,realpathSync,rmSync,existsSync,readFileSync,writeFileSync } from "node:fs";
+import { copyFileSync,mkdirSync,mkdtempSync,realpathSync,renameSync,rmSync,existsSync,readFileSync,writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { buildWindowsHelper } from "../../scripts/build-windows-helper.js";
@@ -29,6 +29,28 @@ beforeAll(async()=>{
 afterAll(()=>{if(scratch)rmSync(scratch,{recursive:true,force:true});});
 const runtime=()=>({platform:process.platform,arch:process.arch,standalone:false,entryPath:entry,executablePath:"unused"});
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
+test.skipIf(!enabled || process.platform!=="win32")("Windows no-replace promotion refuses a destination created after source verification and pins source and ancestors",async()=>{
+ const root=realpathSync(mkdtempSync(path.join(scratch,"windows-race-")));
+ const parent=path.join(root,"parent");mkdirSync(parent);
+ const source=path.join(parent,"source");writeFileSync(source,"original exact source");
+ const signal=path.join(scratch,"windows-race-signal");
+ const helper=spawn(verifiedMacosHelper(runtime()),["promote",root,"parent","source","target",createHash("sha256").update("original exact source").digest("hex")],
+  {env:{...process.env,GATE0_TEST_BOUNDARY:"pre-move:source",GATE0_TEST_BOUNDARY_SIGNAL:signal},stdio:"ignore"});
+ const done=new Promise<void>(resolve=>helper.once("exit",()=>resolve()));
+ try {
+  const deadline=Date.now()+10000;while(!existsSync(signal) && helper.exitCode===null && Date.now()<deadline)await tick();
+  expect(existsSync(signal)).toBe(true);
+  // Windows file sharing pins the hashed source and physical ancestor chain.
+  expect(()=>writeFileSync(source,"external edit")).toThrow();
+  expect(()=>renameSync(source,path.join(parent,"different-source"))).toThrow();
+  expect(()=>renameSync(parent,path.join(root,"detached-parent"))).toThrow();
+  expect(()=>renameSync(root,root+"-detached")).toThrow();
+  writeFileSync(path.join(parent,"target"),"new user destination");
+  await done;expect(helper.exitCode).not.toBe(0);
+  expect(readFileSync(source,"utf8")).toBe("original exact source");
+  expect(readFileSync(path.join(parent,"target"),"utf8")).toBe("new user destination");
+ }finally{helper.kill("SIGKILL");await done;rmSync(root,{recursive:true,force:true});}
+},30000);
 test.skipIf(!enabled || process.platform!=="win32")("killed Windows lease cannot admit recovery while an independent registered native writer survives",async()=>{
  const root=realpathSync(mkdtempSync(path.join(scratch,"lease-only-")));
  await executeManagedReconciliation(await inspectAndPlanReadonlyReconciliation(root,{specialists:"none"},"0.3.7"),runtime());

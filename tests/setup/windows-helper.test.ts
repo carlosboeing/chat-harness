@@ -67,3 +67,18 @@ test.skipIf(!enabled)("Windows native stage refuses junction parents and occupie
     expect(readFileSync(path.join(root,"safe/stage"),"utf8")).toBe("new bytes");
   } finally {rmSync(root,{recursive:true,force:true});rmSync(outside,{recursive:true,force:true});}
 });
+
+test.skipIf(!enabled)("Windows physical-root identity and alias-prone native leaf names fail before changing files",()=>{
+ const root=realpathSync(mkdtempSync(path.join(os.tmpdir(),"harness-win-identities-")));
+ try {
+  writeFileSync(path.join(root,"source"),"keep exact source");
+  const input={operation:"move" as const,workspace:root,parent:".",source:"source",destination:"new",digest:hash("keep exact source")};
+  expect(()=>invokeMacosSafeMove(input,{...runtime,rootIdentity:"0:0"})).toThrow();
+  for(const leaf of ["../escape","target:ads","CON","NUL.txt","target.","target "])
+   expect(()=>invokeMacosSafeMove({...input,destination:leaf},runtime)).toThrow();
+  const junction=path.join(root,"linked-root");symlinkSync(root,junction,"junction");
+  expect(()=>invokeMacosSafeMove({...input,workspace:junction},runtime)).toThrow();
+  expect(readFileSync(path.join(root,"source"),"utf8")).toBe("keep exact source");
+  expect(existsSync(path.join(root,"new"))).toBe(false);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

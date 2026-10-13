@@ -55,4 +55,4 @@ Chat Harness versions its own software and contracts, not hosted product release
 
 ## Native Workspace reconciliation
 
-macOS and Linux arm64/x64 have packaged native no-replace backends. Windows x64 setup mutation is unsupported and fails closed; it can still plan and diagnose read-only. A passing Windows software-lifecycle job does not prove Workspace mutation safety. This narrower implementation is an unresolved v1 Design/release approval boundary. See [reconciliation and recovery](reconciliation.md).
+macOS and Linux arm64/x64 and Windows x64 on local fixed NTFS volumes have packaged native no-replace backends. Windows reconciliation is tested in its dedicated native job, including actual process termination; software lifecycle tests alone do not establish that guarantee. Windows network paths, reparse-point ancestors and other filesystems fail closed. See [reconciliation and recovery](reconciliation.md).
