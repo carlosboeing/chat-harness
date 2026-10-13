@@ -16,9 +16,9 @@ function compilerEnvironment():NodeJS.ProcessEnv {
   const found=spawnSync(path.join(programFiles,"Microsoft Visual Studio/Installer/vswhere.exe"),
     ["-latest","-products","*","-requires","Microsoft.VisualStudio.Component.VC.Tools.x86.x64","-property","installationPath"],{encoding:"utf8"});
   const installation=found.stdout?.trim();
-  if(found.error || found.status!==0 || !installation || /["\r\n]/.test(installation))throw new Error("MSVC installation could not be resolved.");
+  if(found.error || found.status!==0 || !installation || /["\r\n%&|<>^]/.test(installation))throw new Error("MSVC installation could not be resolved.");
   const vcvars=path.join(installation,"VC/Auxiliary/Build/vcvars64.bat");
-  const result=spawnSync(process.env.ComSpec??"cmd.exe",["/d","/s","/c",`"call "${vcvars}" >nul && set"`],{encoding:"utf8"});
+  const result=spawnSync(process.env.ComSpec??"cmd.exe",["/d","/s","/c",`call "${vcvars}" >nul && set`],{encoding:"utf8",windowsVerbatimArguments:true});
   if(result.error || result.status!==0)throw new Error("MSVC x64 environment initialization failed: "+result.stderr);
   const environment:NodeJS.ProcessEnv={...process.env};
   for(const line of result.stdout.split(/\r?\n/)){const at=line.indexOf("=");if(at>0)environment[line.slice(0,at)]=line.slice(at+1);}
