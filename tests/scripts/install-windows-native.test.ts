@@ -33,8 +33,12 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
   // Redirect the actual installer to a disposable local release fixture.
   await writeFile(script,'Set-PSDebug -Trace 1\n'+source.replace('$tempDir = Join-Path',`$base = "http://127.0.0.1:${address.port}"\n$tempDir = Join-Path`));
   const install=(shell="pwsh.exe")=>new Promise<number>((resolve,reject)=>{
+    const environment={...process.env,CHAT_HARNESS_VERSION:"1.0.0",CHAT_HARNESS_INSTALL_DIR:directory};
+    // GitHub's PowerShell 7 parent exports its module search path. A fresh
+    // Windows PowerShell 5.1 must discover its own built-in module directory.
+    if(shell==="powershell.exe")for(const key of Object.keys(environment))if(key.toLowerCase()==="psmodulepath")delete environment[key];
     const child=spawn(shell,["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script],{
-      env:{...process.env,CHAT_HARNESS_VERSION:"1.0.0",CHAT_HARNESS_INSTALL_DIR:directory},stdio:["ignore","pipe","pipe"]});
+      env:environment,stdio:["ignore","pipe","pipe"]});
     let output="";child.stdout.on("data",c=>{output=(output+String(c)).slice(-7000);});
     const timer=setTimeout(()=>{child.kill("SIGKILL");reject(new Error("PowerShell installer fixture timed out in "+shell+"\n"+output+"\n"+error));},30000);
     let error="";child.stderr.on("data",c=>error+=String(c));child.on("error",error=>{clearTimeout(timer);reject(error);});child.on("exit",code=>{clearTimeout(timer);if(code && !tampered)reject(new Error(error));else resolve(code??1);});
