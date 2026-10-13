@@ -20,6 +20,7 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
   let tampered=false;
   const server=createServer((req,res)=>{
     const name=req.url?.slice(1);
+    console.log("Installer fixture request:",name);
     const files:Record<string,Buffer|string>={[asset]:binary,[asset+".sha256"]:hash(binary)+"  "+asset+"\n",
       [native]:tampered?Buffer.from("changed helper"):helper,[native+".sha256"]:hash(helper)+"  "+native+"\n"};
     const body=files[name??""];if(body===undefined){res.writeHead(404);res.end();}else res.end(body);
@@ -30,11 +31,12 @@ test.skipIf(!enabled)("PowerShell v1 installer installs the qualified native pai
   const script=path.join(root,"install.ps1"),directory=path.join(root,"bin");
   const source=await readFile(path.resolve(import.meta.dir,"../../install.ps1"),"utf8");
   // Redirect the actual installer to a disposable local release fixture.
-  await writeFile(script,source.replace('$tempDir = Join-Path',`$base = "http://127.0.0.1:${address.port}"\n$tempDir = Join-Path`));
+  await writeFile(script,'Set-PSDebug -Trace 1\n'+source.replace('$tempDir = Join-Path',`$base = "http://127.0.0.1:${address.port}"\n$tempDir = Join-Path`));
   const install=(shell="pwsh.exe")=>new Promise<number>((resolve,reject)=>{
     const child=spawn(shell,["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script],{
-      env:{...process.env,CHAT_HARNESS_VERSION:"1.0.0",CHAT_HARNESS_INSTALL_DIR:directory},stdio:["ignore","ignore","pipe"]});
-    const timer=setTimeout(()=>{child.kill("SIGKILL");reject(new Error("PowerShell installer fixture timed out"));},30000);
+      env:{...process.env,CHAT_HARNESS_VERSION:"1.0.0",CHAT_HARNESS_INSTALL_DIR:directory},stdio:["ignore","pipe","pipe"]});
+    let output="";child.stdout.on("data",c=>{output=(output+String(c)).slice(-7000);});
+    const timer=setTimeout(()=>{child.kill("SIGKILL");reject(new Error("PowerShell installer fixture timed out in "+shell+"\n"+output+"\n"+error));},30000);
     let error="";child.stderr.on("data",c=>error+=String(c));child.on("error",error=>{clearTimeout(timer);reject(error);});child.on("exit",code=>{clearTimeout(timer);if(code && !tampered)reject(new Error(error));else resolve(code??1);});
   });
   try {
