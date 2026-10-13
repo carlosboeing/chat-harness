@@ -91,6 +91,21 @@ function dependencies(
 }
 
 describe("lifecycle commands", () => {
+  test("Windows update verifies native companion downloads before scheduling and passes their bytes",async()=>{
+    const fixture=dependencies(installation(),{platform:"win32"});
+    const helper=new TextEncoder().encode("qualified Windows helper");
+    const name="chat-harness-windows-x64.exe.windows-safe-move.exe";
+    const latest={...release().release,version:"1.0.0",tag:"v1.0.0",nativeHelper:{binary:{name,url:"https://example/helper"},checksum:{name:name+".sha256",url:"https://example/helper-sha"}}};
+    let scheduled=0;
+    const deps={...fixture.deps,latestStandalone:async()=>latest,
+      download:async(url:string)=>url.endsWith("/helper")?helper:url.endsWith("/helper-sha")?new TextEncoder().encode(sha256(helper)+"  "+name+"\n"):fixture.deps.download(url),
+      scheduleWindowsUpdate:(_target:string,_bytes:Uint8Array,_version:string,_metadata:string,received?:Uint8Array)=>{expect(received).toEqual(helper);scheduled++;}};
+    expect((await runUpdate("0.3.0",{check:false,json:true},deps)).result.state).toBe("update_scheduled");
+    expect(scheduled).toBe(1);
+    const bad={...deps,download:async(url:string)=>url.endsWith("/helper-sha")?new TextEncoder().encode("0".repeat(64)+"  "+name+"\n"):deps.download(url)};
+    expect((await runUpdate("0.3.0",{check:false,json:true},bad)).result.state).toBe("update_failed");
+    expect(scheduled).toBe(1);
+  });
   test("update --check reports availability without mutation", async () => {
     const fixture = dependencies(installation());
     const result = await runUpdate("0.3.0", { check: true, json: true }, fixture.deps);

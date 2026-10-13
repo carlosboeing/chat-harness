@@ -81,12 +81,13 @@ export function parseGithubRelease(
   }
 
   let nativeHelper: StandaloneRelease["nativeHelper"];
-  if (platform === "darwin" || (platform === "linux" && (assets.some(a=>a.name === binaryName+".linux-safe-move") || Number(tag.slice(1).split(".")[0])>=1))) {
-    const helperName = binaryName + (platform === "linux" ? ".linux-safe-move" : ".macos-safe-move");
+  const helperSuffix=platform === "win32" ? ".windows-safe-move.exe" : platform === "linux" ? ".linux-safe-move" : ".macos-safe-move";
+  if (platform === "darwin" || (["linux","win32"].includes(platform) && (assets.some(a=>a.name === binaryName+helperSuffix) || Number(tag.slice(1).split(".")[0])>=1))) {
+    const helperName = binaryName + helperSuffix;
     const helperBinary = assets.find((asset) => asset.name === helperName);
     const helperChecksum = assets.find((asset) => asset.name === helperName + ".sha256");
     if (!helperBinary?.browser_download_url || !helperChecksum?.browser_download_url) {
-      throw new Error("Release " + tag + " is missing the required macOS native helper and its SHA-256 checksum.");
+      throw new Error("Release " + tag + " is missing the required "+(platform === "darwin" ? "macOS" : platform === "win32" ? "Windows" : "Linux")+" native helper and its SHA-256 checksum.");
     }
     nativeHelper = {
       binary: { name: helperName, url: helperBinary.browser_download_url },

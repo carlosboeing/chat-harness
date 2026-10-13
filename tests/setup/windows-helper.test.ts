@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test";
 import { macosHelperPath, verifiedMacosHelper, invokeMacosSafeMove, invokeMacosSafeStage } from "../../src/workspace/macos-helper.js";
-import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync } from "node:fs";
+import { copyFileSync, mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
+import { runWindowsLifecycleJob, defaultWindowsHelperDependencies } from "../../src/lifecycle/windows.js";
 
 test("Windows x64 uses a packaged executable and rejects unqualified architectures", () => {
   const base={platform:"win32",arch:"x64",standalone:false,entryPath:path.resolve("dist/npm/chat-harness.js"),executablePath:"unused"};
@@ -15,6 +16,23 @@ test("Windows x64 uses a packaged executable and rejects unqualified architectur
 const enabled=process.platform==="win32" && process.env.CHAT_HARNESS_TEST_PACKAGING==="1";
 const runtime={platform:process.platform,arch:process.arch,standalone:false,entryPath:path.resolve(import.meta.dir,"../../dist/npm/chat-harness.js"),executablePath:"unused"};
 const hash=(bytes:string)=>createHash("sha256").update(bytes).digest("hex");
+
+test.skipIf(!enabled)("Windows software update verifies the actual renamed helper and rebinds its checksum basename",async()=>{
+  const root=realpathSync(mkdtempSync(path.join(os.tmpdir(),"harness-win-update-")));
+  try {
+    const target=path.join(root,"chat-harness.exe"),staged=path.join(root,".chat-harness-update.test.exe");
+    const helper=staged+".windows-safe-move.exe",backup=path.join(root,".chat-harness-backup.test.exe");
+    copyFileSync(path.resolve(import.meta.dir,"../../dist/bin/chat-harness-windows-x64.exe"),staged);
+    copyFileSync(verifiedMacosHelper(runtime),helper);
+    const digest=createHash("sha256").update(readFileSync(helper)).digest("hex");
+    writeFileSync(helper+".sha256",digest+"  "+path.basename(helper)+"\n");
+    await runWindowsLifecycleJob({schema:1,action:"replace",parentPid:1,target,staged,expectedVersion:"0.3.7",backupPath:backup,
+      nativeHelper:{staged:helper,backupPath:backup+".windows-safe-move.exe",digest},helperPath:"unused",jobPath:"unused"},
+      {...defaultWindowsHelperDependencies,isProcessRunning:()=>false,scheduleCleanup:()=>{}});
+    expect(verifiedMacosHelper({...runtime,standalone:true,executablePath:target})).toBe(target+".windows-safe-move.exe");
+    expect(readFileSync(target+".windows-safe-move.exe.sha256","utf8")).toBe(digest+"  chat-harness.exe.windows-safe-move.exe\n");
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
 
 test.skipIf(!enabled)("Windows native collision and digest mismatch preserve both copies",()=>{
   const root=realpathSync(mkdtempSync(path.join(os.tmpdir(),"harness-windows-")));

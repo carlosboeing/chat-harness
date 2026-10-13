@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { INSTALL_METADATA_BASENAME } from "./installation.js";
+import { verifiedMacosHelper } from "../workspace/macos-helper.js";
+import { createHash } from "node:crypto";
 
 export interface WindowsLifecycleJob {
   schema: 1;
@@ -14,6 +16,7 @@ export interface WindowsLifecycleJob {
   staged?: string;
   expectedVersion?: string;
   backupPath?: string;
+  nativeHelper?: {staged:string;backupPath:string;digest:string};
   helperPath: string;
   jobPath: string;
 }
@@ -23,6 +26,7 @@ export interface WindowsHelperDependencies {
   rename(source: string, destination: string): void;
   remove(target: string): void;
   verifyVersion(binary: string, expected: string): void;
+  verifyNativeHelper?(binary: string, digest:string): void;
   isProcessRunning(pid: number): boolean;
   sleep(milliseconds: number): Promise<void>;
   scheduleCleanup(paths: string[]): void;
@@ -79,6 +83,12 @@ export const defaultWindowsHelperDependencies: WindowsHelperDependencies = {
   rename: renameSync,
   remove: (target) => rmSync(target, { force: true }),
   verifyVersion,
+  verifyNativeHelper:(binary,digest)=>{
+    const file=binary+".windows-safe-move.exe";
+    if(createHash("sha256").update(readFileSync(file)).digest("hex")!==digest)throw new Error("Installed Windows native helper digest differs from approved download.");
+    writeFileSync(file+".sha256",digest+"  "+path.basename(file)+"\n");
+    verifiedMacosHelper({platform:"win32",arch:"x64",standalone:true,entryPath:"unused",executablePath:binary});
+  },
   isProcessRunning,
   sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
   scheduleCleanup,
@@ -128,6 +138,8 @@ function validateJobPaths(
     ) {
       throw new Error("Windows backup path is outside the installation boundary.");
     }
+    if(job.nativeHelper && (job.nativeHelper.staged!==job.staged+".windows-safe-move.exe" ||
+      job.nativeHelper.backupPath!==job.backupPath+".windows-safe-move.exe" || !/^[0-9a-f]{64}$/.test(job.nativeHelper.digest)))throw new Error("Windows native helper paths or digest are outside the software update boundary.");
   }
 
   const tempDirectory = path.resolve(os.tmpdir());
@@ -170,6 +182,8 @@ export async function runWindowsLifecycleJob(
 
   if (job.action === "remove") {
     dependencies.remove(job.target);
+    dependencies.remove(job.target+".windows-safe-move.exe");
+    dependencies.remove(job.target+".windows-safe-move.exe.sha256");
     if (job.metadataPath) dependencies.remove(job.metadataPath);
     dependencies.scheduleCleanup([job.helperPath, job.jobPath]);
     return;
@@ -181,19 +195,31 @@ export async function runWindowsLifecycleJob(
   if (!staged || !expectedVersion || !backupPath) {
     throw new Error("Windows replacement job is incomplete.");
   }
-  if (dependencies.exists(backupPath)) {
-    throw new Error("Refusing to overwrite existing update backup: " + backupPath);
+  const replacements=[{target:job.target,staged,backup:backupPath}];
+  if(job.nativeHelper) {
+    const companion=job.target+".windows-safe-move.exe";
+    if(dependencies.exists(companion)!==dependencies.exists(companion+".sha256"))throw new Error("Existing Windows native helper pair is incomplete; preserve installation.");
+    replacements.push({target:companion,staged:job.nativeHelper.staged,backup:job.nativeHelper.backupPath},
+      {target:companion+".sha256",staged:job.nativeHelper.staged+".sha256",backup:job.nativeHelper.backupPath+".sha256"});
   }
-
+  for(const file of replacements)if(dependencies.exists(file.backup))throw new Error("Refusing to overwrite existing update backup: "+file.backup);
+  const backedUp=new Set<string>(),installed=new Set<string>();
   try {
-    if (dependencies.exists(job.target)) dependencies.rename(job.target, backupPath);
-    dependencies.rename(staged, job.target);
+    for(const file of replacements) {
+      if(dependencies.exists(file.target)){dependencies.rename(file.target,file.backup);backedUp.add(file.target);}
+      dependencies.rename(file.staged,file.target);installed.add(file.target);
+    }
     dependencies.verifyVersion(job.target, expectedVersion);
-    dependencies.remove(backupPath);
+    if(job.nativeHelper) {
+      if(!dependencies.verifyNativeHelper)throw new Error("Windows native verification is unavailable.");
+      dependencies.verifyNativeHelper(job.target,job.nativeHelper.digest);
+    }
   } catch (error) {
     try {
-      dependencies.remove(job.target);
-      if (dependencies.exists(backupPath)) dependencies.rename(backupPath, job.target);
+      for(const file of [...replacements].reverse()) {
+        if(installed.has(file.target))dependencies.remove(file.target);
+        if(backedUp.has(file.target))dependencies.rename(file.backup,file.target);
+      }
     } catch {
       throw new Error(
         "Windows update failed and rollback also failed: " +
@@ -202,9 +228,9 @@ export async function runWindowsLifecycleJob(
     }
     throw error;
   } finally {
-    if (dependencies.exists(staged)) dependencies.remove(staged);
+    for(const file of replacements)if(dependencies.exists(file.staged))dependencies.remove(file.staged);
   }
-
+  for(const file of replacements)if(backedUp.has(file.target))dependencies.remove(file.backup);
   dependencies.scheduleCleanup([job.helperPath, job.jobPath]);
 }
 
@@ -243,6 +269,7 @@ export interface ScheduleWindowsLifecycleJobInput {
   expectedVersion?: string;
   currentExecutable: string;
   parentPid?: number;
+  withNativeHelper?: boolean;
 }
 
 export function scheduleWindowsLifecycleJob(
@@ -266,6 +293,7 @@ export function scheduleWindowsLifecycleJob(
       ...(input.staged ? { staged: input.staged } : {}),
       ...(input.expectedVersion ? { expectedVersion: input.expectedVersion } : {}),
       ...(backupPath ? { backupPath } : {}),
+      ...(input.withNativeHelper && input.staged && backupPath ? {nativeHelper:{staged:input.staged+".windows-safe-move.exe",backupPath:backupPath+".windows-safe-move.exe",digest:createHash("sha256").update(readFileSync(input.staged+".windows-safe-move.exe")).digest("hex")}} : {}),
       helperPath,
       jobPath,
     };

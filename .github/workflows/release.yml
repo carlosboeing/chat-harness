@@ -214,6 +214,8 @@ jobs:
             dist/release/${{ matrix.asset }}.macos-safe-move.sha256
             dist/release/${{ matrix.asset }}.linux-safe-move
             dist/release/${{ matrix.asset }}.linux-safe-move.sha256
+            dist/release/${{ matrix.asset }}.windows-safe-move.exe
+            dist/release/${{ matrix.asset }}.windows-safe-move.exe.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -258,6 +260,24 @@ jobs:
           pattern: chat-harness-linux-*
           path: dist/linux-native-artifacts
           merge-multiple: true
+
+      - name: Download Windows native helper built on matching runner
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          pattern: chat-harness-windows-*
+          path: dist/windows-native-artifacts
+          merge-multiple: true
+
+      - name: Verify and stage Windows helper into npm package
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="chat-harness-windows-x64.exe.windows-safe-move.exe"
+          (cd dist/windows-native-artifacts && sha256sum -c "${name}.sha256")
+          target="dist/npm/native/windows/win32-x64"
+          mkdir -p "${target}"
+          cp "dist/windows-native-artifacts/${name}" "${target}/safe-move.exe"
+          bun run checksum -- "${target}/safe-move.exe"
 
       - name: Verify and stage Linux helpers into npm package
         shell: bash

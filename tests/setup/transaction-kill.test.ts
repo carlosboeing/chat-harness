@@ -5,6 +5,7 @@ import { copyFileSync,mkdirSync,mkdtempSync,realpathSync,rmSync,existsSync,readF
 import os from "node:os";
 import path from "node:path";
 import { buildWindowsHelper } from "../../scripts/build-windows-helper.js";
+import { acquireMacosWorkspaceLease, verifiedMacosHelper } from "../../src/workspace/macos-helper.js";
 import { inspectAndPlanReadonlyReconciliation } from "../../src/setup/readonly-reconcile-plan.js";
 import { executeManagedReconciliation,recoverManagedReconciliation } from "../../src/setup/transaction-engine.js";
 
@@ -28,6 +29,29 @@ beforeAll(async()=>{
 afterAll(()=>{if(scratch)rmSync(scratch,{recursive:true,force:true});});
 const runtime=()=>({platform:process.platform,arch:process.arch,standalone:false,entryPath:entry,executablePath:"unused"});
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
+test.skipIf(!enabled || process.platform!=="win32")("killed Windows lease cannot admit recovery while an independent registered native writer survives",async()=>{
+ const root=realpathSync(mkdtempSync(path.join(scratch,"lease-only-")));
+ await executeManagedReconciliation(await inspectAndPlanReadonlyReconciliation(root,{specialists:"none"},"0.3.7"),runtime());
+ const lease=await acquireMacosWorkspaceLease(root,runtime());
+ const temp=await lease.pin();
+ const bytes="preserved native source";writeFileSync(path.join(root,"native-test-source"),bytes);
+ const signal=path.join(scratch,"lease-only-signal");
+ const helper=spawn(verifiedMacosHelper(runtime()),["move",root,".","native-test-source","native-test-target",createHash("sha256").update(bytes).digest("hex"),
+  "--root-identity="+lease.identity,"--temp-identity="+temp,"--owner-pid="+process.pid,"--lease-pid="+lease.pid],
+  {env:{...process.env,GATE0_TEST_BOUNDARY:"pre-move:native-test-source",GATE0_TEST_BOUNDARY_SIGNAL:signal},stdio:"ignore"});
+ const done=new Promise<void>(resolve=>helper.once("exit",()=>resolve()));
+ try {
+  const deadline=Date.now()+10000;while(!existsSync(signal) && helper.exitCode===null && Date.now()<deadline)await tick();
+  expect(existsSync(signal)).toBe(true);
+  process.kill(lease.pid,"SIGKILL");
+  process.kill(helper.pid!,0); // This sibling operation survives lease termination.
+  await expect(recoverManagedReconciliation(root,runtime())).rejects.toThrow("busy");
+  await done;
+  expect(helper.exitCode).toBe(0);
+  expect(readFileSync(path.join(root,"native-test-target"),"utf8")).toBe(bytes);
+  expect(await recoverManagedReconciliation(root,runtime())).toBe("absent");
+ } finally {helper.kill("SIGKILL");await done;await lease.release();rmSync(root,{recursive:true,force:true});}
+},30000);
 for(const boundary of ["stage-open:journal.json","staged:journal.json","stage-open:.AGENTS.md.chat-harness-stage-","stage-open:.source-policy.yaml.chat-harness-stage-","staged:.AGENTS.md.chat-harness-stage-","moved:AGENTS.md","moved:manifest.yaml","retired:reconcile","discarded:journal.json"]){
  test.skipIf(!enabled)(`real process termination preserves/recoverably resolves ${boundary}`,async()=>{
   const root=realpathSync(mkdtempSync(path.join(scratch,"workspace-")));
@@ -85,12 +109,22 @@ test.skipIf(!enabled)("parent-only SIGKILL cannot release exclusion while a nati
  try{
   const deadline=Date.now()+20000;while(!existsSync(signal) && Date.now()<deadline)await tick();
   expect(existsSync(signal)).toBe(true);
+  const helperPid=Number(readFileSync(signal,"utf8").split("\n")[1]);
+  expect(Number.isSafeInteger(helperPid) && helperPid>0).toBe(true);
+  process.kill(helperPid,0); // It must be alive at the actual pre-move boundary.
   const exited=new Promise<void>(resolve=>child.once("exit",()=>resolve()));child.kill("SIGKILL");await exited;
   // Do NOT kill its active native child. Recovery must refuse until that
   // already-started operation completes, even though the CLI parent is dead.
-  await expect(recoverManagedReconciliation(root,runtime())).rejects.toThrow("busy");
-  expect(existsSync(path.join(root,".chat-harness/temp/reconcile/journal.json"))).toBe(true);
-  await new Promise(resolve=>setTimeout(resolve,2200));
+  let helperAlive=true;try{process.kill(helperPid,0);}catch{helperAlive=false;}
+  // Windows Bun can terminate its child process job along with the CLI. In
+  // that case there is no surviving native writer to exclude; rollback must
+  // still be proved. Every genuinely surviving writer must block recovery.
+  console.log("parent-only termination:",process.platform,"native survivor:",helperAlive);
+  if(process.platform!=="win32" || helperAlive) {
+    await expect(recoverManagedReconciliation(root,runtime())).rejects.toThrow("busy");
+    expect(existsSync(path.join(root,".chat-harness/temp/reconcile/journal.json"))).toBe(true);
+    await new Promise(resolve=>setTimeout(resolve,2200));
+  }
   expect(await recoverManagedReconciliation(root,runtime())).toBe("rolled_back");
   expect(readFileSync(path.join(root,".chat-harness/WORKSPACE.md"))).toEqual(original);
  }finally{child.kill("SIGKILL");await new Promise(resolve=>setTimeout(resolve,2200));rmSync(root,{recursive:true,force:true});}

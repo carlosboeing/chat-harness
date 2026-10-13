@@ -22,6 +22,8 @@ import {
   type StandaloneRelease,
 } from "./standalone.js";
 import { scheduleWindowsLifecycleJob } from "./windows.js";
+import { createHash } from "node:crypto";
+import { verifiedMacosHelper } from "../workspace/macos-helper.js";
 
 export interface LifecycleResult {
   result: {
@@ -55,6 +57,7 @@ export interface LifecycleDependencies {
     bytes: Uint8Array,
     expectedVersion: string,
     metadataPath: string,
+    nativeHelper?: Uint8Array,
   ): void;
   scheduleWindowsRemove(target: string, metadataPath?: string): void;
   writeMetadata(target: string, channel: "standalone" | "development"): string;
@@ -96,6 +99,7 @@ function stageWindowsUpdate(
   bytes: Uint8Array,
   expectedVersion: string,
   metadataPath: string,
+  nativeHelper?: Uint8Array,
 ): void {
   const staged = path.join(
     path.dirname(target),
@@ -104,6 +108,12 @@ function stageWindowsUpdate(
   try {
     writeFileSync(staged, bytes);
     verifyBinaryVersion(staged, expectedVersion);
+    if(nativeHelper) {
+      const helper=staged+".windows-safe-move.exe";
+      writeFileSync(helper,nativeHelper,{flag:"wx"});
+      writeFileSync(helper+".sha256",createHash("sha256").update(nativeHelper).digest("hex")+"  "+path.basename(helper)+"\n",{flag:"wx"});
+      verifiedMacosHelper({platform:"win32",arch:"x64",standalone:true,entryPath:"unused",executablePath:staged});
+    }
     writeInstallationMetadata(target, "standalone");
     scheduleWindowsLifecycleJob({
       action: "replace",
@@ -112,9 +122,11 @@ function stageWindowsUpdate(
       staged,
       expectedVersion,
       currentExecutable: target,
+      ...(nativeHelper ? {withNativeHelper:true} : {}),
     });
   } catch (error) {
     rmSync(staged, { force: true });
+    if(nativeHelper){rmSync(staged+".windows-safe-move.exe",{force:true});rmSync(staged+".windows-safe-move.exe.sha256",{force:true});}
     throw error;
   }
 }
@@ -384,9 +396,9 @@ export async function runUpdate(
     ]);
     verifyDownloadedAsset(binary, checksum, release.binary.name);
     let nativeHelperBytes: Uint8Array | undefined;
-    if (dependencies.platform === "darwin") {
+    if (dependencies.platform === "darwin" || release.nativeHelper || (["linux","win32"].includes(dependencies.platform) && Number(release.version.split(".")[0])>=1)) {
       if (!release.nativeHelper) {
-        throw new Error("Release is missing the macOS native helper; update aborted without modifying the installation.");
+        throw new Error("Release is missing the "+(dependencies.platform === "darwin" ? "macOS" : dependencies.platform === "win32" ? "Windows" : "Linux")+" native helper; update aborted without modifying the installation.");
       }
       const [helperBinary, helperChecksum] = await Promise.all([
         dependencies.download(release.nativeHelper.binary.url),
@@ -406,6 +418,7 @@ export async function runUpdate(
         binary,
         release.version,
         metadataPath,
+        nativeHelperBytes,
       );
       return {
         result: {
