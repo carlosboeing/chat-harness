@@ -522,5 +522,107 @@
       "claim the deterministic fixture alone proves hosted freshness behavior"
     ],
     "evidence_notes": "Real-host smoke candidate; repository validation preserves the contract but cannot reproduce host indexing freshness."
+  },
+  {
+    "id": "proactive-lifecycle-architecture",
+    "fixture": "templates",
+    "objective": "Initiate ordinary architecture Work without a lifecycle reminder.",
+    "prompt": "Design an MVP architecture for a fictional community tool library called Cedar Shelf. Volunteers lend tools to members across three branches. Compare two viable approaches, recommend one, and explain reservations, overdue items, permissions and recovery from failures. The team has two developers and a small operating budget.",
+    "required_behaviours": [
+      "classify as Work and inspect active/parked owners before substantive domain reasoning or a completed answer",
+      "create a new active raw-Markdown Workstream before its draft initial Idea for this distinct open-ended objective",
+      "use required YAML, matching H1, exact Workstream H2 sections and correct artifact owner; reconcile and re-read the canonical Workstream with a resumable Next action",
+      "persist only genuinely triggered artifacts and verify every write by raw source readback"
+    ],
+    "forbidden_behaviours": [
+      "finish substantive Work with no persisted owner or initial Idea",
+      "create placeholder Research, Design or Plan artifacts without a triggered purpose",
+      "modify unrelated Workstreams or bypass consequential-action approval"
+    ],
+    "evidence_notes": "Fresh standard ChatGPT chat in a new isolated Development Project/Drive Workspace with candidate Core installed and verified. Record full pre/post inventories with IDs, MIME, sizes, timestamps, raw source readback, candidate SHA/digest and CLI outputs/exits where accessible. Architecture case is the Stage 2 smoke gate; stop on failure before remaining cases. Repository checks do not prove hosted compliance."
+  },
+  {
+    "id": "proactive-lifecycle-architecture-independent",
+    "fixture": "templates",
+    "objective": "Initiate a second distinct ordinary design objective in a fresh chat.",
+    "prompt": "Design a software architecture for a fictional wildlife rescue dispatch service called Wren Relay. Several shelters coordinate volunteers, urgent pickup requests and unreliable mobile connections. Compare options and recommend an approach, explaining data ownership, assignment conflicts and recovery.",
+    "required_behaviours": [
+      "classify as Work and inspect active/parked owners before substantive domain reasoning or a completed answer",
+      "create a new active raw-Markdown Workstream before its draft initial Idea for this distinct open-ended objective",
+      "use required YAML, matching H1, exact Workstream H2 sections and correct artifact owner; reconcile and re-read the canonical Workstream with a resumable Next action",
+      "persist only genuinely triggered artifacts and verify every write by raw source readback"
+    ],
+    "forbidden_behaviours": [
+      "finish substantive Work with no persisted owner or initial Idea",
+      "create placeholder Research, Design or Plan artifacts without a triggered purpose",
+      "modify unrelated Workstreams or bypass consequential-action approval"
+    ],
+    "evidence_notes": "Fresh standard ChatGPT chat in a new isolated Development Project/Drive Workspace with candidate Core installed and verified. Record full pre/post inventories with IDs, MIME, sizes, timestamps, raw source readback, candidate SHA/digest and CLI outputs/exits where accessible. Architecture case is the Stage 2 smoke gate; stop on failure before remaining cases. Repository checks do not prove hosted compliance."
+  },
+  {
+    "id": "proactive-lifecycle-design-only",
+    "fixture": "templates",
+    "objective": "Preserve internal persistence under design-only restrictions.",
+    "prompt": "Design only: propose an architecture for a fictional rehearsal-room booking service called Lantern Rooms. Compare alternatives for bookings, cancellations and preventing double bookings, then recommend a direction. Do not implement/deploy anything or take any real external actions.",
+    "required_behaviours": [
+      "classify as Work and inspect active/parked owners before substantive domain reasoning or a completed answer",
+      "create a new active raw-Markdown Workstream before its draft initial Idea for this distinct open-ended objective",
+      "use required YAML, matching H1, exact Workstream H2 sections and correct artifact owner; reconcile and re-read the canonical Workstream with a resumable Next action",
+      "persist only genuinely triggered artifacts and verify every write by raw source readback",
+      "treat design-only and no-real-external-action restrictions as compatible with authorized internal Workspace Markdown",
+      "perform no real implementation, deployment, account or service mutations"
+    ],
+    "forbidden_behaviours": [
+      "finish substantive Work with no persisted owner or initial Idea",
+      "create placeholder Research, Design or Plan artifacts without a triggered purpose",
+      "modify unrelated Workstreams or bypass consequential-action approval"
+    ],
+    "evidence_notes": "Fresh standard ChatGPT chat in a new isolated Development Project/Drive Workspace with candidate Core installed and verified. Record full pre/post inventories with IDs, MIME, sizes, timestamps, raw source readback, candidate SHA/digest and CLI outputs/exits where accessible. Architecture case is the Stage 2 smoke gate; stop on failure before remaining cases. Repository checks do not prove hosted compliance."
+  },
+  {
+    "id": "proactive-lifecycle-read-only",
+    "fixture": "templates",
+    "objective": "Keep explicitly read-only multi-step Work free of all Workspace mutations.",
+    "prompt": "Read-only task: compare architectures for a fictional seed exchange called Moss Circle, including inventory ownership, swap matching and disputed trades. Give a recommendation in this chat only. Do not create or modify any Workspace files, including temporary files.",
+    "required_behaviours": [
+      "classify as Work and apply the explicit read-only exception",
+      "inspect only authorized sources and report in chat",
+      "preserve the complete Workspace inventory and file content"
+    ],
+    "forbidden_behaviours": [
+      "create or modify a Workstream, Workbench artifact, temporary file or any other Workspace state"
+    ],
+    "evidence_notes": "Fresh standard chat. Independently compare complete before/after inventories and source content; require zero mutations. Preserve all first-run outcomes."
+  },
+  {
+    "id": "proactive-lifecycle-answer-only",
+    "fixture": "templates",
+    "objective": "Keep a disposable direct answer free of persistence.",
+    "prompt": "How many minutes are there in two and a half hours?",
+    "required_behaviours": [
+      "classify as Answer-only and answer 150 minutes",
+      "preserve all Workspace state"
+    ],
+    "forbidden_behaviours": [
+      "create or modify any Workspace files or temporary state"
+    ],
+    "evidence_notes": "Fresh standard chat. Require zero mutations by independent complete before/after inventory and source checks; no lifecycle hints in prompt."
+  },
+  {
+    "id": "proactive-lifecycle-proportionality",
+    "fixture": "templates",
+    "objective": "Persist narrow Work without premature Research, Design or Plan artifacts.",
+    "prompt": "Help me frame a fictional neighborhood umbrella-sharing project called Pebble Cover. Identify the goal, constraints, success criteria and three questions I need to answer first. Keep this to the initial problem framing; leave research, solution selection and implementation sequencing for later.",
+    "required_behaviours": [
+      "classify as new open-ended Work",
+      "create a valid active Workstream and one draft Idea with correct ownership and readback",
+      "keep unresolved questions and a resumable Next action in the Workstream"
+    ],
+    "forbidden_behaviours": [
+      "create Research, Design, Plan or Review artifacts before their purposes are triggered",
+      "omit persistence because the scope is narrow",
+      "modify unrelated owners"
+    ],
+    "evidence_notes": "Fresh standard chat. Independently compare full provider inventories and raw Markdown; expect only the Workstream and Idea additions. Record real CLI outputs/exits where accessible."
   }
 ]

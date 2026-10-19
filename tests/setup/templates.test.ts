@@ -40,6 +40,28 @@ describe("canonical templates",()=>{
     expect(AGENTS_TEMPLATE).toContain("what changes, where, why");
     expect(AGENTS_TEMPLATE).toContain("Temp files retain Workstream ownership");
   });
+  // These assert instruction contracts, not hosted model compliance.
+  test("ordinary Work executes persistence before substantive reasoning or a final answer",()=>{
+    const lifecycle = AGENTS_TEMPLATE.split("## Work lifecycle\n")[1]!.split("### Workstream")[0]!;
+    expect(lifecycle).toMatch(/before substantive (?:domain )?(?:reasoning|analysis).*completed answer/);
+    expect(lifecycle).toContain("execute these steps without waiting for a save request");
+    expect(lifecycle.indexOf("resume a same-objective Workstream")).toBeLessThan(lifecycle.indexOf("Workbench artifact"));
+    expect(AGENTS_TEMPLATE).toContain("Create immediately for each new open-ended Work objective");
+  });
+  test("design-only restrictions preserve authorized internal Markdown persistence",()=>{
+    expect(AGENTS_TEMPLATE).toMatch(/"design only".*"do not implement\/deploy".*"no real external actions"/);
+    expect(AGENTS_TEMPLATE).toContain("do not prohibit authorized internal Workspace Markdown");
+    expect(AGENTS_TEMPLATE).toContain("Consequential external actions require explicit human approval");
+    expect(AGENTS_TEMPLATE).toContain("Never modify **unrelated** Workstreams");
+  });
+  test("Answer-only and explicitly read-only Work prohibit all Workspace mutations",()=>{
+    expect(AGENTS_TEMPLATE).toMatch(/Answer-only and explicitly read-only Work.*without creating or modifying Workstreams, artifacts, temp files or other Workspace state/);
+    expect(AGENTS_TEMPLATE).toContain("Folders describe purpose, not mandatory stages. Create on trigger without placeholders");
+  });
+  test("Core names exact required Workstream sections and resumable Next action",()=>{
+    expect(AGENTS_TEMPLATE).toContain("exact H2s: Objective, Current direction, Next action");
+    expect(AGENTS_TEMPLATE).toContain("Active Workstreams require a Next action");
+  });
   test("Workstream stays synchronized",async()=>{
     expect(await readFile(path.join(root,"templates","workstream.md"),"utf8")).toBe(WORKSTREAM_TEMPLATE);
   });
