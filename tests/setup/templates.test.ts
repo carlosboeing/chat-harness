@@ -21,12 +21,16 @@ describe("canonical templates",()=>{
     expect(source).toContain("resume a same-objective Workstream");
     expect(source).toContain("discovery, not freshness authority");
     expect(source).toContain("never cite/link temp as canonical");
-    const originalPersistenceBlock = "## Persistence invariants\n\nDurable internal text defaults to raw Markdown. Workstreams and textual Workbench artifacts **must** be `.md` with required YAML and H1; invalid structure is persistence failure.\n\nOn remote storage, write Markdown (`text/markdown`); never substitute a native provider document for convenience. Other formats are allowed only when the artifact requires them.\n\nAfter every Workstream/Workbench write, re-read/list it and verify filename, format/MIME where available, frontmatter/H1, and intended content. If writing or verification fails, report persistence failure; do not claim success.\n\nA checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact does not count.\n\n";
-    expect(source).toContain(originalPersistenceBlock);
-    const originalBlockIndex = source.indexOf(originalPersistenceBlock);
-    const fallbackIndex = source.indexOf("If an authorized in-place replacement fails after a normal retry, and the provider supports create/read/rename/delete, use a copy-on-write fallback: create a complete temporary candidate and verify its content/type/location; re-read the canonical file to detect concurrent changes; rename the canonical file to a unique backup; promote the candidate; re-read and verify the new canonical file; then delete the backup. Never delete the last known-good copy. If promotion or verification fails, restore the backup when possible and report persistence failure. Surface any changed provider file ID or metadata/reference consequences.");
-    expect(originalBlockIndex).toBeGreaterThanOrEqual(0);
-    expect(fallbackIndex).toBeGreaterThan(originalBlockIndex);
+    const persistence = source.split("## Persistence invariants\n")[1]!.split("## Checkpoint and closeout")[0]!;
+    expect(persistence).toContain("verified COW backup cleanup");
+    const order = ["verify a complete candidate", "re-read canon for concurrent changes", "rename canon to a unique", "promote candidate", "re-read/verify canon", "request any required deletion approval", "delete backup and list to verify absence"];
+    for (let i = 1; i < order.length; i++) {
+      expect(persistence.indexOf(order[i]!)).toBeGreaterThan(persistence.indexOf(order[i - 1]!));
+    }
+    expect(persistence).toContain("Never delete the last known-good copy");
+    expect(persistence).toContain("Denied, failed or unverified cleanup is persistence failure");
+    expect(persistence).toContain("preserve copies, report exact paths/IDs and recovery Next action");
+    expect(persistence).toContain("never claim a complete checkpoint");
   });
   test("specialist seeds stay compact",()=>{
     for(const id of SPECIALIST_IDS){

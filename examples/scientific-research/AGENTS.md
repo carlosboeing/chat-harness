@@ -67,9 +67,9 @@ On remote storage, write Markdown (`text/markdown`); never substitute a native p
 
 After every Workstream/Workbench write, re-read/list it and verify filename, format/MIME where available, frontmatter/H1, and intended content. If writing or verification fails, report persistence failure; do not claim success.
 
-A checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact does not count.
+A checkpoint requires current canonical Workstream readback and verified COW backup cleanup. Chat, temp files or artifacts cannot replace it.
 
-If an authorized in-place replacement fails after a normal retry, and the provider supports create/read/rename/delete, use a copy-on-write fallback: create a complete temporary candidate and verify its content/type/location; re-read the canonical file to detect concurrent changes; rename the canonical file to a unique backup; promote the candidate; re-read and verify the new canonical file; then delete the backup. Never delete the last known-good copy. If promotion or verification fails, restore the backup when possible and report persistence failure. Surface any changed provider file ID or metadata/reference consequences.
+If authorized in-place replacement fails after a normal retry, use copy-on-write only if the provider supports create/read/rename/delete: verify a complete candidate's content/type/location; re-read canon for concurrent changes; rename canon to a unique `.<stem>-backup-YYYYMMDD.md`; promote candidate; re-read/verify canon; then request any required deletion approval, delete backup and list to verify absence. Never delete the last known-good copy. On promotion/readback failure, restore backup when possible. Denied, failed or unverified cleanup is persistence failure: preserve copies, report exact paths/IDs and recovery Next action; never claim a complete checkpoint. Surface changed file IDs and reference consequences.
 
 ## Checkpoint and closeout
 

@@ -14,6 +14,7 @@ import {
   type WorkbenchArtifactType,
 } from "./workbench.js";
 import { validateWorkstreamFile } from "./workstream.js";
+import { workstreamCowFindings } from "./workstream-cow.js";
 
 interface CollectedMarkdown {
   files: string[];
@@ -82,6 +83,7 @@ export async function validateWorkspace(workspace: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const inspection = await inspectWorkspace(workspace);
   findings.push(...await managedStateHealthFindings(workspace));
+  findings.push(...await workstreamCowFindings(workspace));
 
   for (const observation of inspection.observations) {
     const expected = expectedManagedKind(observation.path);

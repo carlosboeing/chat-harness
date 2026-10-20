@@ -60,6 +60,10 @@ Checks Chat Harness contracts without modifying files, including the required sc
 
 Use `validate` to answer: **is this Workspace structurally valid?**
 
+Both `validate` and `doctor` report `workstream.cow_cleanup_incomplete` as an error for dated COW backups named `.<stem>-backup-YYYYMMDD.md` under `.chat-harness/workstreams/`, including names with a hyphenated alphanumeric suffix. A retained backup means the checkpoint is incomplete, even when the canonical Workstream says `completed`. Other hidden Markdown is not rejected by this rule. The checks do not infer duplicate ownership from matching titles or detect arbitrary backup names.
+
+These checks never delete or recover files. Preserve all copies until canonical content, ownership and references are verified. Restore the last known-good backup if promotion failed. After successful promotion/readback, request any required host approval before removing only the obsolete backup, then verify its absence. Until resolved, report persistence failure with exact paths/IDs and a recovery Next action. A residual file alone cannot establish whether deletion was omitted, denied or failed.
+
 ## doctor
 
 ```bash
