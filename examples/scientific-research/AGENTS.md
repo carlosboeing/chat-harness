@@ -1,32 +1,34 @@
 <!-- chat-harness-managed: agents -->
 # Chat Harness Project Instructions
 
-Copy these generic instructions whole into ChatGPT Project Instructions; Workspace behavior belongs in `.chat-harness/WORKSPACE.md`.
+Copy whole into ChatGPT Project Instructions; Workspace behavior belongs in `.chat-harness/WORKSPACE.md`.
 
 ## Startup and classification
 
 Classify each request as **Answer-only** or **Work**.
 
-Use Answer-only only for direct/disposable answers needing no multi-step investigation, decision, plan, review, troubleshooting, external action, durable artifact, or likely resumption.
+Use Answer-only for direct/disposable answers needing no multi-step investigation, decision, plan, review, troubleshooting, external action, durable artifact or likely resumption.
 
-Use Work for any multi-step or resumable objective: research, comparison, decisions, planning/design/build, review, troubleshooting, implementation, management, or external action. When uncertain, choose Work.
+Use Work for any multi-step or resumable objective: research, comparison, recommendations, decisions, planning/design/build, review, troubleshooting, management or external action. When uncertain, choose Work.
 
-After classification, read `.chat-harness/WORKSPACE.md` before domain reasoning. Answer-only may retrieve only minimum sources. For Work, follow the lifecycle and retrieve Procedures/authoritative context progressively as needed.
+After classification, read `.chat-harness/WORKSPACE.md` before domain reasoning. Load needed sources/Procedures progressively.
 
 ## Work lifecycle
 
-For every Work objective, before deep research, extended tool use, or multi-step execution:
+Answer-only and explicitly read-only Work inspect/report without creating or modifying Workstreams, artifacts, temp files or other Workspace state.
+
+For other Work, before substantive domain reasoning, extended tool use or a completed answer, execute these steps without waiting for a save request:
 1. inspect relevant active/parked Workstreams;
 2. resume a same-objective Workstream from **Next action**, or create one immediately;
 3. create or update each Workbench artifact whose trigger applies;
-4. after any material artifact/state change, reconcile the owning Workstream;
-5. continue execution.
+4. reconcile and re-read the owning Workstream;
+5. continue execution, checkpointing material changes.
 
-Do this proactively. Explicitly read-only Work inspects/reports without creating or modifying Workstreams, artifacts, temp files or other Workspace state.
+"design only", "do not implement/deploy" and "no real external actions" do not prohibit authorized internal Workspace Markdown. Read-only requires an explicit restriction on Workspace persistence.
 
 ### Workstream
 
-Compact authoritative resume state for one independent objective: objective, current direction, durable decisions/state, blockers/open questions, relevant artifacts/sources, explicit **Next action**. Related topics still split when they have distinct objectives and resumable Next actions; never store a transcript or private chain-of-thought.
+Authoritative resume state for one independent objective: direction, durable decisions/state, blockers, sources and **Next action**. Split related topics with distinct objectives and resumable Next actions. Never store a transcript or private chain-of-thought.
 
 Every Workstream must be raw `.md` beginning with valid YAML:
 - `type: workstream`
@@ -35,7 +37,7 @@ Every Workstream must be raw `.md` beginning with valid YAML:
 - `created: YYYY-MM-DD`
 - `updated: YYYY-MM-DD`
 
-After frontmatter, include exactly one H1 matching `title`. New Workstreams start `active`; update `updated` when durable content changes. Active Workstreams require a Next action.
+After frontmatter, include exactly one H1 matching `title`. Use exact H2s: Objective, Current direction, Next action. Start `active`; update `updated` on durable changes. Active Workstreams require a Next action.
 
 ### Workbench
 
@@ -46,8 +48,6 @@ Folders describe purpose, not mandatory stages. Create on trigger without placeh
 - `2-design/` — **What direction should we take, and why?** Alternatives, tradeoffs, feasibility and chosen direction/rationale.
 - `3-plans/` — **What exactly will we do?** Executable steps, dependencies and verification.
 - `4-reviews/` — **Is the existing thing good enough, and what should change?** Critiques, audits and readiness checks.
-
-Classify by durable purpose. If uncertain for a new open-ended objective, use `0-ideas/`.
 
 Every Workbench artifact must be raw `.md` beginning with valid YAML:
 - `type: idea | research | design | plan | review`, matching its folder;
@@ -67,9 +67,9 @@ On remote storage, write Markdown (`text/markdown`); never substitute a native p
 
 After every Workstream/Workbench write, re-read/list it and verify filename, format/MIME where available, frontmatter/H1, and intended content. If writing or verification fails, report persistence failure; do not claim success.
 
-A checkpoint is complete only when the canonical Workstream reflects the latest durable state and has been re-read successfully. A replacement in chat, `.chat-harness/temp/`, or another artifact does not count.
+A checkpoint requires current canonical Workstream readback and verified COW backup cleanup. Chat, temp files or artifacts cannot replace it.
 
-If an authorized in-place replacement fails after a normal retry, and the provider supports create/read/rename/delete, use a copy-on-write fallback: create a complete temporary candidate and verify its content/type/location; re-read the canonical file to detect concurrent changes; rename the canonical file to a unique backup; promote the candidate; re-read and verify the new canonical file; then delete the backup. Never delete the last known-good copy. If promotion or verification fails, restore the backup when possible and report persistence failure. Surface any changed provider file ID or metadata/reference consequences.
+If authorized in-place replacement fails after a normal retry, use copy-on-write only if the provider supports create/read/rename/delete: verify a complete candidate's content/type/location; re-read canon for concurrent changes; rename canon to a unique `.<stem>-backup-YYYYMMDD.md`; promote candidate; re-read/verify canon; then request any required deletion approval, delete backup and list to verify absence. Never delete the last known-good copy. On promotion/readback failure, restore backup when possible. Denied, failed or unverified cleanup is persistence failure: preserve copies, report exact paths/IDs and recovery Next action; never claim a complete checkpoint. Surface changed file IDs and reference consequences.
 
 ## Checkpoint and closeout
 

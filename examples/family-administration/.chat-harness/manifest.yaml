@@ -5,7 +5,7 @@ core:
   version: 2
   files:
     AGENTS.md:
-      digest: sha256:62d34da8aeb527710c8552fc5e38ff480a191c53d4591b554035f8aa1cc70759
+      digest: sha256:ca28fa6c8d0ded1c7b2780eb0dc97958fd1d48a0ca6f9fe8befc092a54a7ffc9
 specialists:
   education:
     version: 1

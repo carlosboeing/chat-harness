@@ -22,6 +22,21 @@ describe("pure schema-1 Workspace manifest", () => {
     expect(exactByteDigest("a")).not.toBe(exactByteDigest("a\n"));
   });
 
+  test("Core v2 wording updates are detected by digest without a manifest migration", () => {
+    // Exact bytes of the pre-hardening Core at f70ea949, not a generated expectation.
+    const previous = desired();
+    previous.core.version = 2;
+    previous.core.files["AGENTS.md"].digest = "sha256:62d34da8aeb527710c8552fc5e38ff480a191c53d4591b554035f8aa1cc70759";
+    const parsed = parseManifest(serializeManifest(previous));
+    const candidate = desired();
+    expect(candidate.core.version).toBe(2);
+    expect(previewManifestChanges(parsed, candidate)).toEqual([{
+      path: "AGENTS.md", owner: "core", action: "replace",
+      beforeDigest: previous.core.files["AGENTS.md"].digest,
+      afterDigest: candidate.core.files["AGENTS.md"].digest,
+    }]);
+  });
+
   test("records lexically ordered component ownership including marked Procedures", () => {
     const first = desired(["shopping", "finance", "career"]);
     expect(Object.keys(first.specialists)).toEqual(["career", "finance", "shopping"]);

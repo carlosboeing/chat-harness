@@ -3,6 +3,7 @@ import { type SpecialistId } from "../specialists/definitions.js";
 import { inspectManifestDisk } from "../setup/inspect-manifest-disk.js";
 import { nativeHelperHealthFindings } from "./native-helper.js";
 import { managedStateHealthFindings } from "../validation/managed-state.js";
+import { workstreamCowFindings } from "../validation/workstream-cow.js";
 import {
   detectInstallationMode,
   gitFindings,
@@ -45,6 +46,7 @@ export async function runDoctor(
     )),
     ...(await scaffoldFindings(workspace)),
     ...(await managedStateHealthFindings(workspace)),
+    ...(await workstreamCowFindings(workspace)),
     ...(await localIntegrityFindings(workspace)),
     ...(await recommendedCapabilityFindings(workspace,Object.keys(installed.manifest?.specialists??{}) as SpecialistId[])),
     ...runtimeFindings(mode, runtimeFacts),
