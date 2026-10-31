@@ -1,6 +1,6 @@
 # Reconciliation and recovery
 
-This describes the v1 implementation candidate. The software remains `0.3.7`; merge, version bump, tag and publication are separate approvals. Filesystem verification does not prove manual ChatGPT/other host activation.
+This describes the v1 implementation candidate, published as pre-1.0 `0.4.0`. Filesystem verification does not prove manual ChatGPT/other host activation.
 
 ## Supported execution boundary
 

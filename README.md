@@ -1,6 +1,6 @@
 # Chat Harness
 
-This repository describes the v1 implementation candidate. The published `0.3.7` package may still use the older setup interface; publication is a separate approval. Use a qualified build of this branch to exercise the candidate.
+This repository describes the v1 implementation candidate, published as pre-1.0 `0.4.0`. Hosted acceptance is incomplete; see the [v0.4.0 release notes](docs/releases/v0.4.0.md) for known limitations and the v0.3.x Workspace upgrade boundary.
 
 [![release](https://img.shields.io/github/v/release/carlosboeing/chat-harness)](https://github.com/carlosboeing/chat-harness/releases)
 [![CI](https://github.com/carlosboeing/chat-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosboeing/chat-harness/actions/workflows/ci.yml)
@@ -236,7 +236,7 @@ chat-harness uninstall
 
 Run `chat-harness --help` or `chat-harness <command> --help` for terminal help. See the complete [CLI reference](docs/cli.md) for behavior, safety rules, automation, and exit codes.
 
-Setup uses schema-1 manifest ownership, exact-byte preconditions, native non-clobbering reconciliation and verified recovery. Workspace suffixes and user files are preserved. See [reconciliation safety](docs/reconciliation.md). Windows x64 setup uses a qualified native backend on local fixed NTFS volumes; unsupported paths/filesystems fail closed. Manual acceptance and release signoff remain open. Software version stays `0.3.7` until separate release approval; this branch documents the v1 implementation candidate.
+Setup uses schema-1 manifest ownership, exact-byte preconditions, native non-clobbering reconciliation and verified recovery. Workspace suffixes and user files are preserved. See [reconciliation safety](docs/reconciliation.md). Windows x64 setup uses a qualified native backend on local fixed NTFS volumes; unsupported paths/filesystems fail closed. Manual acceptance and `1.0.0` release signoff remain open.
 
 ## Bounded capability extension
 
