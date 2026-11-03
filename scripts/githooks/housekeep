@@ -1,0 +1,1148 @@
+#!/usr/bin/env bash
+#
+# housekeep — refuse stale project records, report what a merge left behind.
+#
+#   housekeep check --push <base> <head>   local only, exits 1 on findings
+#   housekeep check                        everything, calls gh, always exits 0
+#   housekeep audit                        full inventory, calls gh, always exits 0
+#   housekeep fix                          removes worktrees and branches
+#
+# `check --push` never touches the network. A gate that needs the network
+# becomes slow, fails offline, and gets skipped.
+#
+# Install: see the README beside this file.
+
+set -uo pipefail
+
+# Check top-level lifecycle records in either layout, plus standalone lessons.
+# Other nested bundle contents and assets retain their metadata exemptions.
+LIFECYCLE_RE='(^|/)((0-brainstorms|1-discovery|1-research|2-requirements|2-design|3-design|3-plans|4-plans|4-reviews|5-reviews|6-retros|adrs)/[^/]+\.md|6-retros/lessons/[^/]+/[^/]+\.md)$'
+VALID_STATUS='draft|approved|in-progress|shipped|resolved|superseded|open|parked|abandoned'
+LIFECYCLE_TYPE='brainstorm|research|discovery|requirements|design|plan|review|audit|analysis|retro|lesson|adr'
+BULK_LIMIT=200
+
+# --- helpers ----------------------------------------------------------------
+
+_frontmatter() { # _frontmatter <file> -> the block between the first two ---
+  awk '{sub(/\r$/, "")} NR==1 && $0!="---" {exit 1} NR==1 {next} $0=="---" {exit} {print}' "$1"
+}
+
+_field() { # _field <file> <name> -> the value, or empty
+  local val
+  val="$(_frontmatter "$1" | sed -n "s/^$2:[[:space:]]*//p" | head -1 | tr -d '"')"
+  if [ -z "$val" ]; then
+    val="$(_frontmatter "$1" | awk -v f="$2:" '$0 ~ "^"f {found=1; next} found && /^[[:space:]]*-/ {print; exit} found && !/^[[:space:]]/ {exit}')"
+  fi
+  printf '%s' "$val"
+}
+
+_scalar_field() { # _scalar_field <file> <name> -> restricted scalar, without quotes/comments
+  local value
+  value="$(_field "$1" "$2" | sed 's/[[:space:]]*#.*$//; s/^[[:space:]]*//; s/[[:space:]]*$//')"
+  if [ "${#value}" -ge 2 ] && [ "${value:0:1}" = "'" ] && [ "${value: -1}" = "'" ]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "$value"
+}
+
+_valid_document_date() { # ISO calendar date, including leap years
+  local value="$1" year month day month_days
+  [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || return 1
+  year=$((10#${value:0:4})); month=$((10#${value:5:2})); day=$((10#${value:8:2}))
+  ((year > 0 && month >= 1 && month <= 12 && day >= 1)) || return 1
+  case "$month" in
+    4|6|9|11) month_days=30 ;;
+    2) month_days=28; ((year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))) && month_days=29 ;;
+    *) month_days=31 ;;
+  esac
+  ((day <= month_days))
+}
+
+_relationship_targets() { # _relationship_targets <file> -> one raw target per line
+  _frontmatter "$1" | awk '
+    function clean(s,    q, idx) {
+      gsub(/^[ \t]+|[ \t]+$/, "", s)
+      if (s ~ /^#/) return ""
+      q = substr(s, 1, 1)
+      if (q == "\"" || q == "\x27") {
+        idx = index(substr(s, 2), q)
+        if (idx > 0) {
+          s = substr(s, 2, idx - 1)
+          gsub(/^[ \t]+|[ \t]+$/, "", s)
+          return s
+        }
+      }
+      sub(/(^|[ \t]+)#.*$/, "", s)
+      gsub(/^[ \t]+|[ \t]+$/, "", s)
+      return s
+    }
+    /^(related|supersedes|superseded_by)[ \t]*:/ {
+      in_list = 1
+      rest = $0
+      sub(/^[^:]+:[ \t]*/, "", rest)
+      rest = clean(rest)
+      if (rest ~ /^\[.*\]$/) {
+        inner = substr(rest, 2, length(rest) - 2)
+        n = split(inner, parts, ",")
+        for (i = 1; i <= n; i++) {
+          v = clean(parts[i])
+          if (v != "") print v
+        }
+        in_list = 0
+      } else if (rest != "") {
+        print rest
+        in_list = 0
+      }
+      next
+    }
+    in_list && /^[ \t]+-[ \t]+/ {
+      item = $0
+      sub(/^[ \t]+-[ \t]+/, "", item)
+      v = clean(item)
+      if (v != "") print v
+      next
+    }
+    in_list && /^[ \t]*($|#)/ { next }
+    in_list { in_list = 0 }
+  '
+}
+
+_check_relationship_paths() { # _check_relationship_paths <blob> <label> [head] -> 0 ok, 1 finding
+  local f="$1" label="${2:-$1}" head="${3:-}" rc=0 root label_dir target clean norm rel parent
+  root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
+  label_dir="$(dirname "$label")"
+  [ "$label_dir" = "." ] && label_dir=""
+  while IFS= read -r target; do
+    [ -n "$target" ] || continue
+    case "$target" in
+      http://*|https://*|mailto:*|file://*|'#'*) continue ;;
+    esac
+    clean="${target%%#*}"
+    clean="${clean%%\?*}"
+    clean="${clean%/}"
+    [ -n "$clean" ] || continue
+    case "$clean" in
+      /*)
+        printf '  %s:1  relationship path %s must be relative to the file, not absolute\n' "$label" "$target" >&2
+        rc=1
+        continue ;;
+    esac
+    rel="${label_dir:+$label_dir/}$clean"
+    norm="$(awk -v p="$rel" 'BEGIN {
+      n = split(p, a, "/"); m = 0
+      for (i = 1; i <= n; i++) {
+        if (a[i] == "" || a[i] == ".") continue
+        if (a[i] == "..") {
+          if (m > 0 && out[m] != "..") { m--; continue }
+        }
+        out[++m] = a[i]
+      }
+      for (i = 1; i <= m; i++) printf "%s%s", (i > 1 ? "/" : ""), out[i]
+    }')"
+    case "$norm" in
+      ../*|..)
+        parent="$(dirname "$root")/${norm#../}"
+        if [ -e "$parent" ]; then continue; fi
+        printf '  %s:1  relationship path %s does not resolve from %s\n' "$label" "$target" "${label_dir:-.}" >&2
+        rc=1
+        continue ;;
+    esac
+    if [ -n "$head" ] && git cat-file -e "$head:$norm" 2>/dev/null; then
+      continue
+    fi
+    if [ -e "$root/$norm" ]; then
+      continue
+    fi
+    printf '  %s:1  relationship path %s does not resolve relative to %s\n' "$label" "$target" "${label_dir:-.}" >&2
+    rc=1
+  done <<EOF_REL
+$(_relationship_targets "$f")
+EOF_REL
+  return $rc
+}
+
+_blob() { # _blob <commit-ish> <repo-relative-path> -> prints a temp file path
+  local out
+  out="$(mktemp)" || return 1
+  if git show "$1:$2" > "$out" 2>/dev/null; then printf '%s' "$out"; else rm -f "$out"; return 1; fi
+}
+
+_lifecycle_files() { # _lifecycle_files <base> <head>
+  git diff --name-only --diff-filter=ACMR "$1" "$2" -- '*.md' \
+    | grep -E "$LIFECYCLE_RE" || true
+}
+
+# --- check A: frontmatter ---------------------------------------------------
+
+_check_frontmatter() { # _check_frontmatter <blob-path> <label> [head] -> 0 ok, 1 finding
+  local f="$1" label="${2:-$1}" head="${3:-}" doctype status rc=0
+  [ -f "$f" ] || return 0
+  if ! _frontmatter "$f" >/dev/null 2>&1; then
+    printf '  %s:1  no frontmatter block at byte 0\n' "$label" >&2
+    return 1
+  fi
+  for want in title type authors; do
+    if [ -z "$(_field "$f" "$want")" ]; then
+      printf '  %s:1  missing %s\n' "$label" "$want" >&2
+      rc=1
+    fi
+  done
+  doctype="$(_scalar_field "$f" type)"
+  if printf '%s' "$doctype" | grep -qE "^($LIFECYCLE_TYPE)$"; then
+    local created updated legacy
+    created="$(_scalar_field "$f" created)"; updated="$(_scalar_field "$f" updated)"; legacy="$(_scalar_field "$f" date)"
+    if [ -n "$created" ]; then
+      for want in created updated; do
+        local value
+        value="$(_scalar_field "$f" "$want")"
+        if ! _valid_document_date "$value"; then
+          printf '  %s:1  %s must be a valid YYYY-MM-DD date\n' "$label" "$want" >&2
+          rc=1
+        fi
+      done
+      if _valid_document_date "$created" && _valid_document_date "$updated" && [[ "$updated" < "$created" ]]; then
+        printf '  %s:1  updated precedes created\n' "$label" >&2; rc=1
+      fi
+      if [ -n "$legacy" ] && [ "$legacy" != "$created" ]; then
+        printf '  %s:1  created conflicts with legacy date\n' "$label" >&2; rc=1
+      fi
+    elif [ -z "$legacy" ]; then
+      printf '  %s:1  lifecycle doc missing created or legacy date\n' "$label" >&2; rc=1
+    fi
+    status="$(_scalar_field "$f" status)"
+    if [ -z "$status" ]; then
+      printf '  %s:1  lifecycle doc missing status\n' "$label" >&2; rc=1
+    elif ! printf '%s' "$status" | grep -qE "^($VALID_STATUS)$"; then
+      printf '  %s:1  status %s is not one of: %s\n' "$label" "$status" "$VALID_STATUS" >&2; rc=1
+    fi
+  fi
+  _check_relationship_paths "$f" "$label" "$head" || rc=1
+  return $rc
+}
+
+# --- check C: a shipped roadmap line matches its document -------------------
+
+_check_recently_shipped() { # _check_recently_shipped <base> <head>
+  local roadmap rc=0 line target added dir root abs rel blob status doctype
+  roadmap="$(git diff --name-only "$1" "$2" | grep -E '(^|/)ROADMAP\.md$' | head -1)"
+  [ -n "$roadmap" ] || return 0
+  # A roadmap writes its links relative to its own directory, not to the
+  # repository root. Resolving them from the root made this check a no-op.
+  dir="$(dirname "$roadmap")"
+  root="$(git rev-parse --show-toplevel)"
+  added="$(git diff --unified=0 "$1" "$2" -- "$roadmap" \
+             | grep -E '^\+' | grep -v '^+++' | sed 's/^+//')"
+  [ -n "$added" ] || return 0
+  # Only lines that end up under `## Recently shipped` are judged. Reading the
+  # whole added block was wrong: it judged a Next actions line too, and refused
+  # a roadmap that correctly listed a design still in progress.
+  local blob section
+  blob="$(_blob "$2" "$roadmap")" || return 0
+  section="$(awk '/^##[[:space:]]+Recently shipped/{f=1;next} /^##[[:space:]]/{f=0} f' "$blob")"
+  rm -f "$blob"
+  [ -n "$section" ] || return 0
+  added="$(printf '%s\n' "$added" | grep -Fxf <(printf '%s\n' "$section") || true)"
+  [ -n "$added" ] || return 0
+  while IFS= read -r line; do
+    for target in $(printf '%s' "$line" | grep -oE '\]\([^)]+\.md\)' | tr -d ']()'); do
+      abs="$(cd "$root/$dir" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null \
+             && printf '%s/%s' "$(pwd -P)" "$(basename "$target")")"
+      [ -n "$abs" ] || continue
+      rel="${abs#$root/}"
+      printf '%s' "$rel" | grep -qE "$LIFECYCLE_RE" || continue
+      blob="$(_blob "$2" "$rel")" || continue
+      status="$(_scalar_field "$blob" status)"
+      # Two document types never reach `shipped`, and that is correct.
+      # An ADR is accepted, so `approved` is its terminal state. A brainstorm
+      # concludes in a design, so `resolved` is its terminal state.
+      doctype="$(_scalar_field "$blob" type)"
+      [ "$doctype" = "adr" ] && [ "$status" = "approved" ] && status=shipped
+      [ "$doctype" = "brainstorm" ] && [ "$status" = "resolved" ] && status=shipped
+      rm -f "$blob"
+      if [ "$status" != "shipped" ]; then
+        printf '  %s:1  linked from a Recently shipped line but status is %s\n' \
+          "$rel" "${status:-absent}" >&2
+        rc=1
+      fi
+    done
+  done <<INNER
+$added
+INNER
+  return $rc
+}
+
+# --- check B: changelog pairing ---------------------------------------------
+
+_check_changelog() { # _check_changelog <base> <head>
+  # Off unless this repository opted in. The design measured 97% of quotacap
+  # pushes blocked by this rule, and a hook that fires that often gets
+  # bypassed by reflex, which is worse than no hook.
+  [ -f "$(dirname "$0")/drift-guard.on" ] || return 0
+  git log --format='%s' "$1..$2" | grep -qE '^(feat|fix|perf)(\(|:)' || return 0
+  # Repository infrastructure ships nothing to a user. A changelog line for a CI
+  # fix is noise, and a refusal during a broken release teaches --no-verify.
+  # Measured over 80 crossrev commits: 4 of the 44 feat/fix/perf commits touch
+  # only these paths, and none of the other 40 is wrongly skipped.
+  git diff --name-only "$1" "$2" \
+    | grep -qvE '^(\.github/|scripts/|tests/|docs/)|(^|/)testdata/|^[^/]+\.md$' || return 0
+  git diff --name-only "$1" "$2" | grep -qiE '(^|/)CHANGELOG\.md$' && return 0
+  printf '  CHANGELOG.md:1  a feat, fix or perf commit is in this push with no changelog entry\n' >&2
+  return 1
+}
+
+
+# --- the on-demand check: what did a merge leave behind? ---------------------
+
+GH="${HOUSEKEEP_GH:-gh}"   # a test replaces this with a stub
+
+_AUDIT_TMP=""
+trap '[ -n "$_AUDIT_TMP" ] && rm -rf "$_AUDIT_TMP"' EXIT INT TERM
+
+_github_identity() {
+  local url
+  url="$(git config --get remote.origin.url 2>/dev/null || true)"
+  [ -n "$url" ] || return 1
+  url="${url%.git}"
+  case "$url" in
+    git@github.com:*/*)
+      printf '%s' "${url#git@github.com:}" ;;
+    ssh://git@github.com/*/*)
+      printf '%s' "${url#ssh://git@github.com/}" ;;
+    ssh://git@github.com:*/*)
+      printf '%s' "${url#ssh://git@github.com:}" ;;
+    https://github.com/*/*)
+      printf '%s' "${url#https://github.com/}" ;;
+    http://github.com/*/*)
+      printf '%s' "${url#http://github.com/}" ;;
+    *)
+      return 1 ;;
+  esac
+}
+
+_default_branch() {
+  local ref
+  ref="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)" && {
+    printf '%s' "${ref#refs/remotes/origin/}"
+    return 0
+  }
+  if git show-ref --verify --quiet refs/heads/main; then
+    printf 'main'
+  elif git show-ref --verify --quiet refs/heads/master; then
+    printf 'master'
+  fi
+}
+
+_merged_prs() { # _merged_prs -> one pull request number per line
+  git log --format='%s' ORIG_HEAD..HEAD 2>/dev/null \
+    | sed -n 's/.*(#\([0-9][0-9]*\))$/\1/p'
+}
+
+_roadmap() { # _roadmap -> this repository's roadmap path, or nothing
+  for c in docs/ROADMAP.md ROADMAP.md; do
+    [ -f "$c" ] && { printf '%s' "$c"; return 0; }
+  done
+  return 1
+}
+
+_next_section() { # _next_section <roadmap> -> the lines under ## Next
+  awk '/^##[[:space:]]+Next/{f=1;next} /^##[[:space:]]/{f=0} f' "$1"
+}
+
+_worktree_for() { # _worktree_for <branch> -> the worktree path using it
+  git worktree list --porcelain \
+    | awk -v b="refs/heads/$1" '/^worktree /{w=$2} /^branch /{if($2==b) print w}'
+}
+
+_toplevel() {
+  local top logical
+  top="$(git rev-parse --show-toplevel)"
+  if [ -n "${PWD:-}" ]; then
+    logical="$PWD"
+    while [ "$logical" != "/" ] && [ "$logical" != "." ]; do
+      if [ "$(cd "$logical" 2>/dev/null && pwd -P)" = "$top" ]; then
+        printf '%s' "$logical"
+        return 0
+      fi
+      logical="$(dirname "$logical")"
+    done
+  fi
+  printf '%s' "$top"
+}
+
+_worktrees_data() {
+  git worktree list --porcelain | awk '
+    /^worktree / { wt = substr($0, 10); branch = ""; detached = 0 }
+    /^branch / { branch = substr($0, 8); sub(/^refs\/heads\//, "", branch) }
+    /^detached/ { detached = 1 }
+    /^$/ {
+      if (wt != "") {
+        print wt "|" branch "|" detached
+        wt = ""; branch = ""; detached = 0
+      }
+    }
+    END {
+      if (wt != "") {
+        print wt "|" branch "|" detached
+      }
+    }
+  '
+}
+
+_inspect_worktree() {
+  local path="$1" b="$2"
+  WT_BLOCKER=""
+  WT_LINE=""
+
+  if [ ! -d "$path" ]; then
+    WT_BLOCKER="directory missing"
+    WT_LINE="worktree $path: directory missing, metadata prunable"
+    return 0
+  fi
+
+  local admin_dir reason
+  admin_dir="$(git -C "$path" rev-parse --git-dir 2>/dev/null || true)"
+  if [ -n "$admin_dir" ] && [ -f "$admin_dir/locked" ]; then
+    WT_BLOCKER="is locked"
+    reason="$(tr -d '\r\n' < "$admin_dir/locked" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    if [ -n "$reason" ]; then
+      WT_LINE="worktree $path ($b): locked ($reason), kept"
+    else
+      WT_LINE="worktree $path ($b): locked, kept"
+    fi
+    return 0
+  fi
+
+  local status_file
+  status_file="$(mktemp "${_AUDIT_TMP:-${TMPDIR:-/tmp}}/housekeep-status.XXXXXX")"
+  if ! git -C "$path" status --porcelain > "$status_file" 2>/dev/null; then
+    rm -f "$status_file"
+    WT_BLOCKER="status check failed"
+    WT_LINE="worktree $path ($b): status check failed, kept"
+    return 0
+  fi
+  if [ -s "$status_file" ]; then
+    rm -f "$status_file"
+    WT_BLOCKER="has uncommitted changes"
+    WT_LINE="worktree $path ($b): uncommitted changes, kept"
+    return 0
+  fi
+  rm -f "$status_file"
+
+  local ignored_file
+  ignored_file="$(mktemp "${_AUDIT_TMP:-${TMPDIR:-/tmp}}/housekeep-ignored.XXXXXX")"
+  if ! git -C "$path" status --porcelain --ignored > "$ignored_file" 2>/dev/null; then
+    rm -f "$ignored_file"
+    WT_BLOCKER="status check failed"
+    WT_LINE="worktree $path ($b): status check failed, kept"
+    return 0
+  fi
+  local ignored_files n paths rem
+  ignored_files="$(sed -n 's/^!! //p' "$ignored_file")"
+  rm -f "$ignored_file"
+  if [ -n "$ignored_files" ]; then
+    WT_BLOCKER="holds ignored files"
+    n="$(printf '%s\n' "$ignored_files" | wc -l | tr -d ' ')"
+    if [ "$n" -le 5 ]; then
+      paths="$(printf '%s\n' "$ignored_files" | paste -sd, - | sed 's/,/, /g')"
+      WT_LINE="worktree $path ($b): ignored files ($n: $paths), kept"
+    else
+      paths="$(printf '%s\n' "$ignored_files" | head -5 | paste -sd, - | sed 's/,/, /g')"
+      rem=$((n - 5))
+      WT_LINE="worktree $path ($b): ignored files ($n: $paths, and $rem more), kept"
+    fi
+    return 0
+  fi
+}
+
+_collect_noteworthy_worktrees() {
+  local main_wt_p
+  main_wt_p="$(cd "$AUDIT_ROOT" 2>/dev/null && pwd -P)"
+  while IFS='|' read -r path br detached || [ -n "$path" ]; do
+    [ -n "$path" ] || continue
+    [ "$(cd "$path" 2>/dev/null && pwd -P)" = "$main_wt_p" ] && continue
+
+    if [ "$detached" -eq 1 ]; then
+      printf '  worktree %s: detached HEAD, not managed\n' "$path" >> "$_AUDIT_TMP/worktree_lines.txt"
+    elif [ ! -d "$path" ]; then
+      printf '  worktree %s: directory missing, metadata prunable\n' "$path" >> "$_AUDIT_TMP/worktree_lines.txt"
+    else
+      _inspect_worktree "$path" "$br"
+      if [ -n "$WT_LINE" ]; then
+        printf '  %s\n' "$WT_LINE" >> "$_AUDIT_TMP/worktree_lines.txt"
+      fi
+    fi
+  done < "$_AUDIT_TMP/worktrees.txt"
+}
+
+_verify_and_record_merged() {
+  local b="$1" T="$2" m_num="$3" m_base="$4" m_moid="$5" is_behind="$6"
+  local wt_main="$7" wt_p="$8" wt_b="$9"
+
+  local def_branch dest_ref="" dest_ok=0
+  def_branch="$(_default_branch)"
+  if git rev-parse --verify --quiet "refs/remotes/origin/$m_base" >/dev/null 2>&1; then
+    dest_ref="refs/remotes/origin/$m_base"
+  elif [ -n "$def_branch" ] && git rev-parse --verify --quiet "refs/remotes/origin/$def_branch" >/dev/null 2>&1; then
+    dest_ref="refs/remotes/origin/$def_branch"
+  elif git rev-parse --verify --quiet "refs/heads/$m_base" >/dev/null 2>&1; then
+    dest_ref="refs/heads/$m_base"
+  fi
+
+  if [ -n "$m_moid" ] && [ -n "$dest_ref" ]; then
+    if git cat-file -e "$m_moid^{commit}" 2>/dev/null; then
+      if git merge-base --is-ancestor "$m_moid" "$dest_ref" 2>/dev/null; then
+        dest_ok=1
+      fi
+    fi
+  fi
+
+  if [ "$dest_ok" -eq 0 ]; then
+    local oid12="${m_moid:0:12}"
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: merged pull request #%s, but %s is not in %s history, kept\n' "$b" "$m_num" "$oid12" "$m_base" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  printf '%s\n' "$m_num" >> "$_AUDIT_TMP/merged_prs.txt"
+
+  if [ "$wt_main" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: checked out in the main worktree, kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ -n "$wt_b" ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: pull request #%s merged, worktree %s %s, kept\n' "$b" "$m_num" "$wt_p" "$wt_b" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  AUDIT_R=$((AUDIT_R + 1))
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$b" "$m_num" "$T" "$m_moid" "$m_base" "$wt_p" >> "$_AUDIT_TMP/removable.txt"
+  if [ "$is_behind" -eq 1 ]; then
+    printf '  branch %s: pull request #%s merged, local behind its head, safe to remove\n' "$b" "$m_num" >> "$_AUDIT_TMP/branch_lines.txt"
+  else
+    printf '  branch %s: pull request #%s merged, safe to remove\n' "$b" "$m_num" >> "$_AUDIT_TMP/branch_lines.txt"
+  fi
+  if [ -n "$wt_p" ]; then
+    printf '    worktree %s holds it, so remove that first\n' "$wt_p" >> "$_AUDIT_TMP/branch_lines.txt"
+  fi
+  return 0
+}
+
+_evaluate_branch_prs() {
+  local b="$1" T="$2" pr_records="$3" wt_path="$4" wt_is_main="$5" wt_blocker="$6"
+
+  local has_open_exact=0 open_exact_num=""
+  local has_merged_exact=0 merged_exact_num="" merged_exact_base="" merged_exact_moid=""
+  local has_closed_exact=0 closed_exact_num=""
+
+  local has_ahead=0 ahead_num="" ahead_state=""
+  local has_merged_behind=0 merged_behind_num="" merged_behind_base="" merged_behind_moid=""
+  local has_open_behind=0 open_behind_num=""
+  local has_closed_behind=0 closed_behind_num=""
+  local has_diverged=0 diverged_num=""
+  local has_unresolved=0 unres_reason=""
+
+  while IFS= read -r rec || [ -n "$rec" ]; do
+    [ -n "$rec" ] || continue
+    local num state head head_oid base merge_oid
+    num="$(printf '%s' "$rec" | sed -n 's/.*"number":[[:space:]]*\([0-9]*\).*/\1/p')"
+    state="$(printf '%s' "$rec" | sed -n 's/.*"state":[[:space:]]*"\([A-Z]*\)".*/\1/p')"
+    head="$(printf '%s' "$rec" | sed -n 's/.*"headRefName":[[:space:]]*"\([^"]*\)".*/\1/p')"
+    head_oid="$(printf '%s' "$rec" | sed -n 's/.*"headRefOid":[[:space:]]*"\([^"]*\)".*/\1/p')"
+    base="$(printf '%s' "$rec" | sed -n 's/.*"baseRefName":[[:space:]]*"\([^"]*\)".*/\1/p')"
+    merge_oid="$(printf '%s' "$rec" | sed -n 's/.*"mergeCommit":[[:space:]]*{"oid":[[:space:]]*"\([^"]*\)"}.*/\1/p')"
+
+    if [ "$T" != "$head_oid" ] && ! git cat-file -e "$head_oid^{commit}" 2>/dev/null; then
+      git fetch -q origin "$b" 2>/dev/null || true
+    fi
+
+    if [ "$T" != "$head_oid" ] && ! git cat-file -e "$head_oid^{commit}" 2>/dev/null; then
+      has_unresolved=1
+      unres_reason="lineage unverifiable"
+    elif [ "$T" = "$head_oid" ]; then
+      if [ "$state" = "OPEN" ]; then
+        has_open_exact=1
+        open_exact_num="$num"
+      elif [ "$state" = "CLOSED" ]; then
+        has_closed_exact=1
+        closed_exact_num="$num"
+      elif [ "$state" = "MERGED" ]; then
+        has_merged_exact=1
+        merged_exact_num="$num"
+        merged_exact_base="$base"
+        merged_exact_moid="$merge_oid"
+      fi
+    elif git merge-base --is-ancestor "$head_oid" "$T" 2>/dev/null; then
+      has_ahead=1
+      ahead_num="$num"
+      ahead_state="$state"
+    elif git merge-base --is-ancestor "$T" "$head_oid" 2>/dev/null; then
+      if [ "$state" = "MERGED" ]; then
+        has_merged_behind=1
+        merged_behind_num="$num"
+        merged_behind_base="$base"
+        merged_behind_moid="$merge_oid"
+      elif [ "$state" = "OPEN" ]; then
+        has_open_behind=1
+        open_behind_num="$num"
+      else
+        has_closed_behind=1
+        closed_behind_num="$num"
+      fi
+    else
+      has_diverged=1
+      diverged_num="$num"
+    fi
+  done <<EOF
+$pr_records
+EOF
+
+  if [ "$has_open_exact" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: pull request #%s open, kept\n' "$b" "$open_exact_num" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ "$has_merged_exact" -eq 1 ]; then
+    _verify_and_record_merged "$b" "$T" "$merged_exact_num" "$merged_exact_base" "$merged_exact_moid" 0 "$wt_is_main" "$wt_path" "$wt_blocker"
+    return 0
+  fi
+
+  if [ "$has_closed_exact" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: pull request #%s closed unmerged, kept\n' "$b" "$closed_exact_num" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ "$has_ahead" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: commits past pull request #%s (%s), kept\n' "$b" "$ahead_num" "$ahead_state" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ "$has_open_behind" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: pull request #%s open, kept\n' "$b" "$open_behind_num" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ "$has_merged_behind" -eq 1 ]; then
+    _verify_and_record_merged "$b" "$T" "$merged_behind_num" "$merged_behind_base" "$merged_behind_moid" 1 "$wt_is_main" "$wt_path" "$wt_blocker"
+    return 0
+  fi
+
+  if [ "$has_closed_behind" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: pull request #%s closed unmerged, kept\n' "$b" "$closed_behind_num" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ "$has_diverged" -eq 1 ]; then
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: diverged from pull request #%s head, kept\n' "$b" "$diverged_num" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  if [ "$has_unresolved" -eq 1 ]; then
+    AUDIT_J=$((AUDIT_J + 1))
+    AUDIT_KEPT=$((AUDIT_KEPT + 1))
+    printf '  branch %s: unresolved (%s), kept\n' "$b" "${unres_reason:-lineage unverifiable}" >> "$_AUDIT_TMP/branch_lines.txt"
+    return 0
+  fi
+
+  AUDIT_KEPT=$((AUDIT_KEPT + 1))
+  printf '  branch %s: no pull request found, kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+}
+
+_audit_resolve() {
+  [ -n "$_AUDIT_TMP" ] && rm -rf "$_AUDIT_TMP"
+  _AUDIT_TMP="$(mktemp -d)"
+  AUDIT_ROOT="$(_toplevel)"
+  AUDIT_REPO="$(_github_identity || true)"
+  local main_wt_p
+  main_wt_p="$(cd "$AUDIT_ROOT" 2>/dev/null && pwd -P)"
+
+  git for-each-ref --format='%(refname:short)' refs/heads > "$_AUDIT_TMP/branches.txt"
+  AUDIT_NB="$(wc -l < "$_AUDIT_TMP/branches.txt" | tr -d ' ')"
+
+  _worktrees_data > "$_AUDIT_TMP/worktrees.txt"
+  AUDIT_MW="$(wc -l < "$_AUDIT_TMP/worktrees.txt" | tr -d ' ')"
+
+  AUDIT_P=0
+  AUDIT_K=0
+  AUDIT_J=0
+  AUDIT_R=0
+  AUDIT_KEPT=0
+
+  touch "$_AUDIT_TMP/branch_lines.txt"
+  touch "$_AUDIT_TMP/worktree_lines.txt"
+  touch "$_AUDIT_TMP/removable.txt"
+  touch "$_AUDIT_TMP/merged_prs.txt"
+  touch "$_AUDIT_TMP/bases.txt"
+
+  local def_branch
+  def_branch="$(_default_branch)"
+
+  if [ -z "$AUDIT_REPO" ]; then
+    while IFS= read -r b || [ -n "$b" ]; do
+      [ -n "$b" ] || continue
+      case "$b" in
+        main|master|integration/*|release/*)
+          AUDIT_P=$((AUDIT_P + 1)) ;;
+        *)
+          if [ -n "$def_branch" ] && [ "$b" = "$def_branch" ]; then
+            AUDIT_P=$((AUDIT_P + 1))
+          else
+            AUDIT_J=$((AUDIT_J + 1))
+            AUDIT_KEPT=$((AUDIT_KEPT + 1))
+            printf '  branch %s: unresolved (no GitHub identity), kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+          fi
+          ;;
+      esac
+    done < "$_AUDIT_TMP/branches.txt"
+
+    AUDIT_SCOPE_LINE="  audit $AUDIT_ROOT: no GitHub identity (origin missing or unparseable); pull-request state unresolved for all $AUDIT_J branches"
+    _collect_noteworthy_worktrees
+    AUDIT_SUMMARY_LINE="  0 removable, $AUDIT_KEPT kept, $AUDIT_J unresolved, across $AUDIT_NB branches and $AUDIT_MW worktrees"
+    return 0
+  fi
+
+  local bulk_file="$_AUDIT_TMP/bulk.json"
+  local gh_ok=0
+  if "$GH" pr list -R "$AUDIT_REPO" --state all --limit "$BULK_LIMIT" \
+       --json number,state,headRefName,headRefOid,baseRefName,mergeCommit,mergedAt,closedAt > "$bulk_file" 2>/dev/null; then
+    gh_ok=1
+    local nl="
+"
+    sed -e "s/},[[:space:]]*{/}\\${nl}{/g" -e 's/"headRefName":[[:space:]]*"/"headRefName":"/g' "$bulk_file" > "$_AUDIT_TMP/prs.txt"
+  fi
+
+  if [ "$gh_ok" -eq 0 ]; then
+    while IFS= read -r b || [ -n "$b" ]; do
+      [ -n "$b" ] || continue
+      case "$b" in
+        main|master|integration/*|release/*)
+          AUDIT_P=$((AUDIT_P + 1)) ;;
+        *)
+          if [ -n "$def_branch" ] && [ "$b" = "$def_branch" ]; then
+            AUDIT_P=$((AUDIT_P + 1))
+          else
+            AUDIT_J=$((AUDIT_J + 1))
+            AUDIT_KEPT=$((AUDIT_KEPT + 1))
+            printf '  branch %s: unresolved (no answer from GitHub), kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+          fi
+          ;;
+      esac
+    done < "$_AUDIT_TMP/branches.txt"
+
+    AUDIT_SCOPE_LINE="  audit $AUDIT_REPO at $AUDIT_ROOT: $AUDIT_NB branches ($AUDIT_P protected), $AUDIT_MW worktrees, 0 pull requests resolved, $AUDIT_J unresolved"
+    _collect_noteworthy_worktrees
+    AUDIT_SUMMARY_LINE="  0 removable, $AUDIT_KEPT kept, $AUDIT_J unresolved, across $AUDIT_NB branches and $AUDIT_MW worktrees"
+    return 0
+  fi
+
+  sed -n 's/.*"baseRefName":[[:space:]]*"\([^"]*\)".*/\1/p' "$_AUDIT_TMP/prs.txt" | sort -u > "$_AUDIT_TMP/bases.txt"
+  if [ -n "$def_branch" ]; then
+    printf '%s\n' "$def_branch" >> "$_AUDIT_TMP/bases.txt"
+  fi
+  printf 'main\nmaster\n' >> "$_AUDIT_TMP/bases.txt"
+  sort -u -o "$_AUDIT_TMP/bases.txt" "$_AUDIT_TMP/bases.txt"
+
+  while IFS= read -r b || [ -n "$b" ]; do
+    [ -n "$b" ] || continue
+    if grep -qx "$b" "$_AUDIT_TMP/bases.txt" 2>/dev/null; then
+      AUDIT_P=$((AUDIT_P + 1))
+      continue
+    fi
+    case "$b" in
+      integration/*|release/*)
+        AUDIT_P=$((AUDIT_P + 1))
+        continue
+        ;;
+    esac
+
+    if printf '%s' "$b" | grep -q '"'; then
+      AUDIT_J=$((AUDIT_J + 1))
+      AUDIT_KEPT=$((AUDIT_KEPT + 1))
+      printf '  branch %s: unresolved (branch name contains quote), kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+      continue
+    fi
+
+    local matching_prs
+    matching_prs="$(grep -F "\"headRefName\":\"$b\"" "$_AUDIT_TMP/prs.txt" || true)"
+    if [ -z "$matching_prs" ]; then
+      local target_file="$_AUDIT_TMP/target-$$.json"
+      if "$GH" pr list -R "$AUDIT_REPO" --head "$b" --state all --limit "$BULK_LIMIT" \
+           --json number,state,headRefName,headRefOid,baseRefName,mergeCommit,mergedAt,closedAt > "$target_file" 2>/dev/null; then
+        if grep -q '\[[[:space:]]*\]' "$target_file"; then
+          AUDIT_KEPT=$((AUDIT_KEPT + 1))
+          printf '  branch %s: no pull request found, kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+          rm -f "$target_file"
+          continue
+        else
+          local nl="
+"
+          sed -e "s/},[[:space:]]*{/}\\${nl}{/g" -e 's/"headRefName":[[:space:]]*"/"headRefName":"/g' "$target_file" >> "$_AUDIT_TMP/prs.txt"
+          sed -n 's/.*"baseRefName":[[:space:]]*"\([^"]*\)".*/\1/p' "$target_file" >> "$_AUDIT_TMP/bases.txt"
+          sort -u -o "$_AUDIT_TMP/bases.txt" "$_AUDIT_TMP/bases.txt"
+          rm -f "$target_file"
+          matching_prs="$(grep -F "\"headRefName\":\"$b\"" "$_AUDIT_TMP/prs.txt" || true)"
+        fi
+      else
+        AUDIT_J=$((AUDIT_J + 1))
+        AUDIT_KEPT=$((AUDIT_KEPT + 1))
+        printf '  branch %s: unresolved (no answer from GitHub), kept\n' "$b" >> "$_AUDIT_TMP/branch_lines.txt"
+        rm -f "$target_file"
+        continue
+      fi
+    fi
+
+    AUDIT_K=$((AUDIT_K + 1))
+
+    local wt_info wt_path="" wt_blocker="" wt_is_main=0
+    wt_info="$(awk -v br="$b" -F'|' '$2==br {print $1 "|" $3; exit}' "$_AUDIT_TMP/worktrees.txt")"
+    if [ -n "$wt_info" ]; then
+      wt_path="$(printf '%s' "$wt_info" | cut -d'|' -f1)"
+      if [ "$(cd "$wt_path" 2>/dev/null && pwd -P)" = "$main_wt_p" ]; then
+        wt_is_main=1
+      else
+        _inspect_worktree "$wt_path" "$b"
+        wt_blocker="$WT_BLOCKER"
+      fi
+    fi
+
+    local T
+    T="$(git rev-parse "refs/heads/$b")"
+
+    _evaluate_branch_prs "$b" "$T" "$matching_prs" "$wt_path" "$wt_is_main" "$wt_blocker"
+  done < "$_AUDIT_TMP/branches.txt"
+
+  _collect_noteworthy_worktrees
+
+  AUDIT_SCOPE_LINE="  audit $AUDIT_REPO at $AUDIT_ROOT: $AUDIT_NB branches ($AUDIT_P protected), $AUDIT_MW worktrees, $AUDIT_K pull requests resolved, $AUDIT_J unresolved"
+  AUDIT_SUMMARY_LINE="  $AUDIT_R removable, $AUDIT_KEPT kept, $AUDIT_J unresolved, across $AUDIT_NB branches and $AUDIT_MW worktrees"
+}
+
+_check_roadmap_for_merged_prs() {
+  [ -f "$_AUDIT_TMP/merged_prs.txt" ] || return 0
+  [ -s "$_AUDIT_TMP/merged_prs.txt" ] || return 0
+  [ -n "$AUDIT_REPO" ] || return 0
+
+  local road next_lines seen_issues hits target abs rel blob status
+  road="$(_roadmap || true)"
+  [ -n "$road" ] || return 0
+  next_lines="$(_next_section "$road")"
+  [ -n "$next_lines" ] || return 0
+
+  seen_issues="$_AUDIT_TMP/seen_issues.txt"
+  touch "$seen_issues"
+
+  for n in $(sort -u "$_AUDIT_TMP/merged_prs.txt"); do
+    local view_json
+    view_json="$("$GH" pr view "$n" -R "$AUDIT_REPO" --json closingIssuesReferences 2>/dev/null || true)"
+    for i in $(printf '%s' "$view_json" | grep -o '"number":[0-9]*' | cut -d: -f2); do
+      if grep -qx "$i" "$seen_issues" 2>/dev/null; then
+        continue
+      fi
+      printf '%s\n' "$i" >> "$seen_issues"
+      hits="$(printf '%s\n' "$next_lines" | grep -n "#$i\b" || true)"
+      [ -n "$hits" ] || continue
+      printf '  %s  a Next line names issue %s, which pull request %s closed\n' "$road" "$i" "$n"
+      for target in $(printf '%s\n' "$hits" | grep -oE '\]\([^)]+\.md\)' | tr -d ']()'); do
+        abs="$(cd "$(dirname "$road")" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null \
+               && printf '%s/%s' "$(pwd -P)" "$(basename "$target")")"
+        [ -n "$abs" ] || continue
+        rel="${abs#$AUDIT_ROOT/}"
+        printf '%s' "$rel" | grep -qE "$LIFECYCLE_RE" || continue
+        blob="$(_blob HEAD "$rel")" || continue
+        status="$(_scalar_field "$blob" status)"; rm -f "$blob"
+        [ "$status" = "shipped" ] || printf '    %s:1  linked there but status is %s\n' "$rel" "${status:-absent}"
+      done
+    done
+  done
+}
+
+cmd_audit() {
+  _audit_resolve
+  printf '%s\n' "$AUDIT_SCOPE_LINE"
+  [ -s "$_AUDIT_TMP/branch_lines.txt" ] && cat "$_AUDIT_TMP/branch_lines.txt"
+  [ -s "$_AUDIT_TMP/worktree_lines.txt" ] && cat "$_AUDIT_TMP/worktree_lines.txt"
+
+  _check_roadmap_for_merged_prs
+
+  if [ -n "$AUDIT_REPO" ]; then
+    local pruned
+    pruned="$(git remote prune --dry-run origin 2>/dev/null | sed -n 's/^ \* \[would prune\] /    /p')"
+    [ -n "$pruned" ] && printf '  stale remote refs:\n%s\n' "$pruned"
+  fi
+
+  printf '%s\n' "$AUDIT_SUMMARY_LINE"
+  if [ "$AUDIT_R" -gt 0 ]; then
+    printf '\n  housekeep fix\n\n'
+  fi
+  return 0
+}
+
+cmd_check() { # cmd_check -> always exits 0; it reports, it never refuses
+  local repo
+  repo="$(_github_identity || true)"
+
+  if ! git rev-parse --verify --quiet ORIG_HEAD >/dev/null 2>&1; then
+    printf '  no ORIG_HEAD; nothing to compare this pull against — run housekeep audit for a full inventory\n'
+    if ! git remote prune --dry-run origin >/dev/null 2>&1; then
+      printf '  could not contact origin; stale-ref state unknown\n'
+    else
+      local pruned
+      pruned="$(git remote prune --dry-run origin 2>/dev/null | sed -n 's/^ \* \[would prune\] /    /p')"
+      [ -n "$pruned" ] && printf '  stale remote refs:\n%s\n' "$pruned"
+    fi
+    printf '  full branch inventory: housekeep audit\n'
+    return 0
+  fi
+
+  local a12 b12 subjects prs n state head road next_lines hits found=0 wt target status
+  a12="$(git rev-parse ORIG_HEAD 2>/dev/null | cut -c1-12)"
+  b12="$(git rev-parse HEAD 2>/dev/null | cut -c1-12)"
+  subjects="$(git log --format='%s' ORIG_HEAD..HEAD 2>/dev/null | wc -l | tr -d ' ')"
+  prs="$(_merged_prs)"
+  road="$(_roadmap || true)"
+  [ -n "$road" ] && next_lines="$(_next_section "$road")"
+
+  local resolved_prs=0
+  local findings_tmp
+  findings_tmp="$(mktemp)"
+
+  for n in $prs; do
+    local json
+    if [ -n "$repo" ]; then
+      json="$("$GH" pr view "$n" -R "$repo" --json state,headRefName,closingIssuesReferences 2>/dev/null)" || {
+        printf '  pull request %s: no answer from GitHub, unresolved\n' "$n" >> "$findings_tmp"
+        continue
+      }
+    else
+      json="$("$GH" pr view "$n" --json state,headRefName,closingIssuesReferences 2>/dev/null)" || {
+        printf '  pull request %s: no answer from GitHub, unresolved\n' "$n" >> "$findings_tmp"
+        continue
+      }
+    fi
+    resolved_prs=$((resolved_prs + 1))
+    state="$(printf '%s' "$json" | sed -n 's/.*"state":"\([A-Z]*\)".*/\1/p')"
+    [ "$state" = "MERGED" ] || continue
+    head="$(printf '%s' "$json" | sed -n 's/.*"headRefName":"\([^"]*\)".*/\1/p')"
+
+    if [ -n "$head" ] && git show-ref --verify --quiet "refs/heads/$head"; then
+      printf '  pull request %s merged, branch %s still here\n' "$n" "$head" >> "$findings_tmp"
+      wt="$(_worktree_for "$head")"
+      [ -n "$wt" ] && printf '    worktree %s holds it, so remove that first\n' "$wt" >> "$findings_tmp"
+      found=1
+    fi
+
+    for i in $(printf '%s' "$json" | grep -o '"number":[0-9]*' | cut -d: -f2); do
+      hits="$(printf '%s\n' "$next_lines" | grep -n "#$i\b" || true)"
+      [ -n "$hits" ] || continue
+      printf '  %s  a Next line names issue %s, which pull request %s closed\n' "$road" "$i" "$n" >> "$findings_tmp"
+      found=1
+      for target in $(printf '%s\n' "$hits" | grep -oE '\]\([^)]+\.md\)' | tr -d ']()'); do
+        local abs rel blob
+        abs="$(cd "$(dirname "$road")" 2>/dev/null && cd "$(dirname "$target")" 2>/dev/null \
+               && printf '%s/%s' "$(pwd -P)" "$(basename "$target")")"
+        [ -n "$abs" ] || continue
+        rel="${abs#$(git rev-parse --show-toplevel)/}"
+        printf '%s' "$rel" | grep -qE "$LIFECYCLE_RE" || continue
+        blob="$(_blob HEAD "$rel")" || continue
+        status="$(_scalar_field "$blob" status)"; rm -f "$blob"
+        [ "$status" = "shipped" ] || printf '    %s:1  linked there but status is %s\n' "$rel" "${status:-absent}" >> "$findings_tmp"
+      done
+    done
+  done
+
+  printf '  last pull ORIG_HEAD..HEAD (%s..%s): %s subjects, %s pull requests resolved\n' "$a12" "$b12" "$subjects" "$resolved_prs"
+
+  [ -s "$findings_tmp" ] && cat "$findings_tmp"
+  rm -f "$findings_tmp"
+
+  if ! git remote prune --dry-run origin >/dev/null 2>&1; then
+    printf '  could not contact origin; stale-ref state unknown\n'
+  else
+    local pruned
+    pruned="$(git remote prune --dry-run origin 2>/dev/null | sed -n 's/^ \* \[would prune\] /    /p')"
+    if [ -n "$pruned" ]; then
+      printf '  stale remote refs:\n%s\n' "$pruned"
+      found=1
+    fi
+  fi
+
+  [ "$found" -eq 1 ] && printf '\n  housekeep fix\n\n'
+  printf '  full branch inventory: housekeep audit\n'
+  return 0
+}
+
+cmd_fix() { # cmd_fix -> removes a merged branch and its worktree, locally only
+  _audit_resolve
+  if [ "$AUDIT_R" -eq 0 ]; then
+    printf '  nothing to do\n'
+    return 0
+  fi
+
+  local fetch_err fetch_detail
+  if ! fetch_err="$(git fetch origin 2>&1)"; then
+    fetch_detail="$(printf '%s' "$fetch_err" | tr '\n' ' ' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    printf '  fetch from origin failed (%s); nothing was deleted\n' "$fetch_detail"
+    printf '  inventory: %s branches, %s worktrees\n' "$AUDIT_NB" "$AUDIT_MW"
+    return 0
+  fi
+
+  local did=0 curr_wt_branch
+  curr_wt_branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+
+  while IFS=$'\t' read -r b num tip moid base wt || [ -n "$b" ]; do
+    [ -n "$b" ] || continue
+
+    local recheck_json recheck_state
+    recheck_json="$("$GH" pr view "$num" -R "$AUDIT_REPO" --json state 2>/dev/null || true)"
+    recheck_state="$(printf '%s' "$recheck_json" | sed -n 's/.*"state":[[:space:]]*"\([A-Z]*\)".*/\1/p')"
+    if [ "$recheck_state" != "MERGED" ]; then
+      printf '  branch %s no longer removable (pull request #%s is %s), kept\n' "$b" "$num" "${recheck_state:-unknown}"
+      continue
+    fi
+
+    local cur_tip
+    cur_tip="$(git rev-parse "refs/heads/$b" 2>/dev/null || true)"
+    if [ "$cur_tip" != "$tip" ]; then
+      printf '  branch %s no longer removable (local tip changed), kept\n' "$b"
+      continue
+    fi
+
+    local def_branch dest_ref="" dest_ok=0
+    def_branch="$(_default_branch)"
+    if git rev-parse --verify --quiet "refs/remotes/origin/$base" >/dev/null 2>&1; then
+      dest_ref="refs/remotes/origin/$base"
+    elif [ -n "$def_branch" ] && git rev-parse --verify --quiet "refs/remotes/origin/$def_branch" >/dev/null 2>&1; then
+      dest_ref="refs/remotes/origin/$def_branch"
+    elif git rev-parse --verify --quiet "refs/heads/$base" >/dev/null 2>&1; then
+      dest_ref="refs/heads/$base"
+    fi
+
+    if [ -n "$moid" ] && [ -n "$dest_ref" ]; then
+      if git cat-file -e "$moid^{commit}" 2>/dev/null; then
+        if git merge-base --is-ancestor "$moid" "$dest_ref" 2>/dev/null; then
+          dest_ok=1
+        fi
+      fi
+    fi
+    if [ "$dest_ok" -eq 0 ]; then
+      printf '  branch %s no longer removable (merge commit not in %s history), kept\n' "$b" "$base"
+      continue
+    fi
+
+    if [ "$b" = "$curr_wt_branch" ]; then
+      printf '  branch %s no longer removable (checked out in current worktree), kept\n' "$b"
+      continue
+    fi
+
+    if [ -n "$wt" ]; then
+      if [ ! -d "$wt" ]; then
+        printf '  branch %s no longer removable (worktree directory missing), kept\n' "$b"
+        continue
+      fi
+      local admin_dir
+      admin_dir="$(git -C "$wt" rev-parse --git-dir 2>/dev/null || true)"
+      if [ -n "$admin_dir" ] && [ -f "$admin_dir/locked" ]; then
+        printf '  branch %s no longer removable (worktree is locked), kept\n' "$b"
+        continue
+      fi
+      local status_file
+      status_file="$(mktemp "${_AUDIT_TMP:-${TMPDIR:-/tmp}}/housekeep-fix-status.XXXXXX")"
+      if ! git -C "$wt" status --porcelain > "$status_file" 2>/dev/null; then
+        rm -f "$status_file"
+        printf '  branch %s no longer removable (git status failed), kept\n' "$b"
+        continue
+      fi
+      if [ -s "$status_file" ]; then
+        rm -f "$status_file"
+        printf '  branch %s no longer removable (worktree has uncommitted changes), kept\n' "$b"
+        continue
+      fi
+      rm -f "$status_file"
+
+      local ignored_file
+      ignored_file="$(mktemp "${_AUDIT_TMP:-${TMPDIR:-/tmp}}/housekeep-fix-ignored.XXXXXX")"
+      if ! git -C "$wt" status --porcelain --ignored > "$ignored_file" 2>/dev/null; then
+        rm -f "$ignored_file"
+        printf '  branch %s no longer removable (git status failed), kept\n' "$b"
+        continue
+      fi
+      if grep -q '^!! ' "$ignored_file"; then
+        rm -f "$ignored_file"
+        printf '  branch %s no longer removable (worktree holds ignored files), kept\n' "$b"
+        continue
+      fi
+      rm -f "$ignored_file"
+
+      if git worktree remove "$wt" 2>/dev/null; then
+        printf '  removed worktree %s\n' "$wt"
+        did=1
+      else
+        printf '  worktree %s could not be removed, branch %s stays\n' "$wt" "$b" >&2
+        continue
+      fi
+    fi
+
+    if git branch -D "$b" >/dev/null 2>&1; then
+      printf '  deleted branch %s\n' "$b"
+      did=1
+    fi
+  done < "$_AUDIT_TMP/removable.txt"
+
+  if git remote prune origin 2>/dev/null | awk '/\[pruned\]/ { found=1 } END { exit !found }'; then
+    printf '  pruned stale remote refs\n'
+    did=1
+  fi
+  if git worktree prune --verbose 2>&1 | awk '{ found=1 } END { exit !found }'; then
+    printf '  pruned worktree metadata\n'
+    did=1
+  fi
+
+  if [ "$did" -eq 0 ]; then
+    printf '  nothing to do\n'
+  else
+    local new_nb new_mw
+    new_nb="$(git for-each-ref --format='%(refname)' refs/heads | wc -l | tr -d ' ')"
+    new_mw="$(git worktree list --porcelain | grep -c '^worktree ' || true)"
+    printf '  inventory: %s branches, %s worktrees\n' "$new_nb" "$new_mw"
+  fi
+  return 0
+}
+
+# --- entry point ------------------------------------------------------------
+
+cmd_check_push() { # cmd_check_push <base> <head>
+  local base="$1" head="$2" rc=0 f blob
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    blob="$(_blob "$head" "$f")" || continue
+    _check_frontmatter "$blob" "$f" "$head" || rc=1
+    rm -f "$blob"
+  done <<INNER
+$(_lifecycle_files "$base" "$head")
+INNER
+  _check_recently_shipped "$base" "$head" || rc=1
+  _check_changelog "$base" "$head" || rc=1
+  if [ "$rc" -ne 0 ]; then
+    printf '\nhousekeep: refusing the push.\n' >&2
+    printf '  Fix the findings above, or push with --no-verify to override.\n\n' >&2
+  fi
+  return $rc
+}
+
+case "${1:-}" in
+  check)
+    shift
+    if [ "${1:-}" = "--push" ]; then shift; cmd_check_push "${1:?base}" "${2:?head}"; exit $?; fi
+    cmd_check; exit 0 ;;
+  audit) cmd_audit; exit 0 ;;
+  fix) cmd_fix; exit 0 ;;
+  *) printf 'usage: housekeep check [--push <base> <head>] | housekeep audit | housekeep fix\n' >&2; exit 2 ;;
+esac
