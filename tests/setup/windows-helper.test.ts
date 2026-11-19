@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { runWindowsLifecycleJob, defaultWindowsHelperDependencies } from "../../src/lifecycle/windows.js";
+import packageMetadata from "../../package.json" with { type: "json" };
 
 test("Windows x64 uses a packaged executable and rejects unqualified architectures", () => {
   const base={platform:"win32",arch:"x64",standalone:false,entryPath:path.resolve("dist/npm/chat-harness.js"),executablePath:"unused"};
@@ -41,7 +42,7 @@ test.skipIf(!enabled)("Windows software update verifies the actual renamed helpe
     copyFileSync(verifiedMacosHelper(runtime),helper);
     const digest=createHash("sha256").update(readFileSync(helper)).digest("hex");
     writeFileSync(helper+".sha256",digest+"  "+path.basename(helper)+"\n");
-    await runWindowsLifecycleJob({schema:1,action:"replace",parentPid:1,target,staged,expectedVersion:"0.3.7",backupPath:backup,
+    await runWindowsLifecycleJob({schema:1,action:"replace",parentPid:1,target,staged,expectedVersion:packageMetadata.version,backupPath:backup,
       nativeHelper:{staged:helper,backupPath:backup+".windows-safe-move.exe",digest},helperPath:"unused",jobPath:"unused"},
       {...defaultWindowsHelperDependencies,isProcessRunning:()=>false,scheduleCleanup:()=>{}});
     expect(verifiedMacosHelper({...runtime,standalone:true,executablePath:target})).toBe(target+".windows-safe-move.exe");
